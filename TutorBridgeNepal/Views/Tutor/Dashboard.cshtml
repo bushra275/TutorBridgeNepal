@@ -1,0 +1,250 @@
+﻿@{
+    ViewData["Title"] = "Tutor Dashboard";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tutor Dashboard - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <div class="dash-search">
+                <input type="text" placeholder="Search students, sessions..." />
+            </div>
+            <span class="badge-soft availability-pill"><span class="avail-dot"></span> Available now</span>
+            <div class="dash-topbar-right">
+                <a href="#" class="icon-btn" title="Notifications">
+                    🔔
+                    <span class="dot"></span>
+                </a>
+                <div class="topbar-avatar">RP</div>
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    <div class="avatar">RP</div>
+                    <div>
+                        <div class="name">Ram Prasad Shrestha</div>
+                        <div class="meta">Mathematics · Kathmandu</div>
+                        <span class="role-chip">Tutor</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a href="#" class="active"><span class="nav-icon">🏠</span> Dashboard</a></li>
+                    <li><a href="#"><span class="nav-icon">🗓️</span> My Schedule</a></li>
+                    <li><a href="#"><span class="nav-icon">📥</span> Session Requests <span class="badge-count">2</span></a></li>
+                    <li><a href="#"><span class="nav-icon">👥</span> My Students</a></li>
+                    <li><a href="#"><span class="nav-icon">💬</span> Messages <span class="badge-count">4</span></a></li>
+                    <li><a href="#"><span class="nav-icon">⭐</span> Reviews</a></li>
+                    <li><a href="#"><span class="nav-icon">👤</span> My Profile</a></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><a href="#"><span class="nav-icon">⚙️</span> Settings</a></li>
+                    <li><a href="#"><span class="nav-icon">❓</span> Help &amp; Support</a></li>
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <main class="dash-main">
+                <div class="dash-greeting">
+                    <h1>Good morning, Ram Prasad 👋</h1>
+                    <p>Tuesday, 10 June 2025 · You have 2 sessions today</p>
+                </div>
+
+                <div class="stat-cards">
+                    <div class="stat-card">
+                        <div class="label">Total sessions</div>
+                        <div class="value">312</div>
+                        <div class="delta">+8 this month</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Active students</div>
+                        <div class="value">18</div>
+                        <div class="delta">+2 this month</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Hours taught</div>
+                        <div class="value">412h</div>
+                        <div class="sub">Lifetime total</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Avg rating</div>
+                        <div class="rating-value"><span class="value">4.9</span><span class="star">★</span></div>
+                        <div class="sub">128 reviews</div>
+                    </div>
+                </div>
+
+                <div class="dash-columns">
+                    <div>
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Today's schedule</h2>
+                                <span class="tag-count">2 today</span>
+                                <a href="#" class="view-all-link panel-action" style="margin:0;">View calendar →</a>
+                            </div>
+
+                            <div class="session-card">
+                                <div class="avatar">AS</div>
+                                <div class="session-info">
+                                    <div class="name">Aayusha Shrestha</div>
+                                    <div class="meta">Mathematics · Grade 11</div>
+                                    <div class="time">Today, 4:00 PM – 5:00 PM</div>
+                                </div>
+                                <div class="session-actions">
+                                    <span class="pill pill-confirmed">Confirmed</span>
+                                    <div class="session-btn-row">
+                                        <a href="#" class="mini-btn green">Start session</a>
+                                        <a href="#" class="mini-btn">Message student</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="session-card">
+                                <div class="avatar yellow">SK</div>
+                                <div class="session-info">
+                                    <div class="name">Suman Karki</div>
+                                    <div class="meta">Physics · Grade 12</div>
+                                    <div class="time">Today, 6:00 PM – 7:00 PM</div>
+                                </div>
+                                <div class="session-actions">
+                                    <span class="pill pill-confirmed">Confirmed</span>
+                                    <div class="session-btn-row">
+                                        <a href="#" class="mini-btn">View details</a>
+                                        <a href="#" class="mini-btn">Message student</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Pending session requests</h2>
+                                <span class="tag-count" style="background:#fff1d5;color:#a96808;">2</span>
+                            </div>
+
+                            <div class="request-card">
+                                <div class="avatar purple">PT</div>
+                                <div class="request-info">
+                                    <div class="name">Priya Tamang</div>
+                                    <div class="meta">Mathematics · Requested for 12 Jun, 3:00 PM</div>
+                                    <div class="ago">Requested 20 minutes ago</div>
+                                </div>
+                                <div class="request-actions">
+                                    <a href="#" class="mini-btn green">Accept</a>
+                                    <a href="#" class="mini-btn danger">Decline</a>
+                                    <a href="#" class="mini-btn">Propose new time</a>
+                                </div>
+                            </div>
+
+                            <div class="request-card">
+                                <div class="avatar">RB</div>
+                                <div class="request-info">
+                                    <div class="name">Rina Bhattarai</div>
+                                    <div class="meta">Mathematics · Requested for 13 Jun, 10:00 AM</div>
+                                    <div class="ago">Requested 1 hour ago</div>
+                                </div>
+                                <div class="request-actions">
+                                    <a href="#" class="mini-btn green">Accept</a>
+                                    <a href="#" class="mini-btn danger">Decline</a>
+                                    <a href="#" class="mini-btn">Propose new time</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head"><h2>Recent sessions</h2></div>
+                            <table class="dash-table">
+                                <thead>
+                                    <tr><th>Student</th><th>Date</th><th>Duration</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Aayusha Shrestha</td><td>7 Jun 2025</td><td>1h 00m</td><td><span class="status-text completed">Completed</span></td></tr>
+                                    <tr><td>Anisha Maharjan</td><td>9 Jun 2025</td><td>1h 00m</td><td><span class="status-text completed">Completed</span></td></tr>
+                                    <tr><td>Bishal Shrestha</td><td>5 Jun 2025</td><td>1h 00m</td><td><span class="status-text missed">Missed</span></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>My students</h2>
+                                <a href="#" class="view-all-link panel-action" style="margin:0;">View all (18) →</a>
+                            </div>
+
+                            <div class="student-row">
+                                <div class="avatar">AS</div>
+                                <div class="student-info">
+                                    <div class="name">Aayusha Shrestha</div>
+                                    <div class="meta">Grade 11 · 12 sessions</div>
+                                    <div class="next">Next: Today 4:00 PM</div>
+                                </div>
+                                <a href="#" class="mini-btn">Message</a>
+                            </div>
+
+                            <div class="student-row">
+                                <div class="avatar yellow">AM</div>
+                                <div class="student-info">
+                                    <div class="name">Anisha Maharjan</div>
+                                    <div class="meta">Grade 10 · 8 sessions</div>
+                                    <div class="next">Next: 12 Jun, 2:00 PM</div>
+                                </div>
+                                <a href="#" class="mini-btn">Message</a>
+                            </div>
+
+                            <div class="student-row">
+                                <div class="avatar purple">BS</div>
+                                <div class="student-info">
+                                    <div class="name">Bishal Shrestha</div>
+                                    <div class="meta">Grade 11 · 6 sessions</div>
+                                    <div class="next">Next: Not scheduled</div>
+                                </div>
+                                <a href="#" class="mini-btn">Message</a>
+                            </div>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Recent reviews</h2>
+                                <a href="#" class="view-all-link panel-action" style="margin:0;">View all (128) →</a>
+                            </div>
+                            <div class="review-card">
+                                <div class="avatar">AS</div>
+                                <div class="review-body">
+                                    <div class="review-top">
+                                        <span class="name">Aayusha Shrestha</span>
+                                        <span class="when">2 days ago</span>
+                                    </div>
+                                    <div class="review-stars">★★★★★</div>
+                                    <p class="review-text">"Explains concepts so clearly! My SEE score improved from 68 to 89."</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

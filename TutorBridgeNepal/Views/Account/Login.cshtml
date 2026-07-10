@@ -1,0 +1,140 @@
+﻿@model TutorBridgeNepal.ViewModels.LoginViewModel
+@{
+    ViewData["Title"] = $"{Model.Role} Login";
+    var isTutor = Model.Role == "Tutor";
+    var isAdmin = Model.Role == "Admin";
+}
+
+<main class="auth-page">
+    <aside class="auth-side @(isTutor ? "tutor" : isAdmin ? "admin" : "")">
+        <div class="auth-side-content">
+            <h2 class="auth-logo @(isAdmin ? "" : "serif")">TutorBridge Nepal</h2>
+            <p class="auth-small">@(isAdmin ? "🛠 Admin Portal" : "Connecting learners with verified tutors")</p>
+
+            @if (isAdmin)
+            {
+                <h1 class="auth-side-title">Platform <span>administration</span><br />starts here.</h1>
+                <p class="auth-side-copy">Manage users · Verify tutors · Resolve complaints</p>
+            }
+            else if (isTutor)
+            {
+                <h1 class="auth-side-title">Teach Better.<br /><span>Earn More.</span><br />Inspire Always.</h1>
+                <p class="auth-side-copy">Join hundreds of verified tutors helping students across all 18 districts of Nepal.</p>
+            }
+            else
+            {
+                <h1 class="auth-side-title serif">Learn Better.<br /><span>Grow Faster.</span><br />Succeed Together.</h1>
+                <p class="auth-side-copy">Join thousands of students across Nepal getting personalised tutoring support.</p>
+            }
+
+            <div class="auth-stats">
+                <div class="auth-stat"><div><strong>@(isAdmin ? "1,284" : "500+")</strong><span>@(isAdmin ? "Total users" : "Verified Tutors")</span></div></div>
+                <div class="auth-stat"><div><strong>@(isAdmin ? "312" : "3,200+")</strong><span>@(isAdmin ? "Active tutors" : "Sessions Done")</span></div></div>
+                <div class="auth-stat"><div><strong>@(isAdmin ? "8,412" : "4.8★")</strong><span>@(isAdmin ? "Sessions" : "Avg. Rating")</span></div></div>
+            </div>
+
+            @if (!isAdmin)
+            {
+                <div class="quote-card">
+                    <p>"@(isTutor ? "TutorBridge gave me a platform to reach students across Kathmandu. My income doubled in 3 months!" : "TutorBridge helped me score a distinction in my SEE Math exam. The tutors are so patient!")"</p>
+                    <div class="quote-person">
+                        <div class="quote-avatar">@(isTutor ? "BK" : "PS")</div>
+                        <div><strong>@(isTutor ? "Bikash KC, Math Tutor" : "Priya Shrestha, Grade 10")</strong><br /><span class="auth-small">@(isTutor ? "Pokhara" : "Kathmandu")</span></div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="quote-card">
+                    <strong>🔒 Restricted access</strong>
+                    <p class="mb-0 mt-2">This portal is only for authorized platform administrators.</p>
+                </div>
+            }
+        </div>
+        <div class="auth-sdg">SDG 4: Quality Education</div>
+    </aside>
+
+    <section class="auth-main">
+        <div class="auth-top">
+            <a class="back-link" asp-controller="Role" asp-action="Select">← Back to role selection</a>
+            @if (isAdmin)
+            {
+                <div class="auth-switch">Not an administrator? <a class="tb-btn-outline green" asp-controller="Account" asp-action="Login" asp-route-role="Student">User login</a></div>
+            }
+        </div>
+
+        <div class="auth-panel @(isAdmin ? "admin-panel" : "")">
+            <div class="auth-heading">
+                @if (isAdmin)
+                {
+                    <div class="admin-chip">🛠 Admin access</div>
+                    <h1 class="mt-2">Admin sign in</h1>
+                    <p>Enter your administrator credentials</p>
+                }
+                else
+                {
+                    <h1 class="@(isTutor ? "" : "serif")">Welcome Back</h1>
+                    <p>Log in to your TutorBridge @(isTutor ? "tutor " : "")account</p>
+                }
+            </div>
+
+            @if (!isAdmin)
+            {
+                <div class="role-tabs">
+                    <a class="role-tab @(Model.Role == "Student" ? "active" : "")" asp-action="Login" asp-route-role="Student">Student</a>
+                    <a class="role-tab @(Model.Role == "Tutor" ? "active tutor" : "")" asp-action="Login" asp-route-role="Tutor">Tutor</a>
+                </div>
+            }
+
+            <form asp-action="Login" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="Role" />
+                <div asp-validation-summary="ModelOnly"></div>
+
+                <div class="field mb-3">
+                    <label asp-for="Email">@(isAdmin ? "Admin ID or email" : "Email Address")</label>
+                    <input asp-for="Email" class="tb-input" placeholder="@(isAdmin ? "name@tutorbridge.com" : isTutor ? "Enter your tutor email" : "Enter your email")" />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="Password">Password</label>
+                    <div class="password-wrap">
+                        <input asp-for="Password" type="password" class="tb-input" placeholder="Enter your password" />
+                        <span class="eye-dot"></span>
+                    </div>
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                </div>
+
+                @if (isAdmin)
+                {
+                    <p class="admin-note mt-2">If two-factor authentication is enabled on your account, you'll be asked for a code from your authenticator app on the next step.</p>
+                }
+
+                <div class="form-row-between">
+                    <label class="form-checkline"><input asp-for="RememberMe" class="box-check" /> @(isAdmin ? "Remember this device for 7 days" : "Remember me")</label>
+                    <a class="link-green" href="#">Forgot password?</a>
+                </div>
+
+                <button class="tb-btn @(isTutor ? "dark" : isAdmin ? "brown" : "") w-100" type="submit">@(isAdmin ? "Sign in to Admin Portal" : isTutor ? "Log In as Tutor" : "Log In")</button>
+
+                @if (isAdmin)
+                {
+                    <div class="admin-warning">⚠ Unauthorized access is logged and reported<br />All admin actions are recorded for security audits.</div>
+                    <p class="admin-note">Need admin access? Contact your platform supervisor.</p>
+                }
+            </form>
+
+            @if (!isAdmin)
+            {
+                <div class="divider">or continue with</div>
+                <button class="google-btn" type="button"><span class="g-dot">G</span><span>Sign in with Google</span><span></span></button>
+                <p class="auth-bottom">Don't have @(isTutor ? "a tutor " : "an ")account? <a class="link-green" asp-action="Register" asp-route-role="@Model.Role">@(isTutor ? "Register as Tutor" : "Create one free")</a></p>
+            }
+        </div>
+    </section>
+</main>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

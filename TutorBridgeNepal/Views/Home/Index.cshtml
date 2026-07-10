@@ -1,0 +1,149 @@
+﻿@model TutorBridgeNepal.ViewModels.HomeIndexViewModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<main class="home">
+    @await Html.PartialAsync("_HomeNav")
+
+    <section class="hero">
+        <div>
+            <div class="badge-soft">✓ Verified educators across Nepal</div>
+            <h1>Connect with the right <span>tutor</span> for any subject</h1>
+            <p>TutorBridge Nepal links students across the country with credential-verified tutors, making it easy to book sessions and track your progress along the way.</p>
+            <div class="hero-cta">
+                <a class="tb-btn" asp-controller="Account" asp-action="StudentRegister">Find a tutor</a>
+                <a class="tb-btn-outline" asp-controller="Account" asp-action="TutorRegister">Become a tutor</a>
+            </div>
+        </div>
+
+        <div class="search-panel">
+            <form class="search-box" asp-controller="Home" asp-action="FindTutors" method="get">
+                <input type="text" name="q" placeholder="Search by subject, level or tutor name..." />
+                <button type="submit" class="tb-btn">Search</button>
+            </form>
+
+            @if (!Model.TopTutors.Any())
+            {
+                <p class="empty-state">No verified tutors yet — <a asp-controller="Account" asp-action="TutorRegister">be the first to register</a>.</p>
+            }
+            else
+            {
+                foreach (var tutor in Model.TopTutors)
+                {
+                    <div class="tutor-mini">
+                        <div class="avatar">@tutor.Initials</div>
+                        <div>
+                            <div class="tutor-name">@tutor.FullName</div>
+                            <div class="tutor-meta">@string.Join(" · ", tutor.SubjectTags.Take(2))</div>
+                            <div class="stars">
+                                @if (tutor.AverageRating > 0)
+                                {
+                                    @:★★★★★ <span class="tutor-meta">@tutor.AverageRating.ToString("0.0")</span>
+                                }
+                                else
+                                {
+                                    <span class="tutor-meta">New tutor</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="verified-pill">✓ Verified</div>
+                    </div>
+                }
+            }
+        </div>
+    </section>
+
+    <section class="stats-strip">
+        <div class="stat-item"><div><strong>500+</strong><span>Verified Tutors</span></div></div>
+        <div class="stat-item"><div><strong>3,200+</strong><span>Sessions Booked</span></div></div>
+        <div class="stat-item"><div><strong>18</strong><span>Districts Covered</span></div></div>
+        <div class="stat-item"><div><strong>4.8 ★</strong><span>Avg. Tutor Rating</span></div></div>
+    </section>
+
+    <section class="home-section" id="about">
+        <div class="eyebrow">Why Choose TutorBridge</div>
+        <h2 class="section-title">All the tools you need, built into one place</h2>
+        <p class="section-sub">From verified profiles to effortless booking — built specifically for students and tutors across Nepal.</p>
+
+        <div class="feature-grid">
+            <article class="feature-card"><div class="feature-icon">🛡</div><h3>Credential-verified tutors</h3><p>Every tutor's qualifications are checked before they can join, so students always know exactly who they're learning from.</p></article>
+            <article class="feature-card"><div class="feature-icon">📅</div><h3>Real-time scheduling</h3><p>Check a tutor's open slots instantly and lock in a session in a few clicks — no more waiting on replies.</p></article>
+            <article class="feature-card"><div class="feature-icon">💬</div><h3>Secure messaging</h3><p>Chat directly with your tutor or student inside the platform, both before and after every session.</p></article>
+            <article class="feature-card"><div class="feature-icon">⭐</div><h3>Honest reviews</h3><p>Feedback from real sessions helps students choose confidently and helps tutors build a strong reputation.</p></article>
+            <article class="feature-card"><div class="feature-icon">📊</div><h3>Platform oversight</h3><p>Administrators keep an eye on activity, verify accounts, and enforce quality standards across the platform.</p></article>
+            <article class="feature-card"><div class="feature-icon">🔔</div><h3>Instant alerts</h3><p>Get notified the moment a booking, message, or session reminder comes in — so nothing gets missed.</p></article>
+        </div>
+    </section>
+
+    <section class="home-section bg-white border-top border-bottom" id="steps">
+        <div class="eyebrow">How It Works</div>
+        <h2 class="section-title">Four simple steps to get started</h2>
+        <div class="steps">
+            <div class="step"><div class="step-num">1</div><h3>Sign up</h3><p>Register as a student or tutor in under five minutes.</p></div>
+            <div class="step"><div class="step-num">2</div><h3>Search for a tutor</h3><p>Filter by subject, grade level, or location to find your match.</p></div>
+            <div class="step"><div class="step-num">3</div><h3>Reserve a slot</h3><p>Pick an available time and get instant booking confirmation.</p></div>
+            <div class="step"><div class="step-num">4</div><h3>Attend & review</h3><p>Join your session, then share an honest review afterward.</p></div>
+        </div>
+    </section>
+
+    <section class="home-section" id="featured">
+        <div class="eyebrow">Featured Tutors</div>
+        <h2 class="section-title">This month's top-rated tutors</h2>
+        <p class="section-sub">Selected based on strong ratings, quick responses, and positive student feedback.</p>
+
+        @if (!Model.TopTutors.Any())
+        {
+            <p class="empty-state">No verified tutors have joined yet. <a asp-controller="Account" asp-action="TutorRegister">Register as a tutor</a> to be featured here.</p>
+        }
+        else
+        {
+            <div class="tutor-grid">
+                @foreach (var tutor in Model.TopTutors)
+                {
+                    <article class="tutor-card">
+                        <div class="tutor-head">
+                            <div class="avatar">@tutor.Initials</div>
+                            <div>
+                                <strong>@tutor.FullName</strong>
+                                <div class="tutor-meta">@string.Join(" & ", tutor.SubjectTags.Take(2))</div>
+                                <div class="stars">
+                                    @if (tutor.AverageRating > 0)
+                                    {
+                                        @:★★★★★ <span class="tutor-meta">@tutor.AverageRating.ToString("0.0")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="tutor-meta">New tutor</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tags">
+                            @foreach (var tag in tutor.SubjectTags.Take(3))
+                            {
+                                <span class="tag">@tag</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(tutor.District))
+                            {
+                                <span class="tag">@tutor.District</span>
+                            }
+                        </div>
+                        <div class="tutor-price" style="justify-content:flex-end;"><a class="tb-btn" asp-controller="Account" asp-action="StudentRegister">Book session</a></div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="cta-band">
+        <h2>Ready to begin your learning journey?</h2>
+        <p>Thousands of students across Nepal have already found their tutor on TutorBridge Nepal — you can too.</p>
+        <div class="d-flex justify-content-center gap-3 mt-4 flex-wrap">
+            <a class="tb-btn bg-white text-success" asp-controller="Account" asp-action="StudentRegister">Find a tutor today</a>
+            <a class="tb-btn-outline" asp-controller="Account" asp-action="TutorRegister">Register as a tutor</a>
+        </div>
+    </section>
+
+    @await Html.PartialAsync("_HomeFooter")
+</main>

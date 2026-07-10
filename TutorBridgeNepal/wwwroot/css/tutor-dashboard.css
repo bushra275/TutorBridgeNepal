@@ -1,0 +1,167 @@
+﻿/* ==== Tutor Dashboard (extends dashboard.css) ==== */
+
+.availability-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+}
+
+.avail-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green-2);
+}
+
+.rating-value {
+    display: flex;
+    align-items: baseline;
+    gap: .3rem;
+}
+
+    .rating-value .star {
+        color: var(--orange);
+        font-size: 1.3rem;
+    }
+
+.session-btn-row.wrap {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.request-card {
+    background: #fff8ec;
+    border: 1px solid #ffdda1;
+    border-left: 4px solid var(--orange);
+    border-radius: 10px;
+    padding: .95rem 1.1rem;
+    margin-bottom: .8rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+    .request-card:last-child {
+        margin-bottom: 0;
+    }
+
+.request-info {
+    flex: 1;
+    min-width: 0;
+}
+
+    .request-info .name {
+        font-weight: 800;
+        font-size: .94rem;
+    }
+
+    .request-info .meta {
+        color: var(--muted);
+        font-size: .8rem;
+        margin-top: .15rem;
+        font-weight: 600;
+    }
+
+    .request-info .ago {
+        color: var(--muted);
+        font-size: .76rem;
+        margin-top: .2rem;
+        font-weight: 600;
+    }
+
+.request-actions {
+    display: grid;
+    gap: .4rem;
+}
+
+.student-row {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: .85rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+    .student-row:last-child {
+        border-bottom: none;
+    }
+
+.student-info {
+    flex: 1;
+    min-width: 0;
+}
+
+    .student-info .name {
+        font-weight: 800;
+        font-size: .9rem;
+    }
+
+    .student-info .meta {
+        color: var(--muted);
+        font-size: .78rem;
+        font-weight: 600;
+        margin-top: .1rem;
+    }
+
+    .student-info .next {
+        color: var(--muted);
+        font-size: .76rem;
+        font-weight: 600;
+        margin-top: .1rem;
+    }
+
+.review-card {
+    display: flex;
+    gap: .8rem;
+}
+
+.review-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.review-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+    .review-top .name {
+        font-weight: 800;
+        font-size: .9rem;
+    }
+
+    .review-top .when {
+        color: var(--muted);
+        font-size: .76rem;
+        font-weight: 600;
+    }
+
+.review-stars {
+    color: var(--orange);
+    font-size: .82rem;
+    margin: .2rem 0 .4rem;
+}
+
+.review-text {
+    color: var(--ink);
+    font-size: .86rem;
+    font-weight: 500;
+    line-height: 1.5;
+    font-style: italic;
+}
+
+.status-text.missed {
+    color: var(--danger);
+}
+
+@media (max-width: 720px) {
+    .request-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .request-actions {
+        width: 100%;
+    }
+}

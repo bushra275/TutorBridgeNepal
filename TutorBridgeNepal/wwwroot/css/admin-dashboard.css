@@ -1,0 +1,311 @@
+﻿/* ==== Admin Dashboard (extends dashboard.css) ==== */
+
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+}
+
+.kpi-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1rem 1.15rem;
+}
+
+.kpi-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+}
+
+    .kpi-top .label {
+        color: var(--muted);
+        font-size: .78rem;
+        font-weight: 700;
+    }
+
+.kpi-value {
+    font-size: 1.75rem;
+    font-weight: 900;
+    color: var(--ink);
+    margin-top: .3rem;
+    line-height: 1;
+}
+
+.kpi-badge {
+    border-radius: 999px;
+    padding: .12rem .55rem;
+    font-size: .68rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+    .kpi-badge.up {
+        background: var(--mint);
+        color: var(--green);
+    }
+
+    .kpi-badge.urgent {
+        background: var(--danger-bg);
+        color: var(--danger);
+    }
+
+    .kpi-badge.review {
+        background: #fff1d5;
+        color: #a96808;
+    }
+
+/* Chart */
+.chart-panel .panel-head .btn-period {
+    margin-left: auto;
+    min-height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--soft);
+    padding: 0 .8rem;
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    height: 190px;
+    padding: 0 .5rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.bar-col {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 100%;
+}
+
+.bar {
+    width: 60%;
+    border-radius: 4px 4px 0 0;
+    background: var(--mint-2);
+}
+
+    .bar.peak {
+        background: var(--green-dark);
+    }
+
+.bar-labels {
+    display: flex;
+    gap: 1rem;
+    padding: .5rem .5rem 0;
+}
+
+    .bar-labels span {
+        flex: 1;
+        text-align: center;
+        color: var(--muted);
+        font-size: .76rem;
+        font-weight: 600;
+    }
+
+.chart-axis {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: .7rem;
+    font-weight: 600;
+    margin-bottom: .3rem;
+}
+
+/* Verification queue */
+.queue-row {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: .8rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+    .queue-row:last-child {
+        border-bottom: none;
+    }
+
+.queue-info {
+    flex: 1;
+    min-width: 0;
+}
+
+    .queue-info .name {
+        font-weight: 800;
+        font-size: .88rem;
+    }
+
+    .queue-info .meta {
+        color: var(--muted);
+        font-size: .78rem;
+        font-weight: 600;
+    }
+
+.queue-actions {
+    display: flex;
+    gap: .4rem;
+}
+
+.view-all-link {
+    display: block;
+    text-align: center;
+    color: var(--green);
+    font-weight: 700;
+    font-size: .84rem;
+    text-decoration: none;
+    margin-top: .9rem;
+}
+
+/* Registrations table pills */
+.pill-active {
+    background: var(--mint);
+    color: var(--green);
+}
+
+.pill-pending2 {
+    background: #fff1d5;
+    color: #a96808;
+}
+
+.status-text.ongoing {
+    color: #a96808;
+}
+
+/* Complaints */
+.complaint-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-radius: 10px;
+    padding: .9rem 1.1rem;
+    margin-bottom: .8rem;
+    background: var(--danger-bg);
+    border: 1px solid #f3caca;
+}
+
+    .complaint-card:last-child {
+        margin-bottom: 0;
+    }
+
+    .complaint-card.warning {
+        background: #fff8ec;
+        border-color: #ffdda1;
+    }
+
+.complaint-info {
+    flex: 1;
+    min-width: 0;
+}
+
+    .complaint-info .title {
+        font-weight: 800;
+        font-size: .9rem;
+    }
+
+    .complaint-info .meta {
+        color: var(--muted);
+        font-size: .78rem;
+        margin-top: .15rem;
+        font-weight: 600;
+    }
+
+/* Platform health */
+.progress-fill.orange {
+    background: var(--orange);
+}
+
+/* Activity log */
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: .7rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+
+.activity-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+    .activity-dot.green {
+        background: var(--green-2);
+    }
+
+    .activity-dot.orange {
+        background: var(--orange);
+    }
+
+    .activity-dot.red {
+        background: var(--danger);
+    }
+
+.activity-time {
+    color: var(--muted);
+    font-size: .8rem;
+    font-weight: 700;
+    width: 70px;
+    flex-shrink: 0;
+}
+
+.activity-text {
+    flex: 1;
+    font-size: .86rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.activity-tag {
+    border-radius: 999px;
+    padding: .15rem .6rem;
+    font-size: .7rem;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+    .activity-tag.student {
+        background: var(--mint);
+        color: var(--green);
+    }
+
+    .activity-tag.session {
+        background: var(--mint);
+        color: var(--green);
+    }
+
+    .activity-tag.verify {
+        background: #fff1d5;
+        color: #a96808;
+    }
+
+    .activity-tag.review {
+        background: var(--danger-bg);
+        color: var(--danger);
+    }
+
+@media (max-width: 1200px) {
+    .kpi-row {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 720px) {
+    .kpi-row {
+        grid-template-columns: 1fr;
+    }
+}

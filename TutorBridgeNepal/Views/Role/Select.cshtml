@@ -1,0 +1,49 @@
+﻿@{
+    ViewData["Title"] = "Select Role";
+}
+
+<main class="page-bg role-page">
+    <section class="role-wrap">
+        <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+        <h1 class="role-title">How would you like to continue?</h1>
+        <p class="role-sub">Select your role to access the right dashboard and features</p>
+
+        <div class="role-cards">
+            <article class="role-card">
+                <div class="role-icon">🎓</div>
+                <h2>Student</h2>
+                <p>Learn with verified tutors</p>
+                <p>Find tutors, book sessions, and track your learning progress</p>
+                <ul class="role-list">
+                    <li>Browse and book verified tutors</li>
+                    <li>Message tutors directly</li>
+                    <li>Track your learning progress</li>
+                </ul>
+                <a class="tb-btn w-100" asp-controller="Account" asp-action="StudentLogin">Continue as Student →</a>
+            </article>
+
+            <article class="role-card">
+                <div class="role-icon">🧑‍🏫</div>
+                <h2>Tutor</h2>
+                <p>Teach and manage students</p>
+                <p>Set your availability, accept sessions, and manage your students</p>
+                <ul class="role-list">
+                    <li>Manage your teaching schedule</li>
+                    <li>Message students directly</li>
+                    <li>Track sessions & earnings</li>
+                </ul>
+                <a class="tb-btn w-100" asp-controller="Account" asp-action="TutorLogin">Continue as Tutor →</a>
+            </article>
+        </div>
+
+        <div class="role-footer">
+            <p>Already know your role? You can switch anytime from your account settings.</p>
+            <div class="sdg-pill">SDG Goal 4: Quality Education</div>
+            <div class="d-flex justify-content-center gap-5">
+                <span>Terms of Use</span>
+                <span>Privacy Policy</span>
+                <span>Help Center</span>
+            </div>
+        </div>
+    </section>
+</main>

@@ -1,0 +1,304 @@
+﻿@{
+    ViewData["Title"] = "Admin Dashboard";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <div class="dash-search">
+                <input type="text" placeholder="Search users, sessions..." />
+            </div>
+            <span class="admin-chip">Admin</span>
+            <div class="dash-topbar-right">
+                <a href="#" class="icon-btn" title="Notifications">
+                    🔔
+                    <span class="dot"></span>
+                </a>
+                <div class="topbar-avatar">KS</div>
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    <div class="avatar">KS</div>
+                    <div>
+                        <div class="name">Karan Shrestha</div>
+                        <div class="meta">Platform Administrator</div>
+                        <span class="role-chip" style="background:#fff1d5;color:#a96808;">Super Admin</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a href="#" class="active"><span class="nav-icon">📊</span> Dashboard</a></li>
+                    <li><a href="#"><span class="nav-icon">👥</span> User Management</a></li>
+                    <li><a href="#"><span class="nav-icon">✅</span> Tutor Verification <span class="badge-count">5</span></a></li>
+                    <li><a href="#"><span class="nav-icon">🗒️</span> Session Logs</a></li>
+                    <li><a href="#"><span class="nav-icon">📈</span> Reports</a></li>
+                    <li><a href="#"><span class="nav-icon">⚠️</span> Complaints <span class="badge-count">2</span></a></li>
+                    <li><a href="#"><span class="nav-icon">🔔</span> Notifications</a></li>
+                    <li><a href="#"><span class="nav-icon">⚙️</span> Settings</a></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><a href="#"><span class="nav-icon">❓</span> Help center</a></li>
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <main class="dash-main">
+                <div class="dash-greeting" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                    <div>
+                        <h1>Admin Dashboard</h1>
+                        <p>Tuesday, 10 June 2025 · TutorBridge Nepal platform overview</p>
+                    </div>
+                    <a href="#" class="tb-btn-outline">Export report</a>
+                </div>
+
+                <!-- KPI row -->
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Total users</span>
+                            <span class="kpi-badge up">+12%</span>
+                        </div>
+                        <div class="kpi-value">1,284</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Active tutors</span>
+                            <span class="kpi-badge up">+8%</span>
+                        </div>
+                        <div class="kpi-value">312</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Sessions this month</span>
+                            <span class="kpi-badge up">+21%</span>
+                        </div>
+                        <div class="kpi-value">847</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Pending verifications</span>
+                            <span class="kpi-badge urgent">Urgent</span>
+                        </div>
+                        <div class="kpi-value">5</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Open complaints</span>
+                            <span class="kpi-badge review">Review</span>
+                        </div>
+                        <div class="kpi-value">2</div>
+                    </div>
+                </div>
+
+                <div class="dash-columns">
+                    <!-- Left -->
+                    <div>
+                        <div class="panel chart-panel">
+                            <div class="panel-head">
+                                <h2>Session activity — June 2025</h2>
+                                <button class="btn-period">This month</button>
+                            </div>
+                            <div class="chart-axis"><span>40</span></div>
+                            <div class="bar-chart">
+                                <div class="bar-col"><div class="bar" style="height:25%"></div></div>
+                                <div class="bar-col"><div class="bar" style="height:37%"></div></div>
+                                <div class="bar-col"><div class="bar" style="height:50%"></div></div>
+                                <div class="bar-col"><div class="bar" style="height:42%"></div></div>
+                                <div class="bar-col"><div class="bar" style="height:55%"></div></div>
+                                <div class="bar-col"><div class="bar peak" style="height:87%"></div></div>
+                                <div class="bar-col"><div class="bar" style="height:72%"></div></div>
+                                <div class="bar-col"><div class="bar" style="height:52%"></div></div>
+                                <div class="bar-col"><div class="bar" style="height:47%"></div></div>
+                                <div class="bar-col"><div class="bar" style="height:30%"></div></div>
+                            </div>
+                            <div class="bar-labels">
+                                <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+                                <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+                            </div>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head"><h2>Recent sessions</h2></div>
+                            <table class="dash-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student</th><th>Tutor</th><th>Subject</th><th>Date</th><th>Amount</th><th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Aayusha Shrestha</td><td>Ram Prasad S.</td><td>Mathematics</td><td>10 Jun</td><td>Rs 500</td><td><span class="status-text completed">Completed</span></td></tr>
+                                    <tr><td>Priya Tamang</td><td>Sita Bajracharya</td><td>Science</td><td>10 Jun</td><td>Rs 450</td><td><span class="status-text ongoing">Ongoing</span></td></tr>
+                                    <tr><td>Rohan Bista</td><td>Arjun Karmacharya</td><td>English</td><td>9 Jun</td><td>Rs 400</td><td><span class="status-text completed">Completed</span></td></tr>
+                                    <tr><td>Anisha Maharjan</td><td>Ram Prasad S.</td><td>Mathematics</td><td>9 Jun</td><td>Rs 500</td><td><span class="status-text completed">Completed</span></td></tr>
+                                    <tr><td>Sanjay Gurung</td><td>Nirajan Pradhan</td><td>Chemistry</td><td>8 Jun</td><td>Rs 480</td><td><span class="status-text cancelled">Cancelled</span></td></tr>
+                                    <tr><td>Deepa Karki</td><td>Sita Bajracharya</td><td>Biology</td><td>8 Jun</td><td>Rs 450</td><td><span class="status-text completed">Completed</span></td></tr>
+                                </tbody>
+                            </table>
+                            <a href="#" class="view-all-link">View all sessions →</a>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Open complaints</h2>
+                                <span class="tag-count" style="background:var(--danger-bg);color:var(--danger);">2</span>
+                            </div>
+                            <div class="complaint-card">
+                                <div class="complaint-info">
+                                    <div class="title">Session not conducted</div>
+                                    <div class="meta">Reported by Rohan Bista · 9 Jun 2025</div>
+                                    <div class="meta">Against: Arjun Karmacharya (English)</div>
+                                </div>
+                                <a href="#" class="mini-btn">Investigate</a>
+                            </div>
+                            <div class="complaint-card warning">
+                                <div class="complaint-info">
+                                    <div class="title">Late cancellation</div>
+                                    <div class="meta">Reported by Priya Tamang · 8 Jun 2025</div>
+                                    <div class="meta">Against: Sita Bajracharya (Science)</div>
+                                </div>
+                                <a href="#" class="mini-btn">Review</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right -->
+                    <div>
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Tutor verification queue</h2>
+                                <span class="tag-count">5</span>
+                            </div>
+                            <div class="queue-row">
+                                <div class="avatar">NP</div>
+                                <div class="queue-info">
+                                    <div class="name">Nirajan Pradhan</div>
+                                    <div class="meta">Chemistry · Pokhara</div>
+                                </div>
+                                <div class="queue-actions">
+                                    <a href="#" class="mini-btn green">Approve</a>
+                                    <a href="#" class="mini-btn danger">Reject</a>
+                                </div>
+                            </div>
+                            <div class="queue-row">
+                                <div class="avatar purple">SR</div>
+                                <div class="queue-info">
+                                    <div class="name">Sunita Rai</div>
+                                    <div class="meta">English · Lalitpur</div>
+                                </div>
+                                <div class="queue-actions">
+                                    <a href="#" class="mini-btn green">Approve</a>
+                                    <a href="#" class="mini-btn danger">Reject</a>
+                                </div>
+                            </div>
+                            <div class="queue-row">
+                                <div class="avatar yellow">BT</div>
+                                <div class="queue-info">
+                                    <div class="name">Bikram Tamang</div>
+                                    <div class="meta">Physics · Bhaktapur</div>
+                                </div>
+                                <div class="queue-actions">
+                                    <a href="#" class="mini-btn green">Approve</a>
+                                    <a href="#" class="mini-btn danger">Reject</a>
+                                </div>
+                            </div>
+                            <a href="#" class="view-all-link">View all 5 pending →</a>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head"><h2>Recent registrations</h2></div>
+                            <table class="dash-table">
+                                <thead>
+                                    <tr><th>Name</th><th>Role</th><th>District</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Bijay Thapa</td><td>Student</td><td>Kathmandu</td><td><span class="pill pill-active">Active</span></td></tr>
+                                    <tr><td>Sunita Rai</td><td>Tutor</td><td>Lalitpur</td><td><span class="pill pill-pending2">Pending</span></td></tr>
+                                    <tr><td>Rina Magar</td><td>Student</td><td>Pokhara</td><td><span class="pill pill-active">Active</span></td></tr>
+                                    <tr><td>Bikram Tamang</td><td>Tutor</td><td>Bhaktapur</td><td><span class="pill pill-pending2">Pending</span></td></tr>
+                                    <tr><td>Manisha Koirala</td><td>Student</td><td>Chitwan</td><td><span class="pill pill-active">Active</span></td></tr>
+                                    <tr><td>Nirajan Pradhan</td><td>Tutor</td><td>Pokhara</td><td><span class="pill pill-pending2">Pending</span></td></tr>
+                                </tbody>
+                            </table>
+                            <a href="#" class="view-all-link">View all users →</a>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head"><h2>Platform health</h2></div>
+                            <div class="progress-row">
+                                <div class="progress-label"><span>Tutor approval rate</span><span>86%</span></div>
+                                <div class="progress-track"><div class="progress-fill" style="width:86%"></div></div>
+                            </div>
+                            <div class="progress-row">
+                                <div class="progress-label"><span>Session completion rate</span><span>92%</span></div>
+                                <div class="progress-track"><div class="progress-fill" style="width:92%"></div></div>
+                            </div>
+                            <div class="progress-row">
+                                <div class="progress-label"><span>Student satisfaction</span><span>95%</span></div>
+                                <div class="progress-track"><div class="progress-fill" style="width:95%"></div></div>
+                            </div>
+                            <div class="progress-row">
+                                <div class="progress-label"><span>Complaint resolution rate</span><span>80%</span></div>
+                                <div class="progress-track"><div class="progress-fill orange" style="width:80%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2>Recent activity log</h2>
+                        <a href="#" class="mini-btn panel-action">View all</a>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-dot green"></div>
+                        <div class="activity-time">10:32 AM</div>
+                        <div class="activity-text"><strong>New student registration</strong> — Bijay Thapa, Kathmandu</div>
+                        <span class="activity-tag student">Student</span>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-dot green"></div>
+                        <div class="activity-time">09:48 AM</div>
+                        <div class="activity-text"><strong>Session completed</strong> — Ram Prasad × Aayusha Shrestha (Maths)</div>
+                        <span class="activity-tag session">Session</span>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-dot orange"></div>
+                        <div class="activity-time">09:15 AM</div>
+                        <div class="activity-text"><strong>Tutor verification submitted</strong> — Nirajan Pradhan, Chemistry</div>
+                        <span class="activity-tag verify">Verify</span>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-dot red"></div>
+                        <div class="activity-time">08:50 AM</div>
+                        <div class="activity-text"><strong>Complaint filed</strong> — Rohan Bista against Arjun Karmacharya</div>
+                        <span class="activity-tag review">Review</span>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

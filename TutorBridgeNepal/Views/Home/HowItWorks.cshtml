@@ -1,0 +1,40 @@
+﻿@{
+    ViewData["Title"] = "How It Works";
+}
+
+<main class="home">
+    @await Html.PartialAsync("_HomeNav")
+
+    <section class="home-section" id="students-flow">
+        <div class="eyebrow">For Students</div>
+        <h2 class="section-title">From sign-up to your first session</h2>
+        <div class="steps">
+            <div class="step"><div class="step-num">1</div><h3>Create your profile</h3><p>Tell us your grade level and what subjects you need help with.</p></div>
+            <div class="step"><div class="step-num">2</div><h3>Browse verified tutors</h3><p>Compare tutors by subject, rate, district, and student reviews.</p></div>
+            <div class="step"><div class="step-num">3</div><h3>Pick a time that works</h3><p>Choose from a tutor's open slots — no messaging back and forth to coordinate.</p></div>
+            <div class="step"><div class="step-num">4</div><h3>Learn and track progress</h3><p>Attend your session, message your tutor anytime, and watch your progress build over time.</p></div>
+        </div>
+    </section>
+
+    <section class="home-section bg-white border-top border-bottom" id="tutors-flow">
+        <div class="eyebrow">For Tutors</div>
+        <h2 class="section-title">From application to your first student</h2>
+        <div class="steps">
+            <div class="step"><div class="step-num">1</div><h3>Apply and get verified</h3><p>Submit your qualifications and experience for our team to review.</p></div>
+            <div class="step"><div class="step-num">2</div><h3>Set your schedule</h3><p>Add your available hours and hourly rate — update them whenever you like.</p></div>
+            <div class="step"><div class="step-num">3</div><h3>Accept bookings</h3><p>Students book directly into your open slots, and you get notified instantly.</p></div>
+            <div class="step"><div class="step-num">4</div><h3>Build your reputation</h3><p>Every completed session earns you a review, helping more students find you.</p></div>
+        </div>
+    </section>
+
+    <section class="cta-band">
+        <h2>Not sure where to start?</h2>
+        <p>Pick the path that matches you — the sign-up takes less than five minutes either way.</p>
+        <div class="d-flex justify-content-center gap-3 mt-4 flex-wrap">
+            <a class="tb-btn bg-white text-success" asp-controller="Account" asp-action="StudentRegister" asp-route-role="Student">I'm a student</a>
+            <a class="tb-btn-outline" asp-controller="Account" asp-action="TutorRegister" asp-route-role="Tutor">I'm a tutor</a>
+        </div>
+    </section>
+
+    @await Html.PartialAsync("_HomeFooter")
+</main>

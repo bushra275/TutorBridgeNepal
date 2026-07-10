@@ -1,0 +1,67 @@
+﻿@model TutorBridgeNepal.ViewModels.AuthenticatorSetupViewModel
+@{
+    ViewData["Title"] = "Set Up Authenticator";
+}
+
+<main class="auth-page">
+    <aside class="auth-side admin">
+        <div class="auth-side-content">
+            <h2 class="auth-logo">TutorBridge Nepal</h2>
+            <p class="auth-small">🛠 Admin Portal</p>
+            <h1 class="auth-side-title">Secure your<br /><span>admin account</span><br />with 2FA.</h1>
+            <p class="auth-side-copy">Scan the QR code with Google Authenticator, Microsoft Authenticator, Authy, or any TOTP app.</p>
+        </div>
+        <div class="auth-sdg">SDG 4: Quality Education</div>
+    </aside>
+
+    <section class="auth-main">
+        <div class="auth-top">
+            <a class="back-link" asp-controller="Admin" asp-action="Dashboard">← Back to dashboard</a>
+        </div>
+
+        <div class="auth-panel admin-panel">
+            <div class="auth-heading">
+                <div class="admin-chip">🛠 Admin access</div>
+                <h1 class="mt-2">Set up two-factor authentication</h1>
+                @if (Model.Is2faEnabled)
+                {
+                    <p>✅ 2FA is currently <strong>enabled</strong> on your account.</p>
+                }
+                else
+                {
+                    <p>2FA is currently <strong>not enabled</strong>. Follow the steps below to turn it on.</p>
+                }
+            </div>
+
+            @if (TempData["2faError"] != null)
+            {
+                <div class="alert alert-danger">@TempData["2faError"]</div>
+            }
+            @if (TempData["2faSuccess"] != null)
+            {
+                <div class="alert alert-success">@TempData["2faSuccess"]</div>
+            }
+
+            <ol class="mb-4">
+                <li>Install an authenticator app (Google Authenticator, Authy, Microsoft Authenticator).</li>
+                <li>Scan this QR code, or enter the key manually if scanning isn't possible.</li>
+            </ol>
+
+            <div class="text-center mb-3">
+                <img src="@Model.QrCodeUrl" alt="Authenticator QR code" style="border:1px solid var(--line); border-radius:8px;" />
+            </div>
+            <p class="text-center"><code>@Model.SharedKey</code></p>
+
+            <form asp-action="AdminEnableAuthenticator" method="post" class="mt-4">
+                @Html.AntiForgeryToken()
+                <div class="field mb-3">
+                    <label>Enter the 6-digit code from your app to confirm</label>
+                    <input name="verificationCode" class="tb-input" placeholder="000000" autocomplete="one-time-code" maxlength="7" />
+                </div>
+                <button class="tb-btn brown w-100" type="submit">
+                    @(Model.Is2faEnabled ? "Re-verify & Keep 2FA Enabled" : "Enable Two-Factor Authentication")
+                </button>
+            </form>
+        </div>
+    </section>
+</main>

@@ -1,0 +1,52 @@
+﻿@{
+    ViewData["Title"] = "About";
+}
+
+<main class="home">
+    @await Html.PartialAsync("_HomeNav")
+
+    <section class="home-section" id="mission">
+        <div class="eyebrow">Our Mission</div>
+        <h2 class="section-title">Making quality tutoring reachable for every student in Nepal</h2>
+        <p class="section-sub" style="max-width:760px;">
+            Private tuition has always played a big role in how students in Nepal prepare for SEE, NEB, and beyond —
+            but finding someone reliable usually means asking around, hoping for a good referral, and trusting a
+            stranger with your child's education. TutorBridge Nepal was built to remove that guesswork.
+        </p>
+    </section>
+
+    <section class="home-section bg-white border-top border-bottom">
+        <div class="eyebrow">What Drives Us</div>
+        <h2 class="section-title">Three things we won't compromise on</h2>
+        <div style="max-width:760px; display:flex; flex-direction:column; gap:1.5rem; margin-top:1.5rem;">
+            <div>
+                <h3>Trust before convenience</h3>
+                <p class="section-sub">Every tutor's credentials are checked before their profile ever goes live. We'd rather have fewer tutors on the platform than unverified ones.</p>
+            </div>
+            <div>
+                <h3>Transparency in every booking</h3>
+                <p class="section-sub">Rates, availability, and reviews are visible up front — no hidden fees, no back-and-forth negotiating over messages.</p>
+            </div>
+            <div>
+                <h3>Access across all 18 districts</h3>
+                <p class="section-sub">Whether a student is in Kathmandu or a smaller municipality, the goal is the same: connect them with a tutor who fits their level and budget.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section" id="sdg">
+        <div class="eyebrow">Our Commitment</div>
+        <h2 class="section-title">Aligned with SDG Goal 4: Quality Education</h2>
+        <p class="section-sub" style="max-width:760px;">
+            TutorBridge Nepal supports the UN's push for inclusive, equitable education by lowering the barrier
+            between students who need help and tutors qualified to give it — regardless of where either of them
+            is starting from.
+        </p>
+        <div class="hero-cta mt-4">
+            <a class="tb-btn" asp-controller="Account" asp-action="StudentRegister" asp-route-role="Student">Join as a student</a>
+            <a class="tb-btn-outline" asp-controller="Account" asp-action="TutorRegister" asp-route-role="Tutor">Join as a tutor</a>
+        </div>
+    </section>
+
+    @await Html.PartialAsync("_HomeFooter")
+</main>

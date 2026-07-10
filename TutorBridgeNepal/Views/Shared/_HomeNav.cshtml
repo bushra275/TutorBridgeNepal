@@ -1,0 +1,13 @@
+﻿<nav class="home-nav">
+    <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+    <div class="home-links">
+        <a class="text-decoration-none" asp-controller="Home" asp-action="FindTutors">Find Tutors</a>
+        <a class="text-decoration-none" asp-controller="Home" asp-action="HowItWorks">How It Works</a>
+        <a class="text-decoration-none" asp-controller="Account" asp-action="TutorRegister" asp-route-role="Tutor">Become a Tutor</a>
+        <a class="text-decoration-none" asp-controller="Home" asp-action="About">About</a>
+    </div>
+    <div class="home-actions">
+        <a class="tb-btn-outline" asp-controller="Account" asp-action="StudentLogin">Log in</a>
+        <a class="tb-btn" asp-controller="Role" asp-action="Select">Sign up free</a>
+    </div>
+</nav>

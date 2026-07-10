@@ -1,0 +1,81 @@
+﻿@model TutorBridgeNepal.ViewModels.LoginViewModel
+@{
+    ViewData["Title"] = "Student Login";
+}
+
+<main class="auth-page">
+    <aside class="auth-side">
+        <div class="auth-side-content">
+            <h2 class="auth-logo serif">TutorBridge Nepal</h2>
+            <p class="auth-small">Connecting learners with verified tutors</p>
+
+            <h1 class="auth-side-title serif">Learn Better.<br /><span>Grow Faster.</span><br />Succeed Together.</h1>
+            <p class="auth-side-copy">Join thousands of students across Nepal getting personalised tutoring support.</p>
+
+            <div class="auth-stats">
+                <div class="auth-stat"><div><strong>500+</strong><span>Verified Tutors</span></div></div>
+                <div class="auth-stat"><div><strong>3,200+</strong><span>Sessions Done</span></div></div>
+                <div class="auth-stat"><div><strong>4.8★</strong><span>Avg. Rating</span></div></div>
+            </div>
+
+            <div class="quote-card">
+                <p>"TutorBridge helped me score a distinction in my SEE Math exam. The tutors are so patient!"</p>
+                <div class="quote-person">
+                    <div class="quote-avatar">PS</div>
+                    <div><strong>Priya Shrestha, Grade 10</strong><br /><span class="auth-small">Kathmandu</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="auth-sdg">SDG 4: Quality Education</div>
+    </aside>
+
+    <section class="auth-main">
+        <div class="auth-top">
+            <a class="back-link" asp-controller="Role" asp-action="Select">← Back to role selection</a>
+        </div>
+
+        <div class="auth-panel">
+            <div class="auth-heading">
+                <h1 class="serif">Welcome Back</h1>
+                <p>Log in to your TutorBridge student account</p>
+            </div>
+
+            <form asp-action="Login" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="Role" />
+                <div asp-validation-summary="ModelOnly"></div>
+
+                <div class="field mb-3">
+                    <label asp-for="Email">Email Address</label>
+                    <input asp-for="Email" class="tb-input" placeholder="Enter your email" />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="Password">Password</label>
+                    <div class="password-wrap">
+                        <input asp-for="Password" type="password" class="tb-input" placeholder="Enter your password" />
+                        <span class="eye-dot"></span>
+                    </div>
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                </div>
+
+                <div class="form-row-between">
+                    <label class="form-checkline"><input asp-for="RememberMe" class="box-check" /> Remember me</label>
+                    <a class="link-green" asp-action="ForgotPassword" asp-route-role="Student">Forgot password?</a>
+                </div>
+
+                <button class="tb-btn w-100" type="submit">Log In</button>
+            </form>
+
+            <div class="divider">or continue with</div>
+            <button class="google-btn" type="button"><span class="g-dot">G</span><span>Sign in with Google</span><span></span></button>
+            <p class="auth-bottom">Don't have an account? <a class="link-green" asp-action="StudentRegister" asp-route-role="Student">Create one free</a></p>
+            <p class="auth-bottom">Are you a tutor? <a class="link-green" asp-action="TutorLogin">Log in here</a></p>
+        </div>
+    </section>
+</main>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,266 @@
+﻿@model TutorBridgeNepal.ViewModels.StudentDashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    Layout = null;
+
+    var hour = DateTime.Now.Hour;
+    var greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+    var firstName = Model.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? Model.FullName;
+    var subMeta = string.Join(" · ", new[] { Model.GradeLevel, Model.District }.Where(x => !string.IsNullOrWhiteSpace(x)));
+    var maxSubjectSessions = Model.SubjectProgress.Any() ? Model.SubjectProgress.Max(s => s.CompletedSessions) : 0;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+
+        <!-- Top bar -->
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+
+            <form class="dash-search" asp-controller="Home" asp-action="FindTutors" method="get">
+                <input type="text" placeholder="Search tutors, subjects..." />
+            </form>
+
+            <div class="dash-topbar-right">
+                <a href="#messages-panel" class="icon-btn" title="Messages & notifications">🔔</a>
+                <div class="topbar-avatar" title="@Model.FullName">@Model.Initials</div>
+            </div>
+        </header>
+
+        <div class="dash-body">
+
+            <!-- Sidebar -->
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    <div class="avatar">@Model.Initials</div>
+                    <div>
+                        <div class="name">@Model.FullName</div>
+                        <div class="meta">@(string.IsNullOrWhiteSpace(subMeta) ? "Student" : subMeta)</div>
+                        <span class="role-chip">Student</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a asp-controller="Student" asp-action="Dashboard" class="active"><span class="nav-icon">🏠</span> Dashboard</a></li>
+                    <li><a asp-controller="Home" asp-action="FindTutors"><span class="nav-icon">🔍</span> Find Tutors</a></li>
+                    <li><a href="#sessions-panel"><span class="nav-icon">📅</span> My Sessions</a></li>
+                    <li><a href="#messages-panel"><span class="nav-icon">💬</span> Messages</a></li>
+                    <li><a href="#tutors-panel"><span class="nav-icon">👥</span> My Tutors</a></li>
+                    <li><a href="#progress-panel"><span class="nav-icon">📈</span> Progress</a></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><a asp-area="Identity" asp-page="/Account/Manage/Index"><span class="nav-icon">⚙️</span> Settings</a></li>
+                    <li><a asp-controller="Home" asp-action="Contact"><span class="nav-icon">❓</span> Help &amp; Support</a></li>
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <!-- Main content -->
+            <main class="dash-main">
+                <div class="dash-greeting">
+                    <h1>@greeting, @firstName 👋</h1>
+                    <p>@DateTime.Now.ToString("dddd, d MMMM yyyy") · Here's your learning overview</p>
+                </div>
+
+                <!-- Stat cards -->
+                <div class="stat-cards">
+                    <div class="stat-card">
+                        <div class="label">Total sessions</div>
+                        <div class="value">@Model.TotalSessions</div>
+                        <div class="delta">@Model.CompletedSessions completed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Hours learned</div>
+                        <div class="value">@Model.HoursLearned.ToString("0.#")h</div>
+                        <div class="sub">From completed sessions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Active tutors</div>
+                        <div class="value">@Model.ActiveTutorsCount</div>
+                        <div class="sub">@(Model.MyTutors.Any() ? string.Join(", ", Model.MyTutors.Select(t => t.Subjects).Distinct().Take(3)) : "None yet")</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Upcoming</div>
+                        <div class="value">@Model.UpcomingCount</div>
+                        <div class="sub">
+                            @if (Model.UpcomingSessions.Any())
+                            {
+                                @:Next: @Model.UpcomingSessions.First().StartTime.ToString("ddd, d MMM 'at' h:mm tt")
+                            }
+                            else
+                            {
+                                @:Nothing scheduled
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dash-columns">
+
+                    <!-- Left column -->
+                    <div>
+                        <div class="panel" id="sessions-panel">
+                            <div class="panel-head">
+                                <h2>Upcoming sessions</h2>
+                                <span class="tag-count">@Model.UpcomingCount</span>
+                            </div>
+
+                            @if (!Model.UpcomingSessions.Any())
+                            {
+                                <p class="empty-state">You don't have any upcoming sessions yet. <a asp-controller="Home" asp-action="FindTutors">Browse tutors</a> to book your first session.</p>
+                            }
+                            else
+                            {
+                                foreach (var session in Model.UpcomingSessions)
+                                {
+                                    var statusClass = session.Status == "Confirmed" ? "pill-confirmed" : session.Status == "Pending" ? "pill-pending" : "pill-pending";
+                                    <div class="session-card @(session.Status == "Pending" ? "pending" : "")">
+                                        <div class="avatar">@session.TutorInitials</div>
+                                        <div class="session-info">
+                                            <div class="name">@session.TutorName</div>
+                                            <div class="meta">@session.Subject</div>
+                                            <div class="time">@session.StartTime.ToString("ddd, d MMM, h:mm tt") – @session.EndTime.ToString("h:mm tt")</div>
+                                        </div>
+                                        <div class="session-actions">
+                                            <span class="pill @statusClass">@session.Status</span>
+                                            <div class="session-btn-row">
+                                                @if (session.Status == "Confirmed")
+                                                {
+                                                    <span class="mini-btn" title="Your tutor will share the meeting link closer to the session time">Join session</span>
+                                                }
+                                                else
+                                                {
+                                                    <a href="#messages-panel" class="mini-btn">View details</a>
+                                                }
+                                                <form asp-action="CancelBooking" asp-controller="Student" method="post" onsubmit="return confirm('Cancel this session?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@session.BookingId" />
+                                                    <button type="submit" class="mini-btn danger">Cancel</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Recent sessions</h2>
+                            </div>
+                            @if (!Model.RecentSessions.Any())
+                            {
+                                <p class="empty-state">No past sessions yet — your session history will appear here.</p>
+                            }
+                            else
+                            {
+                                <table class="dash-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Tutor</th>
+                                            <th>Subject</th>
+                                            <th>Date</th>
+                                            <th>Duration</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var session in Model.RecentSessions)
+                                        {
+                                            var duration = session.EndTime - session.StartTime;
+                                            var statusText = session.Status == "Cancelled" ? "cancelled" : "completed";
+                                            <tr>
+                                                <td>@session.TutorName</td>
+                                                <td>@session.Subject</td>
+                                                <td>@session.StartTime.ToString("d MMM yyyy")</td>
+                                                <td>@($"{(int)duration.TotalHours}h {duration.Minutes:D2}m")</td>
+                                                <td><span class="status-text @statusText">@session.Status</span></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        </div>
+
+                        <div class="panel" id="progress-panel">
+                            <div class="panel-head">
+                                <h2>Learning progress</h2>
+                            </div>
+
+                            @if (!Model.SubjectProgress.Any())
+                            {
+                                <p class="empty-state">Complete your first session to start tracking progress by subject.</p>
+                            }
+                            else
+                            {
+                                foreach (var subject in Model.SubjectProgress)
+                                {
+                                    var widthPercent = maxSubjectSessions > 0 ? (subject.CompletedSessions * 100 / maxSubjectSessions) : 0;
+                                    <div class="progress-row">
+                                        <div class="progress-label"><span>@subject.Subject</span><span>@subject.CompletedSessions session@(subject.CompletedSessions == 1 ? "" : "s")</span></div>
+                                        <div class="progress-track"><div class="progress-fill" style="width:@(widthPercent)%"></div></div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Right column -->
+                    <div>
+                        <div class="panel" id="tutors-panel">
+                            <div class="panel-head">
+                                <h2>My tutors</h2>
+                                <a asp-controller="Home" asp-action="FindTutors" class="mini-btn green panel-action">+ Find more</a>
+                            </div>
+
+                            @if (!Model.MyTutors.Any())
+                            {
+                                <p class="empty-state">You haven't booked any tutors yet. <a asp-controller="Home" asp-action="FindTutors">Find one</a> to get started.</p>
+                            }
+                            else
+                            {
+                                foreach (var tutor in Model.MyTutors)
+                                {
+                                    <div class="tutor-row">
+                                        <div class="avatar">@tutor.TutorInitials</div>
+                                        <div class="tutor-row-info">
+                                            <div class="name">@tutor.TutorName</div>
+                                            <div class="meta">@tutor.Subjects · Rs @tutor.HourlyRate.ToString("0")/hr</div>
+                                            <div class="stars">★ @tutor.AverageRating.ToString("0.0")</div>
+                                        </div>
+                                        <a asp-controller="Home" asp-action="FindTutors" class="mini-btn">Book</a>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="panel" id="messages-panel">
+                            <div class="panel-head">
+                                <h2>Recent messages</h2>
+                            </div>
+                            <p class="empty-state">No messages yet. Once you book a session, you'll be able to chat with your tutor here.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

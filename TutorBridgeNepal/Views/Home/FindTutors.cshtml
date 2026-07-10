@@ -1,0 +1,82 @@
+﻿@model TutorBridgeNepal.ViewModels.FindTutorsViewModel
+@{
+    ViewData["Title"] = "Find Tutors";
+    var avatarClasses = new[] { "", "yellow", "purple" };
+}
+
+<main class="home">
+    @await Html.PartialAsync("_HomeNav")
+
+    <section class="home-section" id="browse">
+        <div class="eyebrow">Browse Tutors</div>
+        <h2 class="section-title">Search our full tutor directory</h2>
+        <p class="section-sub">Filter by subject, district, or tutor name to find a match — every profile below is credential-verified.</p>
+
+        <form class="search-box mt-4" style="max-width:600px;" asp-controller="Home" asp-action="FindTutors" method="get">
+            <input type="text" name="q" value="@Model.Query" placeholder="Try 'SEE Prep', 'IELTS', or a district name..." />
+            <button type="submit" class="tb-btn">Search</button>
+        </form>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Query))
+        {
+            <p class="section-sub mt-3">
+                @Model.Results.Count result@(Model.Results.Count == 1 ? "" : "s") for "@Model.Query"
+                — <a asp-controller="Home" asp-action="FindTutors">clear search</a>
+            </p>
+        }
+
+        @if (!Model.Results.Any())
+        {
+            @if (!string.IsNullOrWhiteSpace(Model.Query))
+            {
+                <p class="empty-state">No tutors matched "@Model.Query". Try a different subject, name, or district.</p>
+            }
+            else
+            {
+                <p class="empty-state">No verified tutors have joined yet. <a asp-controller="Account" asp-action="TutorRegister">Register as a tutor</a> to be the first listed here.</p>
+            }
+        }
+        else
+        {
+            <div class="tutor-grid mt-4">
+                @for (int i = 0; i < Model.Results.Count; i++)
+                {
+                    var tutor = Model.Results[i];
+                    var avatarClass = avatarClasses[i % avatarClasses.Length];
+                    <article class="tutor-card">
+                        <div class="tutor-head">
+                            <div class="avatar @avatarClass">@tutor.Initials</div>
+                            <div>
+                                <strong>@tutor.FullName</strong>
+                                <div class="tutor-meta">@string.Join(" & ", tutor.SubjectTags.Take(2))</div>
+                                <div class="stars">
+                                    @if (tutor.AverageRating > 0)
+                                    {
+                                        @:★★★★★ <span class="tutor-meta">@tutor.AverageRating.ToString("0.0")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="tutor-meta">New tutor</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tags">
+                            @foreach (var tag in tutor.SubjectTags.Take(3))
+                            {
+                                <span class="tag">@tag</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(tutor.District))
+                            {
+                                <span class="tag">@tutor.District</span>
+                            }
+                        </div>
+                        <div class="tutor-price" style="justify-content:flex-end;"><a class="tb-btn" asp-controller="Account" asp-action="StudentRegister">View & book</a></div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    @await Html.PartialAsync("_HomeFooter")
+</main>

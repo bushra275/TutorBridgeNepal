@@ -1,0 +1,271 @@
+﻿@model TutorBridgeNepal.ViewModels.RegisterViewModel
+@{
+    ViewData["Title"] = "Tutor Register";
+}
+
+<main class="auth-page">
+    <aside class="auth-side tutor">
+        <div class="auth-side-content">
+            <h2 class="auth-logo serif">TutorBridge Nepal</h2>
+            <p class="auth-small">Build your tutoring career today</p>
+
+            <div class="benefit-panel text-center">
+                <h2 class="serif mb-0">Join Nepal's Largest</h2>
+                <h2 class="serif text-white">Tutor Network</h2>
+                <hr class="border-light opacity-25" />
+                <p class="auth-small">Set your rates · Pick your subjects · Teach on your own schedule · Get paid weekly</p>
+                <div class="sdg-pill mt-2 mb-0">Tutor-First Platform</div>
+            </div>
+
+            <h3 class="mt-5 fs-6 fw-bold">What you get as a tutor:</h3>
+            <ul class="check-list">
+                <li>Profile visible to 10,000+ students across Nepal</li>
+                <li>Teach Math, Science, English, SEE, NEB & IELTS</li>
+                <li>Flexible online or in-person sessions</li>
+                <li>Transparent NPR payments, weekly payout</li>
+                <li>Verified badge after document review</li>
+                <li>Coverage in all 18 districts of Nepal</li>
+            </ul>
+        </div>
+        <div class="auth-sdg">SDG 4: Quality Education</div>
+    </aside>
+
+    <section class="auth-main">
+        <div class="auth-top">
+            <a class="back-link" asp-controller="Role" asp-action="Select">← Back to role selection</a>
+        </div>
+
+        <div class="auth-panel">
+            <div class="auth-heading">
+                <h1 class="serif">Create Your Tutor Account</h1>
+                <p>It only takes 2 minutes to get started.</p>
+            </div>
+
+            <div class="progress-steps" id="registerSteps">
+                <div class="step-dot active" data-step-dot="1"><span>1</span>Account</div>
+                <div class="step-dot" data-step-dot="2"><span>2</span>Details</div>
+                <div class="step-dot" data-step-dot="3"><span>3</span>Confirm</div>
+            </div>
+
+            <form asp-action="Register" method="post" id="registerForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="Role" />
+                <div asp-validation-summary="ModelOnly"></div>
+
+                <section class="register-step active" data-step="1">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="FullName">Full Name</label>
+                            <input asp-for="FullName" class="tb-input step-required" placeholder="e.g. Ram Prasad Shrestha" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="Email">Email Address</label>
+                            <input asp-for="Email" class="tb-input step-required" placeholder="name@example.com" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="PhoneNumber">Phone Number</label>
+                            <input asp-for="PhoneNumber" class="tb-input" placeholder="+977 98XXXXXXXX" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="District">District</label>
+                            <select asp-for="District" class="tb-select step-required">
+                                <option value="">Select district</option>
+                                <option>Kathmandu</option>
+                                <option>Lalitpur</option>
+                                <option>Bhaktapur</option>
+                                <option>Pokhara</option>
+                                <option>Chitwan</option>
+                                <option>Biratnagar</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="register-step" data-step="2">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="Subjects">Teaching Subject(s)</label>
+                            <input asp-for="Subjects" class="tb-input step-required" placeholder="e.g. Math, Science" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="YearsOfExperience">Years of Experience</label>
+                            <input asp-for="YearsOfExperience" class="tb-input" type="number" min="0" placeholder="Select experience" />
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="Password">Password</label>
+                            <div class="password-wrap">
+                                <input asp-for="Password" type="password" class="tb-input step-required" placeholder="Create a strong password" id="passwordInput" />
+                                <span class="eye-dot"></span>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label asp-for="ConfirmPassword">Confirm Password</label>
+                            <input asp-for="ConfirmPassword" type="password" class="tb-input step-required" placeholder="Re-enter password" id="confirmPasswordInput" />
+                        </div>
+                        <div class="field full">
+                            <label>Password Strength</label>
+                            <div class="strength"><span id="strengthBar"></span></div>
+                            <div class="strength-text" id="strengthText">Start typing a password</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="register-step" data-step="3">
+                    <div class="confirm-box">
+                        <h3>Confirm your details</h3>
+                        <p>Please review your information before creating your account.</p>
+                        <div class="confirm-grid">
+                            <div><span>Role</span><strong>Tutor</strong></div>
+                            <div><span>Full Name</span><strong id="confirmName">-</strong></div>
+                            <div><span>Email</span><strong id="confirmEmail">-</strong></div>
+                            <div><span>District</span><strong id="confirmDistrict">-</strong></div>
+                            <div><span>Subjects</span><strong id="confirmStudy">-</strong></div>
+                            <div><span>Password</span><strong id="confirmPasswordStatus">Not checked</strong></div>
+                        </div>
+                    </div>
+
+                    <label class="terms-line">
+                        <input class="box-check step-required" type="checkbox" checked id="termsCheck" />
+                        I agree to the <a class="link-green" asp-controller="Home" asp-action="Terms">Terms of Service</a> and <a class="link-green" asp-controller="Home" asp-action="Privacy">Privacy Policy</a>
+                    </label>
+                </section>
+
+                <div class="register-actions">
+                    <button class="tb-btn-outline" type="button" id="prevStep" disabled>Back</button>
+                    <button class="tb-btn dark" type="button" id="nextStep">Next</button>
+                    <button class="tb-btn dark d-none" type="submit" id="submitRegister">Create Tutor Account</button>
+                </div>
+            </form>
+
+            <div class="divider">or sign up with</div>
+            <button class="google-btn" type="button"><span class="g-dot">G</span><span>Sign up with Google</span><span></span></button>
+            <p class="auth-bottom">Already have an account? <a class="link-green" asp-action="TutorLogin">Log in</a></p>
+            <p class="auth-bottom">Looking to learn instead? <a class="link-green" asp-action="StudentRegister">Register as Student</a></p>
+        </div>
+    </section>
+</main>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            let currentStep = 1;
+            const totalSteps = 3;
+            const steps = document.querySelectorAll(".register-step");
+            const dots = document.querySelectorAll("[data-step-dot]");
+            const prevButton = document.getElementById("prevStep");
+            const nextButton = document.getElementById("nextStep");
+            const submitButton = document.getElementById("submitRegister");
+            const passwordInput = document.getElementById("passwordInput");
+            const confirmPasswordInput = document.getElementById("confirmPasswordInput");
+            const strengthBar = document.getElementById("strengthBar");
+            const strengthText = document.getElementById("strengthText");
+
+            function showStep(step) {
+                currentStep = step;
+                steps.forEach(item => item.classList.toggle("active", Number(item.dataset.step) === step));
+                dots.forEach(item => item.classList.toggle("active", Number(item.dataset.stepDot) <= step));
+
+                prevButton.disabled = step === 1;
+                nextButton.classList.toggle("d-none", step === totalSteps);
+                submitButton.classList.toggle("d-none", step !== totalSteps);
+
+                if (step === 3) {
+                    updateConfirm();
+                }
+            }
+
+            function getStepFields(step) {
+                return document.querySelectorAll(`.register-step[data-step="${step}"] .step-required`);
+            }
+
+            function validateCurrentStep() {
+                let isValid = true;
+                getStepFields(currentStep).forEach(field => {
+                    const empty = field.type === "checkbox" ? !field.checked : !field.value.trim();
+                    field.classList.toggle("input-error", empty);
+                    if (empty) isValid = false;
+                });
+
+                if (currentStep === 2) {
+                    const password = passwordInput.value;
+                    const confirmPassword = confirmPasswordInput.value;
+                    const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
+                    confirmPasswordInput.classList.toggle("input-error", !passwordsMatch);
+                    if (!passwordsMatch) isValid = false;
+                }
+
+                return isValid;
+            }
+
+            function scorePassword(password) {
+                let score = 0;
+                if (password.length >= 6) score++;
+                if (password.length >= 10) score++;
+                if (/[A-Z]/.test(password)) score++;
+                if (/[a-z]/.test(password)) score++;
+                if (/[0-9]/.test(password)) score++;
+                if (/[^A-Za-z0-9]/.test(password)) score++;
+                return score;
+            }
+
+            function updateStrength() {
+                const password = passwordInput.value;
+                const score = scorePassword(password);
+                let label = "Start typing a password";
+                let width = "0%";
+                let color = "#deded8";
+
+                if (password.length > 0 && score <= 2) {
+                    label = "Weak - use 6+ characters, numbers and capitals";
+                    width = "28%";
+                    color = "#d9534f";
+                } else if (score <= 4 && password.length > 0) {
+                    label = "Good - add symbols for Strong";
+                    width = "65%";
+                    color = "#47aa80";
+                } else if (score >= 5) {
+                    label = "Strong password";
+                    width = "100%";
+                    color = "#127a5b";
+                }
+
+                strengthBar.style.width = width;
+                strengthBar.style.background = color;
+                strengthText.textContent = label;
+                strengthText.style.color = color;
+            }
+
+            function valueOf(name) {
+                const field = document.querySelector(`[name="${name}"]`);
+                return field && field.value ? field.value : "-";
+            }
+
+            function updateConfirm() {
+                document.getElementById("confirmName").textContent = valueOf("FullName");
+                document.getElementById("confirmEmail").textContent = valueOf("Email");
+                document.getElementById("confirmDistrict").textContent = valueOf("District");
+                document.getElementById("confirmStudy").textContent = valueOf("Subjects");
+
+                const password = passwordInput.value;
+                const confirmPassword = confirmPasswordInput.value;
+                document.getElementById("confirmPasswordStatus").textContent =
+                    password && password === confirmPassword ? "Password matched" : "Password not matched";
+            }
+
+            nextButton.addEventListener("click", () => {
+                if (!validateCurrentStep()) return;
+                showStep(Math.min(currentStep + 1, totalSteps));
+            });
+
+            prevButton.addEventListener("click", () => {
+                showStep(Math.max(currentStep - 1, 1));
+            });
+
+            passwordInput.addEventListener("input", updateStrength);
+            showStep(1);
+            updateStrength();
+        })();
+    </script>
+}
