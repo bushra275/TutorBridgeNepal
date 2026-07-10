@@ -7,6 +7,9 @@
 
 /* Top bar */
 .dash-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
     height: 64px;
     display: flex;
     align-items: center;
