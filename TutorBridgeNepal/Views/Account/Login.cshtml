@@ -113,7 +113,7 @@
 
                 <div class="form-row-between">
                     <label class="form-checkline"><input asp-for="RememberMe" class="box-check" /> @(isAdmin ? "Remember this device for 7 days" : "Remember me")</label>
-                    <a class="link-green" href="#">Forgot password?</a>
+                    <a class="link-green" asp-action="ForgotPassword" asp-route-role="@Model.Role">Forgot password?</a>
                 </div>
 
                 <button class="tb-btn @(isTutor ? "dark" : isAdmin ? "brown" : "") w-100" type="submit">@(isAdmin ? "Sign in to Admin Portal" : isTutor ? "Log In as Tutor" : "Log In")</button>
