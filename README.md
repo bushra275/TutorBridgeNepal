@@ -30,7 +30,7 @@ TutorBridge Nepal is a web platform that connects students with local tutors acr
 
 1. Clone the repository
    ```
-   git clone https://github.com/yourusername/TutorBridgeNepal.git
+   git clone https://github.com/bushra275/TutorBridgeNepal.git
    ```
 2. Open `TutorBridgeNepal.slnx` in Visual Studio, or `cd` into the `TutorBridgeNepal` folder
 3. Update the connection string in `appsettings.Development.json` if needed
