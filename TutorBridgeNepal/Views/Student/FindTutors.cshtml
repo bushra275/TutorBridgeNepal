@@ -1,0 +1,166 @@
+﻿@model TutorBridgeNepal.ViewModels.StudentFindTutorsViewModel
+@{
+    ViewData["Title"] = "Find Tutors";
+    Layout = null;
+
+    string PageUrl(int p) => Url.Action("FindTutors", new { q = Model.Query, subject = Model.Subject, district = Model.District, sort = Model.Sort, page = p })!;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Find Tutors - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_StudentTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_StudentSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>Find Tutors</h1>
+                        <p>Browse verified tutors — filter by subject, price or location</p>
+                    </div>
+                </div>
+
+                <form method="get" asp-controller="Student" asp-action="FindTutors">
+                    <div class="filter-bar">
+                        <input class="filter-search" type="text" name="q" value="@Model.Query" placeholder="Search by name, subject or keyword..." />
+
+                        <select class="filter-select" name="subject" onchange="this.form.submit()">
+                            <option value="">Subject</option>
+                            @foreach (var s in Model.SubjectOptions)
+                            {
+                                <option value="@s" selected="@(Model.Subject == s)">@s</option>
+                            }
+                        </select>
+
+                        <select class="filter-select" name="district" onchange="this.form.submit()">
+                            <option value="">Location</option>
+                            @foreach (var d in Model.DistrictOptions)
+                            {
+                                <option value="@d" selected="@(Model.District == d)">@d</option>
+                            }
+                        </select>
+
+                        <select class="filter-select" name="sort" onchange="this.form.submit()">
+                            <option value="rating" selected="@(Model.Sort == "rating")">Top rated</option>
+                            <option value="price_low" selected="@(Model.Sort == "price_low")">Price: Low to High</option>
+                            <option value="price_high" selected="@(Model.Sort == "price_high")">Price: High to Low</option>
+                            <option value="experience" selected="@(Model.Sort == "experience")">Most experienced</option>
+                        </select>
+
+                        <span class="filter-verified-chip">✓ Verified only</span>
+                        <button type="submit" class="tb-btn">Search</button>
+                    </div>
+                </form>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Query) || !string.IsNullOrWhiteSpace(Model.Subject) || !string.IsNullOrWhiteSpace(Model.District))
+                {
+                    <div class="active-filters">
+                        @if (!string.IsNullOrWhiteSpace(Model.Query))
+                        {
+                            <a class="filter-chip" asp-action="FindTutors" asp-route-subject="@Model.Subject" asp-route-district="@Model.District" asp-route-sort="@Model.Sort">"@Model.Query" ×</a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Subject))
+                        {
+                            <a class="filter-chip" asp-action="FindTutors" asp-route-q="@Model.Query" asp-route-district="@Model.District" asp-route-sort="@Model.Sort">@Model.Subject ×</a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.District))
+                        {
+                            <a class="filter-chip" asp-action="FindTutors" asp-route-q="@Model.Query" asp-route-subject="@Model.Subject" asp-route-sort="@Model.Sort">@Model.District ×</a>
+                        }
+                        <a asp-action="FindTutors" style="font-size:.8rem; color:var(--muted); text-decoration:none; font-weight:700;">Clear all</a>
+                    </div>
+                }
+
+                <p class="results-meta">
+                    @if (Model.TotalCount == 0)
+                    {
+                        @:No tutors matched your filters.
+                    }
+                    else
+                    {
+                        var start = (Model.Page - 1) * Model.PageSize + 1;
+                        var end = Math.Min(Model.Page * Model.PageSize, Model.TotalCount);
+                        @:Showing @start–@end of @Model.TotalCount tutors
+                    }
+                </p>
+
+                @if (!Model.Tutors.Any())
+                {
+                    <p class="empty-state">Try a different subject, name, or district. <a asp-action="FindTutors">Reset filters</a></p>
+                }
+                else
+                {
+                    <div class="tutor-list-grid">
+                        @foreach (var tutor in Model.Tutors)
+                        {
+                            <article class="tutor-list-card">
+                                <div class="tutor-list-head">
+                                    <div class="avatar">@tutor.Initials</div>
+                                    <div>
+                                        <div class="name-row">
+                                            <strong>@tutor.FullName</strong>
+                                            <span class="verified-inline">✓ Verified</span>
+                                        </div>
+                                        <div class="tutor-meta">@string.Join(" · ", tutor.SubjectTags.Take(2))@(string.IsNullOrWhiteSpace(tutor.District) ? "" : " · " + tutor.District)</div>
+                                        <div class="tutor-meta">@tutor.YearsOfExperience yrs exp</div>
+                                        <div class="stars">
+                                            @if (tutor.AverageRating > 0)
+                                            {
+                                                @:★★★★★ <span class="tutor-meta">@tutor.AverageRating.ToString("0.0")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="tutor-meta">New tutor</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="tags">
+                                    @foreach (var tag in tutor.SubjectTags.Take(3))
+                                    {
+                                        <span class="tag">@tag</span>
+                                    }
+                                </div>
+                                <div class="tutor-list-foot">
+                                    <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@tutor.TutorProfileId" class="tb-btn">View profile</a>
+                                </div>
+                            </article>
+                        }
+                    </div>
+
+                    @if (Model.TotalPages > 1)
+                    {
+                        <div class="pagination-bar">
+                            <span>Page @Model.Page of @Model.TotalPages</span>
+                            <div class="page-links">
+                                <a class="page-btn @(Model.Page <= 1 ? "disabled" : "")" href="@PageUrl(Model.Page - 1)">‹</a>
+                                @for (int p = 1; p <= Model.TotalPages; p++)
+                                {
+                                    <a class="page-btn @(p == Model.Page ? "active" : "")" href="@PageUrl(p)">@p</a>
+                                }
+                                <a class="page-btn @(Model.Page >= Model.TotalPages ? "disabled" : "")" href="@PageUrl(Model.Page + 1)">›</a>
+                            </div>
+                        </div>
+                    }
+                }
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

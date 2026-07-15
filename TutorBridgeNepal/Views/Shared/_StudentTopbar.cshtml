@@ -1,0 +1,16 @@
+﻿@{
+    var initials = ViewData["SidebarInitials"] as string ?? "?";
+    var name = ViewData["SidebarName"] as string ?? "";
+}
+<header class="dash-topbar">
+    <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+
+    <form class="dash-search" asp-controller="Student" asp-action="FindTutors" method="get">
+        <input type="text" name="q" placeholder="Search tutors, subjects..." />
+    </form>
+
+    <div class="dash-topbar-right">
+        <a asp-controller="Student" asp-action="Dashboard" asp-fragment="messages-panel" class="icon-btn" title="Messages & notifications">🔔</a>
+        <div class="topbar-avatar" title="@name">@initials</div>
+    </div>
+</header>

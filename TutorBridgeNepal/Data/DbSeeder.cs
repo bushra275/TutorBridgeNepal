@@ -44,15 +44,14 @@ public static class DbSeeder
         var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var context = serviceProvider.GetRequiredService<TutorBridgeNepal.Data.ApplicationDbContext>();
 
-
         var sampleTutors = new[]
         {
-            new { Email = "ram.shrestha@tutorbridge.com", FullName = "Ram Prasad Shrestha", District = "Kathmandu", Subjects = "Mathematics, SEE Prep", Years = 6, Rate = 500m, Rating = 4.9m },
-            new { Email = "sita.bajracharya@tutorbridge.com", FullName = "Sita Bajracharya", District = "Lalitpur", Subjects = "Science, Biology, SEE Prep", Years = 5, Rate = 450m, Rating = 4.8m },
-            new { Email = "arjun.karmacharya@tutorbridge.com", FullName = "Arjun Karmacharya", District = "Lalitpur", Subjects = "English, Communication, IELTS Prep", Years = 4, Rate = 400m, Rating = 4.7m },
-            new { Email = "bimala.gurung@tutorbridge.com", FullName = "Bimala Gurung", District = "Pokhara", Subjects = "Physics, Chemistry, NEB Prep", Years = 7, Rate = 550m, Rating = 4.9m },
-            new { Email = "prakash.adhikari@tutorbridge.com", FullName = "Prakash Adhikari", District = "Kathmandu", Subjects = "Computer Science, Programming", Years = 5, Rate = 600m, Rating = 4.8m },
-            new { Email = "kabita.rai@tutorbridge.com", FullName = "Kabita Rai", District = "Kathmandu", Subjects = "Biology, SEE Prep, NEB Prep", Years = 6, Rate = 470m, Rating = 4.8m },
+            new { Email = "ram.shrestha@tutorbridge.com", FullName = "Ram Prasad Shrestha", District = "Kathmandu", Subjects = "Mathematics, SEE Prep", Years = 6, Rating = 4.9m },
+            new { Email = "sita.bajracharya@tutorbridge.com", FullName = "Sita Bajracharya", District = "Lalitpur", Subjects = "Science, Biology, SEE Prep", Years = 5, Rating = 4.8m },
+            new { Email = "arjun.karmacharya@tutorbridge.com", FullName = "Arjun Karmacharya", District = "Lalitpur", Subjects = "English, Communication, IELTS Prep", Years = 4, Rating = 4.7m },
+            new { Email = "bimala.gurung@tutorbridge.com", FullName = "Bimala Gurung", District = "Pokhara", Subjects = "Physics, Chemistry, NEB Prep", Years = 7, Rating = 4.9m },
+            new { Email = "prakash.adhikari@tutorbridge.com", FullName = "Prakash Adhikari", District = "Kathmandu", Subjects = "Computer Science, Programming", Years = 5, Rating = 4.8m },
+            new { Email = "kabita.rai@tutorbridge.com", FullName = "Kabita Rai", District = "Kathmandu", Subjects = "Biology, SEE Prep, NEB Prep", Years = 6, Rating = 4.8m },
         };
 
         foreach (var sample in sampleTutors)
@@ -82,7 +81,6 @@ public static class DbSeeder
                     UserId = user.Id,
                     Subjects = sample.Subjects,
                     YearsOfExperience = sample.Years,
-                    HourlyRate = sample.Rate,
                     AverageRating = sample.Rating,
                     IsVerified = true
                 });

@@ -6,7 +6,6 @@
     var hour = DateTime.Now.Hour;
     var greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
     var firstName = Model.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? Model.FullName;
-    var subMeta = string.Join(" · ", new[] { Model.GradeLevel, Model.District }.Where(x => !string.IsNullOrWhiteSpace(x)));
     var maxSubjectSessions = Model.SubjectProgress.Any() ? Model.SubjectProgress.Max(s => s.CompletedSessions) : 0;
 }
 <!DOCTYPE html>
@@ -24,49 +23,10 @@
 </head>
 <body>
     <div class="dash-shell">
-
-        <!-- Top bar -->
-        <header class="dash-topbar">
-            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
-
-            <form class="dash-search" asp-controller="Home" asp-action="FindTutors" method="get">
-                <input type="text" placeholder="Search tutors, subjects..." />
-            </form>
-
-            <div class="dash-topbar-right">
-                <a href="#messages-panel" class="icon-btn" title="Messages & notifications">🔔</a>
-                <div class="topbar-avatar" title="@Model.FullName">@Model.Initials</div>
-            </div>
-        </header>
+        @await Html.PartialAsync("_StudentTopbar")
 
         <div class="dash-body">
-
-            <!-- Sidebar -->
-            <aside class="dash-sidebar">
-                <div class="dash-user">
-                    <div class="avatar">@Model.Initials</div>
-                    <div>
-                        <div class="name">@Model.FullName</div>
-                        <div class="meta">@(string.IsNullOrWhiteSpace(subMeta) ? "Student" : subMeta)</div>
-                        <span class="role-chip">Student</span>
-                    </div>
-                </div>
-
-                <ul class="dash-nav">
-                    <li><a asp-controller="Student" asp-action="Dashboard" class="active"><span class="nav-icon">🏠</span> Dashboard</a></li>
-                    <li><a asp-controller="Home" asp-action="FindTutors"><span class="nav-icon">🔍</span> Find Tutors</a></li>
-                    <li><a href="#sessions-panel"><span class="nav-icon">📅</span> My Sessions</a></li>
-                    <li><a href="#messages-panel"><span class="nav-icon">💬</span> Messages</a></li>
-                    <li><a href="#tutors-panel"><span class="nav-icon">👥</span> My Tutors</a></li>
-                    <li><a href="#progress-panel"><span class="nav-icon">📈</span> Progress</a></li>
-                </ul>
-
-                <ul class="dash-nav-secondary">
-                    <li><a asp-area="Identity" asp-page="/Account/Manage/Index"><span class="nav-icon">⚙️</span> Settings</a></li>
-                    <li><a asp-controller="Home" asp-action="Contact"><span class="nav-icon">❓</span> Help &amp; Support</a></li>
-                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
-                </ul>
-            </aside>
+            @await Html.PartialAsync("_StudentSidebar")
 
             <!-- Main content -->
             <main class="dash-main">
@@ -115,18 +75,18 @@
                         <div class="panel" id="sessions-panel">
                             <div class="panel-head">
                                 <h2>Upcoming sessions</h2>
-                                <span class="tag-count">@Model.UpcomingCount</span>
+                                <a asp-controller="Student" asp-action="Sessions" class="mini-btn panel-action">View all</a>
                             </div>
 
                             @if (!Model.UpcomingSessions.Any())
                             {
-                                <p class="empty-state">You don't have any upcoming sessions yet. <a asp-controller="Home" asp-action="FindTutors">Browse tutors</a> to book your first session.</p>
+                                <p class="empty-state">You don't have any upcoming sessions yet. <a asp-controller="Student" asp-action="FindTutors">Browse tutors</a> to book your first session.</p>
                             }
                             else
                             {
                                 foreach (var session in Model.UpcomingSessions)
                                 {
-                                    var statusClass = session.Status == "Confirmed" ? "pill-confirmed" : session.Status == "Pending" ? "pill-pending" : "pill-pending";
+                                    var statusClass = session.Status == "Confirmed" ? "pill-confirmed" : "pill-pending";
                                     <div class="session-card @(session.Status == "Pending" ? "pending" : "")">
                                         <div class="avatar">@session.TutorInitials</div>
                                         <div class="session-info">
@@ -143,11 +103,12 @@
                                                 }
                                                 else
                                                 {
-                                                    <a href="#messages-panel" class="mini-btn">View details</a>
+                                                    <a asp-controller="Student" asp-action="Sessions" class="mini-btn">View details</a>
                                                 }
                                                 <form asp-action="CancelBooking" asp-controller="Student" method="post" onsubmit="return confirm('Cancel this session?');">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="id" value="@session.BookingId" />
+                                                    <input type="hidden" name="returnTo" value="Dashboard" />
                                                     <button type="submit" class="mini-btn danger">Cancel</button>
                                                 </form>
                                             </div>
@@ -160,6 +121,7 @@
                         <div class="panel">
                             <div class="panel-head">
                                 <h2>Recent sessions</h2>
+                                <a asp-controller="Student" asp-action="Sessions" asp-route-tab="all" class="mini-btn panel-action">View all</a>
                             </div>
                             @if (!Model.RecentSessions.Any())
                             {
@@ -223,12 +185,12 @@
                         <div class="panel" id="tutors-panel">
                             <div class="panel-head">
                                 <h2>My tutors</h2>
-                                <a asp-controller="Home" asp-action="FindTutors" class="mini-btn green panel-action">+ Find more</a>
+                                <a asp-controller="Student" asp-action="FindTutors" class="mini-btn green panel-action">+ Find more</a>
                             </div>
 
                             @if (!Model.MyTutors.Any())
                             {
-                                <p class="empty-state">You haven't booked any tutors yet. <a asp-controller="Home" asp-action="FindTutors">Find one</a> to get started.</p>
+                                <p class="empty-state">You haven't booked any tutors yet. <a asp-controller="Student" asp-action="FindTutors">Find one</a> to get started.</p>
                             }
                             else
                             {
@@ -238,10 +200,10 @@
                                         <div class="avatar">@tutor.TutorInitials</div>
                                         <div class="tutor-row-info">
                                             <div class="name">@tutor.TutorName</div>
-                                            <div class="meta">@tutor.Subjects · Rs @tutor.HourlyRate.ToString("0")/hr</div>
+                                            <div class="meta">@tutor.Subjects</div>
                                             <div class="stars">★ @tutor.AverageRating.ToString("0.0")</div>
                                         </div>
-                                        <a asp-controller="Home" asp-action="FindTutors" class="mini-btn">Book</a>
+                                        <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@tutor.TutorProfileId" class="mini-btn">Book</a>
                                     </div>
                                 }
                             }

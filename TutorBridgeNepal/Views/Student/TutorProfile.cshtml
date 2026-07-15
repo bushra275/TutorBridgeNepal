@@ -1,0 +1,112 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorProfileDetailViewModel
+@{
+    ViewData["Title"] = Model.FullName;
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@Model.FullName - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_StudentTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_StudentSidebar")
+
+            <main class="dash-main">
+                <a asp-controller="Student" asp-action="FindTutors" class="back-link" style="display:inline-block; margin-bottom:1rem;">← Back to Find Tutors</a>
+
+                @if (TempData["BookingError"] != null)
+                {
+                    <div class="status-banner warn mb-3">@TempData["BookingError"]</div>
+                }
+
+                <div class="tutor-profile-head">
+                    <div class="tutor-profile-avatar">@Model.Initials</div>
+                    <div style="flex:1; min-width:220px;">
+                        <div class="name-row" style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+                            <h1 style="margin:0; font-size:1.3rem;">@Model.FullName</h1>
+                            @if (Model.IsVerified)
+                            {
+                                <span class="verified-inline">✓ Verified</span>
+                            }
+                        </div>
+                        <p class="tutor-meta mb-1">@string.Join(" · ", Model.SubjectTags)@(string.IsNullOrWhiteSpace(Model.District) ? "" : " · " + Model.District)</p>
+                        <p class="tutor-meta mb-1">@Model.YearsOfExperience yrs experience</p>
+                        <div class="stars">
+                            @if (Model.AverageRating > 0)
+                            {
+                                @:★★★★★ <span class="tutor-meta">@Model.AverageRating.ToString("0.0")</span>
+                            }
+                            else
+                            {
+                                <span class="tutor-meta">New tutor</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(Model.Bio))
+                        {
+                            <p class="mt-2">@Model.Bio</p>
+                        }
+                    </div>
+                    <div class="text-end">
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2>Available time slots</h2>
+                    </div>
+
+                    @if (!Model.AvailableSlots.Any())
+                    {
+                        <p class="empty-state">This tutor has no open slots right now. Check back soon, or message them via your dashboard once you've booked before.</p>
+                    }
+                    else
+                    {
+                        <form asp-controller="Student" asp-action="BookSlot" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="tutorProfileId" value="@Model.TutorProfileId" />
+                            <div class="field mb-3" style="max-width:320px;">
+                                <label>Subject for this session</label>
+                                <select name="subject" class="filter-select" style="width:100%;">
+                                    @foreach (var tag in Model.SubjectTags)
+                                    {
+                                        <option value="@tag">@tag</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="slot-grid">
+                                @foreach (var slot in Model.AvailableSlots)
+                                {
+                                    <label class="slot-card" style="cursor:pointer; display:block;">
+                                        <input type="radio" name="slotId" value="@slot.SlotId" required style="margin-right:.4rem;" />
+                                        <span class="slot-time">@slot.StartTime.ToString("h:mm tt") – @slot.EndTime.ToString("h:mm tt")</span>
+                                        <div class="slot-date">@slot.StartTime.ToString("ddd, d MMM yyyy")</div>
+                                    </label>
+                                }
+                            </div>
+
+                            <button type="submit" class="tb-btn mt-3">Request this session</button>
+                            <p class="tutor-meta mt-2">Your tutor will confirm the booking before the session is finalized.</p>
+                        </form>
+                    }
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

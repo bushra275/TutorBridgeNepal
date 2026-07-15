@@ -36,7 +36,6 @@ public class TutorRowViewModel
     public string TutorName { get; set; } = string.Empty;
     public string TutorInitials { get; set; } = string.Empty;
     public string Subjects { get; set; } = string.Empty;
-    public decimal HourlyRate { get; set; }
     public decimal AverageRating { get; set; }
 }
 

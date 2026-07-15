@@ -1,0 +1,31 @@
+﻿@{
+    var name = ViewData["SidebarName"] as string ?? "";
+    var initials = ViewData["SidebarInitials"] as string ?? "?";
+    var meta = ViewData["SidebarMeta"] as string ?? "Student";
+    var activeNav = ViewData["ActiveNav"] as string ?? "";
+}
+<aside class="dash-sidebar">
+    <div class="dash-user">
+        <div class="avatar">@initials</div>
+        <div>
+            <div class="name">@name</div>
+            <div class="meta">@meta</div>
+            <span class="role-chip">Student</span>
+        </div>
+    </div>
+
+    <ul class="dash-nav">
+        <li><a asp-controller="Student" asp-action="Dashboard" class="@(activeNav == "dashboard" ? "active" : "")"><span class="nav-icon">🏠</span> Dashboard</a></li>
+        <li><a asp-controller="Student" asp-action="FindTutors" class="@(activeNav == "findtutors" ? "active" : "")"><span class="nav-icon">🔍</span> Find Tutors</a></li>
+        <li><a asp-controller="Student" asp-action="Sessions" class="@(activeNav == "sessions" ? "active" : "")"><span class="nav-icon">📅</span> My Sessions</a></li>
+        <li><a asp-controller="Student" asp-action="Dashboard" asp-fragment="messages-panel" class="@(activeNav == "messages" ? "active" : "")"><span class="nav-icon">💬</span> Messages</a></li>
+        <li><a asp-controller="Student" asp-action="Dashboard" asp-fragment="tutors-panel" class="@(activeNav == "tutors" ? "active" : "")"><span class="nav-icon">👥</span> My Tutors</a></li>
+        <li><a asp-controller="Student" asp-action="Dashboard" asp-fragment="progress-panel" class="@(activeNav == "progress" ? "active" : "")"><span class="nav-icon">📈</span> Progress</a></li>
+    </ul>
+
+    <ul class="dash-nav-secondary">
+        <li><a asp-area="Identity" asp-page="/Account/Manage/Index"><span class="nav-icon">⚙️</span> Settings</a></li>
+        <li><a asp-controller="Home" asp-action="Contact"><span class="nav-icon">❓</span> Help &amp; Support</a></li>
+        <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+    </ul>
+</aside>
