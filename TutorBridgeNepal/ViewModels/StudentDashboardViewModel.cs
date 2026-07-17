@@ -17,6 +17,17 @@ public class StudentDashboardViewModel
     public List<BookingRowViewModel> RecentSessions { get; set; } = new();
     public List<TutorRowViewModel> MyTutors { get; set; } = new();
     public List<SubjectProgressViewModel> SubjectProgress { get; set; } = new();
+    public List<RecentMessageViewModel> RecentMessages { get; set; } = new();
+}
+
+public class RecentMessageViewModel
+{
+    public int TutorProfileId { get; set; }
+    public string TutorName { get; set; } = string.Empty;
+    public string TutorInitials { get; set; } = string.Empty;
+    public string Preview { get; set; } = string.Empty;
+    public DateTime SentAt { get; set; }
+    public bool IsFromStudent { get; set; }
 }
 
 public class BookingRowViewModel

@@ -15,6 +15,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<TutorProfile> TutorProfiles => Set<TutorProfile>();
     public DbSet<TutorAvailabilitySlot> TutorAvailabilitySlots => Set<TutorAvailabilitySlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<Message> Messages => Set<Message>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -44,5 +45,20 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .WithMany()
             .HasForeignKey(b => b.TutorAvailabilitySlotId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Message>()
+            .HasOne(m => m.StudentProfile)
+            .WithMany()
+            .HasForeignKey(m => m.StudentProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Message>()
+            .HasOne(m => m.TutorProfile)
+            .WithMany()
+            .HasForeignKey(m => m.TutorProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Message>()
+            .HasIndex(m => new { m.StudentProfileId, m.TutorProfileId, m.SentAt });
     }
 }

@@ -970,3 +970,630 @@ span.mini-btn {
         font-size: .78rem;
         margin-bottom: .5rem;
     }
+
+/* ===== Find Tutors / Sessions / Tutor Profile — redesign additions ===== */
+
+/* Find Tutors: two-row filter bar */
+.filter-row-1 {
+    display: flex;
+    gap: .6rem;
+    align-items: center;
+    margin-bottom: .6rem;
+}
+
+.filter-row-2 {
+    display: flex;
+    gap: .6rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: .9rem;
+}
+
+.icon-toggle-btn {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    border: 1px solid #78ddc0;
+    background: var(--mint);
+    color: var(--green);
+    display: grid;
+    place-items: center;
+    font-size: 1rem;
+    cursor: default;
+}
+
+/* Find Tutors: card top row + action buttons */
+.tutor-card-actions {
+    display: flex;
+    gap: .6rem;
+    margin-top: .3rem;
+}
+
+.btn-outline-sm {
+    min-height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    padding: 0 1rem;
+    font-weight: 700;
+    font-size: .82rem;
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    cursor: default;
+    opacity: .85;
+    flex: 1;
+}
+
+.btn-solid-sm {
+    min-height: 38px;
+    border-radius: 8px;
+    background: var(--green);
+    color: #fff;
+    padding: 0 1rem;
+    font-weight: 700;
+    font-size: .82rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    flex: 1;
+}
+
+    .btn-solid-sm:hover {
+        background: #0f6d51;
+        color: #fff;
+    }
+
+/* My Sessions: small count chip next to section headings */
+.section-count-chip {
+    background: var(--mint);
+    color: var(--green);
+    border-radius: 999px;
+    padding: .1rem .6rem;
+    font-size: .7rem;
+    font-weight: 800;
+    margin-left: .5rem;
+}
+
+.status-banner.success {
+    background: var(--mint);
+    color: var(--green);
+}
+
+/* Tutor Profile: header card */
+.profile-head-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.4rem;
+    margin-bottom: 1.2rem;
+}
+
+.profile-head-avatar {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: var(--mint);
+    color: var(--green);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    border: 1px solid #99e3cd;
+}
+
+.badge-row {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.session-count-text {
+    color: var(--muted);
+    font-size: .8rem;
+    font-weight: 600;
+    margin-top: .35rem;
+}
+
+.action-row {
+    display: flex;
+    gap: .6rem;
+    flex-wrap: wrap;
+}
+
+/* Tutor Profile: two-column layout */
+.profile-layout {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 1000px) {
+    .profile-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.info-panel {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.3rem 1.4rem;
+    margin-bottom: 1.2rem;
+}
+
+    .info-panel h2 {
+        margin: 0 0 .7rem;
+        font-size: 1.05rem;
+        font-weight: 800;
+    }
+
+.bio-text {
+    margin: 0;
+    font-size: .88rem;
+    line-height: 1.6;
+    color: var(--ink);
+}
+
+.subject-row-item {
+    display: flex;
+    justify-content: space-between;
+    padding: .65rem 0;
+    border-bottom: 1px solid var(--line);
+    font-size: .88rem;
+    font-weight: 700;
+}
+
+    .subject-row-item:last-child {
+        border-bottom: none;
+    }
+
+.review-empty {
+    color: var(--muted);
+    font-size: .85rem;
+    line-height: 1.55;
+    margin: 0;
+}
+
+.availability-line {
+    font-size: .85rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin-top: .3rem;
+}
+
+/* Tutor Profile: booking panel */
+.booking-panel {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.4rem;
+    position: sticky;
+    top: 84px;
+}
+
+    .booking-panel h2 {
+        margin: 0 0 .2rem;
+        font-size: 1.1rem;
+        font-weight: 800;
+    }
+
+.step-label {
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .03em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin: 1.15rem 0 .55rem;
+}
+
+.subject-tab-row {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.subject-tab {
+    flex: 1;
+    min-width: 90px;
+    text-align: center;
+    padding: .6rem .5rem;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    font-weight: 700;
+    font-size: .84rem;
+    cursor: pointer;
+    color: var(--ink);
+    background: #fff;
+}
+
+    .subject-tab.active {
+        background: var(--mint);
+        border-color: #68d6b6;
+        color: var(--green);
+    }
+
+.calendar-box {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: .9rem 1rem;
+}
+
+.calendar-title {
+    font-weight: 800;
+    font-size: .9rem;
+    margin-bottom: .6rem;
+    text-align: center;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: .25rem;
+    text-align: center;
+}
+
+.cal-dow {
+    font-size: .68rem;
+    font-weight: 800;
+    color: var(--muted);
+    padding: .3rem 0;
+}
+
+.cal-day {
+    font-size: .82rem;
+    font-weight: 700;
+    padding: .45rem 0;
+    border-radius: 8px;
+}
+
+.cal-day-empty {
+    visibility: hidden;
+}
+
+.cal-day-unavailable {
+    color: #c7c8c2;
+}
+
+.cal-day-available {
+    cursor: pointer;
+    color: var(--ink);
+    background: var(--soft);
+}
+
+    .cal-day-available:hover {
+        background: var(--mint);
+    }
+
+.cal-day-selected {
+    background: var(--green) !important;
+    color: #fff !important;
+}
+
+.no-date-selected {
+    color: var(--muted);
+    font-size: .82rem;
+    font-weight: 600;
+}
+
+.slot-date-group {
+    margin-top: .4rem;
+}
+
+.slot-section-label {
+    font-size: .74rem;
+    font-weight: 800;
+    color: var(--muted);
+    margin: .6rem 0 .4rem;
+}
+
+.slot-pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.slot-pill {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: .5rem .9rem;
+    font-size: .82rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: #fff;
+    color: var(--ink);
+}
+
+    .slot-pill:hover {
+        border-color: #68d6b6;
+    }
+
+    .slot-pill.selected {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+    }
+
+.booking-summary-box {
+    margin-top: 1.2rem;
+    border-top: 1px solid var(--line);
+    padding-top: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+    .booking-summary-box dl {
+        margin: 0;
+        font-size: .84rem;
+        overflow: hidden;
+    }
+
+    .booking-summary-box dt {
+        color: var(--muted);
+        font-weight: 700;
+        float: left;
+        width: 100px;
+        clear: left;
+        margin-bottom: .35rem;
+    }
+
+    .booking-summary-box dd {
+        margin: 0 0 .35rem 100px;
+        font-weight: 800;
+    }
+
+#confirmBookingBtn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+/* ===== Messages page ===== */
+
+.messages-shell {
+    display: flex;
+    height: calc(100vh - 64px - 3.5rem);
+    min-height: 480px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.conv-list {
+    width: 320px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+}
+
+.conv-list-header {
+    padding: 1rem 1rem .6rem;
+}
+
+    .conv-list-header h2 {
+        font-size: 1.1rem;
+        font-weight: 800;
+        margin: 0 0 .7rem;
+        display: flex;
+        align-items: center;
+        gap: .4rem;
+    }
+
+.conv-search {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 .8rem;
+    font-size: .84rem;
+    background: var(--panel-bg, #f6f6f4);
+}
+
+.conv-items {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.conv-item {
+    display: flex;
+    gap: .7rem;
+    padding: .8rem 1rem;
+    border-bottom: 1px solid var(--line);
+    text-decoration: none;
+    color: var(--ink);
+    align-items: flex-start;
+}
+
+    .conv-item:hover {
+        background: #fafaf8;
+    }
+
+    .conv-item.active {
+        background: var(--mint);
+        border-left: 3px solid var(--green);
+    }
+
+.conv-item-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.conv-item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: .5rem;
+}
+
+    .conv-item-top strong {
+        font-size: .88rem;
+    }
+
+    .conv-item-top span {
+        font-size: .72rem;
+        color: var(--muted);
+        white-space: nowrap;
+    }
+
+.conv-preview {
+    font-size: .8rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: .1rem 0;
+}
+
+.conv-item.has-unread .conv-preview,
+.conv-item.has-unread .conv-item-top strong {
+    color: var(--ink);
+    font-weight: 700;
+}
+
+.conv-meta-row {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .72rem;
+    color: var(--muted);
+}
+
+.unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.unread-count-badge {
+    background: var(--danger, #d9534f);
+    color: #fff;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 800;
+    padding: .05rem .4rem;
+    margin-left: .3rem;
+}
+
+/* Chat panel */
+.chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.chat-header {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: 1rem 1.2rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.chat-header-info {
+    flex: 1;
+}
+
+    .chat-header-info h2 {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 800;
+    }
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: .8rem;
+}
+
+.chat-empty {
+    margin: auto;
+    text-align: center;
+    color: var(--muted);
+    font-size: .9rem;
+    max-width: 320px;
+}
+
+.msg-row {
+    display: flex;
+}
+
+    .msg-row.from-student {
+        justify-content: flex-end;
+    }
+
+.msg-bubble {
+    max-width: 60%;
+    border-radius: 10px;
+    padding: .7rem .9rem;
+    font-size: .88rem;
+    line-height: 1.4;
+}
+
+.msg-row.from-tutor .msg-bubble {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--green);
+}
+
+.msg-row.from-student .msg-bubble {
+    background: var(--green);
+    color: #fff;
+}
+
+.msg-meta {
+    font-size: .7rem;
+    margin-top: .3rem;
+    opacity: .8;
+}
+
+.msg-row.from-student .msg-meta {
+    color: var(--muted);
+    text-align: right;
+}
+
+.msg-row.from-tutor .msg-meta {
+    color: var(--muted);
+}
+
+.chat-input-bar {
+    display: flex;
+    gap: .6rem;
+    padding: .9rem 1.2rem;
+    border-top: 1px solid var(--line);
+}
+
+.chat-input {
+    flex: 1;
+    min-height: 42px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 .9rem;
+    font-size: .88rem;
+    background: var(--panel-bg, #f6f6f4);
+}
+
+.no-conversations {
+    margin: auto;
+    text-align: center;
+    color: var(--muted);
+    font-size: .9rem;
+    padding: 2rem;
+}

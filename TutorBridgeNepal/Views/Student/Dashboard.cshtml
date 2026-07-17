@@ -212,8 +212,26 @@
                         <div class="panel" id="messages-panel">
                             <div class="panel-head">
                                 <h2>Recent messages</h2>
+                                <a asp-controller="Student" asp-action="Messages" class="mini-btn panel-action">View all</a>
                             </div>
-                            <p class="empty-state">No messages yet. Once you book a session, you'll be able to chat with your tutor here.</p>
+                            @if (!Model.RecentMessages.Any())
+                            {
+                                <p class="empty-state">No messages yet. Once you book a session, you'll be able to chat with your tutor here.</p>
+                            }
+                            else
+                            {
+                                foreach (var msg in Model.RecentMessages)
+                                {
+                                    <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@msg.TutorProfileId" class="tutor-row" style="text-decoration:none; color:inherit;">
+                                        <div class="avatar">@msg.TutorInitials</div>
+                                        <div class="tutor-row-info">
+                                            <div class="name">@msg.TutorName</div>
+                                            <div class="meta">@(msg.IsFromStudent ? "You: " : "")@(msg.Preview.Length > 48 ? msg.Preview[..48] + "…" : msg.Preview)</div>
+                                        </div>
+                                        <span class="tutor-meta">@msg.SentAt.ToString("d MMM")</span>
+                                    </a>
+                                }
+                            }
                         </div>
                     </div>
 

@@ -843,10 +843,10 @@ a {
         }
 
 .auth-sdg {
-    position: absolute;
-    left: 4.1rem;
-    bottom: 3rem;
+    position: relative;
     z-index: 1;
+    display: inline-flex;
+    margin-top: 1.6rem;
     border-radius: 7px;
     background: rgba(56, 190, 143, .45);
     color: #dbfff2;

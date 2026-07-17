@@ -3,7 +3,7 @@
     ViewData["Title"] = "Find Tutors";
     Layout = null;
 
-    string PageUrl(int p) => Url.Action("FindTutors", new { q = Model.Query, subject = Model.Subject, district = Model.District, sort = Model.Sort, page = p })!;
+    string PageUrl(int p) => Url.Action("FindTutors", new { q = Model.Query, subject = Model.Subject, district = Model.District, minExperience = Model.MinExperience, page = p })!;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -29,20 +29,30 @@
                 <div class="page-head">
                     <div>
                         <h1>Find Tutors</h1>
-                        <p>Browse verified tutors — filter by subject, price or location</p>
+                        <p>Browse verified tutors — filter by subject, experience or location</p>
                     </div>
                 </div>
 
                 <form method="get" asp-controller="Student" asp-action="FindTutors">
-                    <div class="filter-bar">
+                    <div class="filter-row-1">
                         <input class="filter-search" type="text" name="q" value="@Model.Query" placeholder="Search by name, subject or keyword..." />
+                    </div>
 
+                    <div class="filter-row-2">
                         <select class="filter-select" name="subject" onchange="this.form.submit()">
                             <option value="">Subject</option>
                             @foreach (var s in Model.SubjectOptions)
                             {
                                 <option value="@s" selected="@(Model.Subject == s)">@s</option>
                             }
+                        </select>
+
+                        <select class="filter-select" name="minExperience" onchange="this.form.submit()">
+                            <option value="" selected="@(Model.MinExperience == null)">Experience</option>
+                            <option value="1" selected="@(Model.MinExperience == 1)">1+ years</option>
+                            <option value="3" selected="@(Model.MinExperience == 3)">3+ years</option>
+                            <option value="5" selected="@(Model.MinExperience == 5)">5+ years</option>
+                            <option value="10" selected="@(Model.MinExperience == 10)">10+ years</option>
                         </select>
 
                         <select class="filter-select" name="district" onchange="this.form.submit()">
@@ -53,32 +63,29 @@
                             }
                         </select>
 
-                        <select class="filter-select" name="sort" onchange="this.form.submit()">
-                            <option value="rating" selected="@(Model.Sort == "rating")">Top rated</option>
-                            <option value="price_low" selected="@(Model.Sort == "price_low")">Price: Low to High</option>
-                            <option value="price_high" selected="@(Model.Sort == "price_high")">Price: High to Low</option>
-                            <option value="experience" selected="@(Model.Sort == "experience")">Most experienced</option>
-                        </select>
-
                         <span class="filter-verified-chip">✓ Verified only</span>
                         <button type="submit" class="tb-btn">Search</button>
                     </div>
                 </form>
 
-                @if (!string.IsNullOrWhiteSpace(Model.Query) || !string.IsNullOrWhiteSpace(Model.Subject) || !string.IsNullOrWhiteSpace(Model.District))
+                @if (!string.IsNullOrWhiteSpace(Model.Query) || !string.IsNullOrWhiteSpace(Model.Subject) || !string.IsNullOrWhiteSpace(Model.District) || Model.MinExperience.HasValue)
                 {
                     <div class="active-filters">
                         @if (!string.IsNullOrWhiteSpace(Model.Query))
                         {
-                            <a class="filter-chip" asp-action="FindTutors" asp-route-subject="@Model.Subject" asp-route-district="@Model.District" asp-route-sort="@Model.Sort">"@Model.Query" ×</a>
+                            <a class="filter-chip" asp-action="FindTutors" asp-route-subject="@Model.Subject" asp-route-district="@Model.District" asp-route-minExperience="@Model.MinExperience">"@Model.Query" ×</a>
                         }
                         @if (!string.IsNullOrWhiteSpace(Model.Subject))
                         {
-                            <a class="filter-chip" asp-action="FindTutors" asp-route-q="@Model.Query" asp-route-district="@Model.District" asp-route-sort="@Model.Sort">@Model.Subject ×</a>
+                            <a class="filter-chip" asp-action="FindTutors" asp-route-q="@Model.Query" asp-route-district="@Model.District" asp-route-minExperience="@Model.MinExperience">@Model.Subject ×</a>
+                        }
+                        @if (Model.MinExperience.HasValue)
+                        {
+                            <a class="filter-chip" asp-action="FindTutors" asp-route-q="@Model.Query" asp-route-subject="@Model.Subject" asp-route-district="@Model.District">@Model.MinExperience+ yrs exp ×</a>
                         }
                         @if (!string.IsNullOrWhiteSpace(Model.District))
                         {
-                            <a class="filter-chip" asp-action="FindTutors" asp-route-q="@Model.Query" asp-route-subject="@Model.Subject" asp-route-sort="@Model.Sort">@Model.District ×</a>
+                            <a class="filter-chip" asp-action="FindTutors" asp-route-q="@Model.Query" asp-route-subject="@Model.Subject" asp-route-minExperience="@Model.MinExperience">@Model.District ×</a>
                         }
                         <a asp-action="FindTutors" style="font-size:.8rem; color:var(--muted); text-decoration:none; font-weight:700;">Clear all</a>
                     </div>
@@ -112,10 +119,13 @@
                                     <div>
                                         <div class="name-row">
                                             <strong>@tutor.FullName</strong>
-                                            <span class="verified-inline">✓ Verified</span>
+                                            @if (tutor.IsVerified)
+                                            {
+                                                <span class="verified-inline">✓ Verified</span>
+                                            }
                                         </div>
                                         <div class="tutor-meta">@string.Join(" · ", tutor.SubjectTags.Take(2))@(string.IsNullOrWhiteSpace(tutor.District) ? "" : " · " + tutor.District)</div>
-                                        <div class="tutor-meta">@tutor.YearsOfExperience yrs exp</div>
+                                        <div class="tutor-meta">@tutor.YearsOfExperience yrs exp · @tutor.CompletedSessionsCount sessions completed</div>
                                         <div class="stars">
                                             @if (tutor.AverageRating > 0)
                                             {
@@ -134,8 +144,9 @@
                                         <span class="tag">@tag</span>
                                     }
                                 </div>
-                                <div class="tutor-list-foot">
-                                    <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@tutor.TutorProfileId" class="tb-btn">View profile</a>
+                                <div class="tutor-card-actions">
+                                    <span class="btn-outline-sm" title="Saving tutors isn't available yet">Save tutor</span>
+                                    <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@tutor.TutorProfileId" class="btn-solid-sm">View profile</a>
                                 </div>
                             </article>
                         }

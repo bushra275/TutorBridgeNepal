@@ -2,6 +2,8 @@
 @{
     ViewData["Title"] = "My Sessions";
     Layout = null;
+
+    var todayCount = Model.Sessions.Count(s => s.StartTime.Date == DateTime.Today);
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -34,7 +36,7 @@
 
                 @if (TempData["BookingSuccess"] != null)
                 {
-                    <div class="status-banner info mb-3">@TempData["BookingSuccess"]</div>
+                    <div class="status-banner success mb-3">@TempData["BookingSuccess"]</div>
                 }
 
                 <div class="tab-bar">
@@ -73,7 +75,7 @@
                 @if (Model.ActiveTab == "upcoming")
                 {
                     <div class="section-subhead">
-                        <h2>Upcoming sessions</h2>
+                        <h2>Upcoming sessions @if (todayCount > 0) { <span class="section-count-chip">@todayCount today</span> }</h2>
                     </div>
 
                     if (!Model.Sessions.Any())
@@ -86,6 +88,7 @@
                             @foreach (var s in Model.Sessions)
                             {
                                 var statusClass = s.Status == "Confirmed" ? "pill-confirmed" : "pill-pending";
+                                var minutesUntil = (s.StartTime - DateTime.Now).TotalMinutes;
                                 <div class="session-card @(s.Status == "Pending" ? "pending" : "")">
                                     <div class="avatar">@s.TutorInitials</div>
                                     <div class="session-info">
@@ -101,8 +104,7 @@
                                                 <span class="mini-btn" title="Your tutor will share the meeting link closer to the session time">Join session</span>
                                             }
                                             <span class="disabled-btn" title="Rescheduling isn't available yet — message your tutor directly">Reschedule</span>
-                                            <a asp-controller="Student" asp-action="Dashboard" asp-fragment="messages-panel" class="mini-btn">Message tutor</a>
-                                            <form asp-action="CancelBooking" asp-controller="Student" method="post" onsubmit="return confirm('Cancel this session?');">
+                                            <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@s.TutorProfileId" class="mini-btn">Message tutor</a>                                            <form asp-action="CancelBooking" asp-controller="Student" method="post" onsubmit="return confirm('Cancel this session?');">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="id" value="@s.BookingId" />
                                                 <input type="hidden" name="returnTo" value="Sessions" />
@@ -112,6 +114,14 @@
                                         @if (s.Status == "Pending")
                                         {
                                             <div class="status-banner warn">Awaiting tutor confirmation</div>
+                                        }
+                                        else if (s.Status == "Confirmed" && minutesUntil > 0 && minutesUntil < 1440)
+                                        {
+                                            var hrs = (int)(minutesUntil / 60);
+                                            var mins = (int)(minutesUntil % 60);
+                                            <div class="status-banner success">
+                                                Session starts in @(hrs > 0 ? $"{hrs} hour{(hrs == 1 ? "" : "s")} " : "")@mins minute@(mins == 1 ? "" : "s")
+                                            </div>
                                         }
                                     </div>
                                 </div>
@@ -131,7 +141,7 @@
                     {
                         <table class="dash-table">
                             <thead>
-                                <tr><th>Tutor</th><th>Subject</th><th>Date &amp; Time</th><th>Duration</th><th>Status</th><th>Actions</th></tr>
+                                <tr><th>Tutor</th><th>Subject</th><th>Date &amp; Time</th><th>Duration</th><th>Status</th><th>Rating</th><th>Actions</th></tr>
                             </thead>
                             <tbody>
                                 @foreach (var s in Model.Sessions)
@@ -143,6 +153,7 @@
                                         <td>@s.StartTime.ToString("d MMM yyyy, h:mm tt")</td>
                                         <td>@($"{(int)duration.TotalHours}h {duration.Minutes:D2}m")</td>
                                         <td><span class="status-text completed">Completed</span></td>
+                                        <td><span class="disabled-btn" title="Reviews aren't available yet">Leave review</span></td>
                                         <td>
                                             <span class="disabled-btn" title="Session notes aren't available yet">View notes</span>
                                             <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@s.TutorProfileId" class="mini-btn">Rebook</a>
@@ -174,7 +185,7 @@
                                         <td>@s.TutorName</td>
                                         <td>@s.Subject</td>
                                         <td>@s.StartTime.ToString("d MMM yyyy, h:mm tt")</td>
-                                        <td><span class="status-text cancelled">Cancelled by you</span></td>
+                                        <td><span class="status-text cancelled">Cancelled</span></td>
                                         <td><a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@s.TutorProfileId" class="mini-btn">Rebook same tutor</a></td>
                                     </tr>
                                 }

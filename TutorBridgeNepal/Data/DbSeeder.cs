@@ -42,7 +42,7 @@ public static class DbSeeder
     public static async Task SeedSampleTutorsAsync(IServiceProvider serviceProvider)
     {
         var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var context = serviceProvider.GetRequiredService<TutorBridgeNepal.Data.ApplicationDbContext>();
+        var context = serviceProvider.GetRequiredService<ApplicationDbContext>();
 
         var sampleTutors = new[]
         {
@@ -84,6 +84,43 @@ public static class DbSeeder
                     AverageRating = sample.Rating,
                     IsVerified = true
                 });
+            }
+        }
+
+        await context.SaveChangesAsync();
+
+        // Seed availability slots for these sample tutors so students can actually
+        // browse and book real sessions instead of hitting an empty calendar.
+        var sampleEmails = sampleTutors.Select(s => s.Email).ToList();
+        var tutorProfiles = await context.TutorProfiles
+            .Include(t => t.User)
+            .Where(t => sampleEmails.Contains(t.User.Email!))
+            .ToListAsync();
+
+        var slotTimes = new[] { 9, 11, 16, 18 }; // 9am, 11am, 4pm, 6pm
+
+        foreach (var tutor in tutorProfiles)
+        {
+            var alreadyHasSlots = await context.TutorAvailabilitySlots.AnyAsync(s => s.TutorProfileId == tutor.Id);
+            if (alreadyHasSlots)
+            {
+                continue;
+            }
+
+            for (var dayOffset = 1; dayOffset <= 10; dayOffset++)
+            {
+                var date = DateTime.Today.AddDays(dayOffset);
+
+                foreach (var hour in slotTimes)
+                {
+                    context.TutorAvailabilitySlots.Add(new TutorAvailabilitySlot
+                    {
+                        TutorProfileId = tutor.Id,
+                        StartTime = date.AddHours(hour),
+                        EndTime = date.AddHours(hour).AddHours(1),
+                        IsBooked = false
+                    });
+                }
             }
         }
 

@@ -8,6 +8,7 @@ public class TutorProfile
     public string Subjects { get; set; } = string.Empty;
     public int YearsOfExperience { get; set; }
     public string? Bio { get; set; }
+    public string? TeachingStyle { get; set; }
     public bool IsVerified { get; set; }
     public decimal AverageRating { get; set; }
 }

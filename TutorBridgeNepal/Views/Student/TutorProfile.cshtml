@@ -2,6 +2,18 @@
 @{
     ViewData["Title"] = Model.FullName;
     Layout = null;
+
+    var dateGroups = Model.SlotsByDate;
+    var displayMonth = dateGroups.Any()
+        ? new DateTime(dateGroups.First().Date.Year, dateGroups.First().Date.Month, 1)
+        : new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    var daysInMonth = DateTime.DaysInMonth(displayMonth.Year, displayMonth.Month);
+    var leadingBlanks = (int)displayMonth.DayOfWeek;
+    var availableDateSet = dateGroups.Select(g => g.Date).ToHashSet();
+
+    var slotDaysOfWeek = Model.AvailableSlots.Select(s => s.StartTime.DayOfWeek).Distinct().OrderBy(d => d).ToList();
+    var hasMorning = Model.AvailableSlots.Any(s => s.StartTime.Hour < 17);
+    var hasEvening = Model.AvailableSlots.Any(s => s.StartTime.Hour >= 17);
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -24,24 +36,27 @@
             @await Html.PartialAsync("_StudentSidebar")
 
             <main class="dash-main">
-                <a asp-controller="Student" asp-action="FindTutors" class="back-link" style="display:inline-block; margin-bottom:1rem;">← Back to Find Tutors</a>
+                <p class="tutor-meta mb-3">
+                    <a asp-controller="Student" asp-action="FindTutors" style="color:var(--muted); text-decoration:none;">Find Tutors</a>
+                    / <span style="color:var(--ink); font-weight:600;">@Model.FullName</span>
+                </p>
 
                 @if (TempData["BookingError"] != null)
                 {
                     <div class="status-banner warn mb-3">@TempData["BookingError"]</div>
                 }
 
-                <div class="tutor-profile-head">
-                    <div class="tutor-profile-avatar">@Model.Initials</div>
+                <div class="profile-head-card" style="display:flex; gap:1.2rem; align-items:center; flex-wrap:wrap;">
+                    <div class="profile-head-avatar">@Model.Initials</div>
                     <div style="flex:1; min-width:220px;">
-                        <div class="name-row" style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
-                            <h1 style="margin:0; font-size:1.3rem;">@Model.FullName</h1>
+                        <h1 style="margin:0; font-size:1.3rem;">@Model.FullName</h1>
+                        <div class="badge-row" style="margin-top:.35rem;">
                             @if (Model.IsVerified)
                             {
                                 <span class="verified-inline">✓ Verified</span>
                             }
                         </div>
-                        <p class="tutor-meta mb-1">@string.Join(" · ", Model.SubjectTags)@(string.IsNullOrWhiteSpace(Model.District) ? "" : " · " + Model.District)</p>
+                        <p class="tutor-meta mb-1" style="margin-top:.4rem;">@string.Join(" · ", Model.SubjectTags)@(string.IsNullOrWhiteSpace(Model.District) ? "" : " · " + Model.District)</p>
                         <p class="tutor-meta mb-1">@Model.YearsOfExperience yrs experience</p>
                         <div class="stars">
                             @if (Model.AverageRating > 0)
@@ -53,54 +68,145 @@
                                 <span class="tutor-meta">New tutor</span>
                             }
                         </div>
-                        @if (!string.IsNullOrWhiteSpace(Model.Bio))
-                        {
-                            <p class="mt-2">@Model.Bio</p>
-                        }
+                        <div class="session-count-text">@Model.CompletedSessionsCount session@(Model.CompletedSessionsCount == 1 ? "" : "s") completed</div>
                     </div>
-                    <div class="text-end">
+                    <div class="action-row" style="flex-direction:column; align-items:stretch;">
+                        <a href="#booking-panel" class="tb-btn">Book a session</a>
+                        <div class="action-row" style="margin-top:.6rem;">
+                            <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@Model.TutorProfileId" class="tb-btn-outline">Message</a>
+                            <span class="disabled-btn" title="Saving tutors isn't available yet">Save tutor</span>
                         </div>
+                    </div>
                 </div>
 
-                <div class="panel">
-                    <div class="panel-head">
-                        <h2>Available time slots</h2>
+                <div class="profile-layout">
+                    <!-- Left column -->
+                    <div>
+                        <div class="info-panel">
+                            <h2>Subjects</h2>
+                            @foreach (var tag in Model.SubjectTags)
+                            {
+                                <div class="subject-row-item"><span>@tag</span></div>
+                            }
+                        </div>
+
+                        <div class="info-panel">
+                            <h2>Teaching style</h2>
+                            @if (Model.TeachingStyleTags.Any())
+                            {
+                                <div class="badge-row" style="justify-content:flex-start;">
+                                    @foreach (var tag in Model.TeachingStyleTags)
+                                    {
+                                        <span class="tag">@tag</span>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="bio-text" style="color:var(--muted);">This tutor hasn't listed a teaching style yet.</p>
+                            }
+                        </div>
+
+                        <div class="info-panel">
+                            <h2>Student reviews</h2>
+                            <p class="review-empty">No reviews yet — this feature is coming soon. Once students can rate completed sessions, reviews for @Model.FullName.Split(' ')[0] will appear here.</p>
+                        </div>
                     </div>
 
-                    @if (!Model.AvailableSlots.Any())
-                    {
-                        <p class="empty-state">This tutor has no open slots right now. Check back soon, or message them via your dashboard once you've booked before.</p>
-                    }
-                    else
-                    {
-                        <form asp-controller="Student" asp-action="BookSlot" method="post">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="tutorProfileId" value="@Model.TutorProfileId" />
-                            <div class="field mb-3" style="max-width:320px;">
-                                <label>Subject for this session</label>
-                                <select name="subject" class="filter-select" style="width:100%;">
-                                    @foreach (var tag in Model.SubjectTags)
+                    <!-- Right column: booking panel -->
+                    <div class="booking-panel" id="booking-panel">
+                        <h2>Book a session</h2>
+                        <p class="tutor-meta">Select a subject, date and time slot below</p>
+
+                        @if (!dateGroups.Any())
+                        {
+                            <p class="empty-state">This tutor has no open slots right now. Check back soon, or message them once you've booked before.</p>
+                        }
+                        else
+                        {
+                            <form asp-controller="Student" asp-action="BookSlot" method="post" id="bookingForm">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="tutorProfileId" value="@Model.TutorProfileId" />
+                                <input type="hidden" name="slotId" id="selectedSlotId" required />
+                                <input type="hidden" name="subject" id="selectedSubject" value="@Model.SubjectTags.FirstOrDefault()" />
+
+                                <div class="step-label">Step 1 — Select subject</div>
+                                <div class="subject-tab-row" id="subjectTabs">
+                                    @for (int i = 0; i < Model.SubjectTags.Count; i++)
                                     {
-                                        <option value="@tag">@tag</option>
+                                        <div class="subject-tab @(i == 0 ? "active" : "")" data-subject="@Model.SubjectTags[i]">@Model.SubjectTags[i]</div>
                                     }
-                                </select>
-                            </div>
+                                </div>
 
-                            <div class="slot-grid">
-                                @foreach (var slot in Model.AvailableSlots)
+                                <div class="step-label">Step 2 — Select date</div>
+                                <div class="calendar-box">
+                                    <div class="calendar-title">@displayMonth.ToString("MMMM yyyy")</div>
+                                    <div class="calendar-grid">
+                                        <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
+
+                                        @for (int i = 0; i < leadingBlanks; i++)
+                                        {
+                                            <div class="cal-day cal-day-empty"></div>
+                                        }
+
+                                        @for (int day = 1; day <= daysInMonth; day++)
+                                        {
+                                            var thisDate = new DateTime(displayMonth.Year, displayMonth.Month, day);
+                                            var isAvailable = availableDateSet.Contains(thisDate);
+                                            <div class="cal-day @(isAvailable ? "cal-day-available" : "cal-day-unavailable")"
+                                                 data-date="@thisDate.ToString("yyyy-MM-dd")">
+                                                @day
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="step-label">Step 3 — Select time slot</div>
+                                <div id="noDateMessage" class="no-date-selected">Pick an available date above to see open time slots.</div>
+
+                                @foreach (var group in dateGroups)
                                 {
-                                    <label class="slot-card" style="cursor:pointer; display:block;">
-                                        <input type="radio" name="slotId" value="@slot.SlotId" required style="margin-right:.4rem;" />
-                                        <span class="slot-time">@slot.StartTime.ToString("h:mm tt") – @slot.EndTime.ToString("h:mm tt")</span>
-                                        <div class="slot-date">@slot.StartTime.ToString("ddd, d MMM yyyy")</div>
-                                    </label>
+                                    var morning = group.Slots.Where(s => s.StartTime.Hour < 17).ToList();
+                                    var evening = group.Slots.Where(s => s.StartTime.Hour >= 17).ToList();
+                                    <div class="slot-date-group" data-date="@group.Date.ToString("yyyy-MM-dd")" style="display:none;">
+                                        @if (morning.Any())
+                                        {
+                                            <div class="slot-section-label">Morning</div>
+                                            <div class="slot-pill-row">
+                                                @foreach (var slot in morning)
+                                                {
+                                                    <div class="slot-pill" data-slot-id="@slot.SlotId" data-start="@slot.StartTime.ToString("h:mm tt")" data-end="@slot.EndTime.ToString("h:mm tt")" data-date-label="@slot.StartTime.ToString("ddd, d MMM yyyy")" data-duration="@Math.Round((slot.EndTime - slot.StartTime).TotalMinutes)">@slot.StartTime.ToString("h:mm tt")</div>
+                                                }
+                                            </div>
+                                        }
+                                        @if (evening.Any())
+                                        {
+                                            <div class="slot-section-label">Evening</div>
+                                            <div class="slot-pill-row">
+                                                @foreach (var slot in evening)
+                                                {
+                                                    <div class="slot-pill" data-slot-id="@slot.SlotId" data-start="@slot.StartTime.ToString("h:mm tt")" data-end="@slot.EndTime.ToString("h:mm tt")" data-date-label="@slot.StartTime.ToString("ddd, d MMM yyyy")" data-duration="@Math.Round((slot.EndTime - slot.StartTime).TotalMinutes)">@slot.StartTime.ToString("h:mm tt")</div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
                                 }
-                            </div>
 
-                            <button type="submit" class="tb-btn mt-3">Request this session</button>
-                            <p class="tutor-meta mt-2">Your tutor will confirm the booking before the session is finalized.</p>
-                        </form>
-                    }
+                                <div class="booking-summary-box">
+                                    <dl>
+                                        <dt>Subject</dt>
+                                        <dd id="summarySubject">@Model.SubjectTags.FirstOrDefault()</dd>
+                                        <dt>Date &amp; time</dt>
+                                        <dd id="summaryDateTime">—</dd>
+                                        <dt>Duration</dt>
+                                        <dd id="summaryDuration">—</dd>
+                                    </dl>
+                                    <button type="submit" class="tb-btn" id="confirmBookingBtn" disabled>Confirm booking</button>
+                                </div>
+                                <p class="tutor-meta mt-2">Your tutor will confirm the booking before the session is finalized.</p>
+                            </form>
+                        }
+                    </div>
                 </div>
             </main>
         </div>
@@ -108,5 +214,70 @@
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function () {
+        var subjectTabs = document.querySelectorAll('#subjectTabs .subject-tab');
+        var selectedSubjectInput = document.getElementById('selectedSubject');
+        var summarySubject = document.getElementById('summarySubject');
+
+        subjectTabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+        subjectTabs.forEach(function (t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        var subject = tab.getAttribute('data-subject');
+        selectedSubjectInput.value = subject;
+        summarySubject.textContent = subject;
+        });
+        });
+
+        var dayCells = document.querySelectorAll('.cal-day-available');
+        var slotGroups = document.querySelectorAll('.slot-date-group');
+        var noDateMessage = document.getElementById('noDateMessage');
+        var confirmBtn = document.getElementById('confirmBookingBtn');
+        var selectedSlotIdInput = document.getElementById('selectedSlotId');
+        var summaryDateTime = document.getElementById('summaryDateTime');
+        var summaryDuration = document.getElementById('summaryDuration');
+
+        function resetSlotSelection() {
+        selectedSlotIdInput.value = '';
+        summaryDateTime.textContent = '—';
+        summaryDuration.textContent = '—';
+        confirmBtn.disabled = true;
+        }
+
+        dayCells.forEach(function (cell) {
+        cell.addEventListener('click', function () {
+        dayCells.forEach(function (c) { c.classList.remove('cal-day-selected'); });
+        cell.classList.add('cal-day-selected');
+
+        var date = cell.getAttribute('data-date');
+        slotGroups.forEach(function (g) {
+        g.style.display = (g.getAttribute('data-date') === date) ? 'block' : 'none';
+        });
+        noDateMessage.style.display = 'none';
+        resetSlotSelection();
+        });
+        });
+
+        slotGroups.forEach(function (group) {
+        var pills = group.querySelectorAll('.slot-pill');
+        pills.forEach(function (pill) {
+        pill.addEventListener('click', function () {
+        document.querySelectorAll('.slot-pill').forEach(function (p) { p.classList.remove('selected'); });
+        pill.classList.add('selected');
+
+        selectedSlotIdInput.value = pill.getAttribute('data-slot-id');
+        var minutes = parseInt(pill.getAttribute('data-duration'), 10);
+        var durationLabel = minutes >= 60
+        ? (minutes / 60) + (minutes % 60 === 0 ? ' hr' : '.5 hr')
+        : minutes + ' min';
+        summaryDateTime.textContent = pill.getAttribute('data-date-label') + ' · ' + pill.getAttribute('data-start');
+        summaryDuration.textContent = durationLabel;
+        confirmBtn.disabled = false;
+        });
+        });
+        });
+        })();
+    </script>
 </body>
 </html>

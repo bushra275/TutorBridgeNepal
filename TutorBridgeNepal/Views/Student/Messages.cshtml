@@ -1,0 +1,156 @@
+﻿@model TutorBridgeNepal.ViewModels.MessagesPageViewModel
+@{
+    ViewData["Title"] = "Messages";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Messages - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_StudentTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_StudentSidebar")
+
+            <main class="dash-main">
+                <div class="messages-shell">
+                    <!-- Conversation list -->
+                    <aside class="conv-list">
+                        <div class="conv-list-header">
+                            <h2>
+                                Messages @if (Model.TotalUnread > 0)
+                                {
+                                    <span class="unread-count-badge">@Model.TotalUnread</span>
+                                }
+                            </h2>
+                            <input type="text" class="conv-search" id="convSearch" placeholder="Search conversations..." />
+                        </div>
+
+                        <div class="conv-items" id="convItems">
+                            @if (!Model.Conversations.Any())
+                            {
+                                <p class="no-conversations">You don't have any conversations yet. Book a session with a tutor to start messaging them.</p>
+                            }
+                            else
+                            {
+                                @foreach (var c in Model.Conversations)
+                                {
+                                    var isActive = c.TutorProfileId == Model.ActiveTutorProfileId;
+                                    <a asp-action="Messages" asp-route-tutorProfileId="@c.TutorProfileId"
+                                       class="conv-item @(isActive ? "active" : "") @(c.UnreadCount > 0 ? "has-unread" : "")"
+                                       data-name="@c.TutorName.ToLower()">
+                                        <div class="avatar">@c.TutorInitials</div>
+                                        <div class="conv-item-body">
+                                            <div class="conv-item-top">
+                                                <strong>@c.TutorName</strong>
+                                                <span>@(c.LastMessageAt.HasValue ? c.LastMessageAt.Value.ToString("d MMM") : "")</span>
+                                            </div>
+                                            <div class="conv-preview">@(c.LastMessagePreview ?? "No messages yet — say hello!")</div>
+                                            <div class="conv-meta-row">
+                                                <span>@c.Subjects.Split(',')[0].Trim()</span>
+                                                @if (c.UnreadCount > 0)
+                                                {
+                                                    <span class="unread-dot"></span>
+                                                }
+                                            </div>
+                                        </div>
+                                    </a>
+                                }
+                            }
+                        </div>
+                    </aside>
+
+                    <!-- Chat panel -->
+                    <section class="chat-panel">
+                        @if (Model.ActiveTutorProfileId == null)
+                        {
+                            <div class="chat-empty" style="margin:auto;">
+                                <p>Select a conversation to start chatting, or book a session with a tutor to unlock messaging.</p>
+                                <a asp-controller="Student" asp-action="FindTutors" class="tb-btn mt-2">Find Tutors</a>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="chat-header">
+                                <div class="avatar">@Model.ActiveTutorInitials</div>
+                                <div class="chat-header-info">
+                                    <h2>@Model.ActiveTutorName</h2>
+                                    <p class="tutor-meta mb-0">@Model.ActiveTutorSubjects</p>
+                                </div>
+                                <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@Model.ActiveTutorProfileId" class="tb-btn-outline">View profile</a>
+                            </div>
+
+                            <div class="chat-messages">
+                                @if (!Model.Messages.Any())
+                                {
+                                    <div class="chat-empty">
+                                        <p>No messages yet with @Model.ActiveTutorName.Split(' ')[0]. Send the first message below.</p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    foreach (var m in Model.Messages)
+                                    {
+                                        var fromStudent = m.SenderRole == "Student";
+                                        <div class="msg-row @(fromStudent ? "from-student" : "from-tutor")">
+                                            <div>
+                                                <div class="msg-bubble">@m.Content</div>
+                                                <div class="msg-meta">
+                                                    @m.SentAt.ToString("h:mm tt")
+                                                    @if (fromStudent)
+                                                    {
+                                                        @:· You @(m.IsRead ? "✓✓" : "✓")
+                                                    }
+                                                    else
+                                                    {
+                                                        @:· @Model.ActiveTutorName.Split(' ')[0]
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+
+                            <form class="chat-input-bar" asp-controller="Student" asp-action="SendMessage" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="tutorProfileId" value="@Model.ActiveTutorProfileId" />
+                                <input type="text" name="content" class="chat-input" placeholder="Type a message..." autocomplete="off" required />
+                                <button type="submit" class="tb-btn">Send</button>
+                            </form>
+                        }
+                    </section>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('convSearch')?.addEventListener('input', function () {
+        var term = this.value.toLowerCase();
+        document.querySelectorAll('#convItems .conv-item').forEach(function (item) {
+        var name = item.getAttribute('data-name') || '';
+        item.style.display = name.indexOf(term) !== -1 ? 'flex' : 'none';
+        });
+        });
+
+        var chatMessages = document.querySelector('.chat-messages');
+        if (chatMessages) {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    </script>
+</body>
+</html>

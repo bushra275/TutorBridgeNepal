@@ -1,6 +1,7 @@
 ﻿@{
     var initials = ViewData["SidebarInitials"] as string ?? "?";
     var name = ViewData["SidebarName"] as string ?? "";
+    var unreadCount = ViewData["UnreadMessageCount"] as int? ?? 0;
 }
 <header class="dash-topbar">
     <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
@@ -10,7 +11,13 @@
     </form>
 
     <div class="dash-topbar-right">
-        <a asp-controller="Student" asp-action="Dashboard" asp-fragment="messages-panel" class="icon-btn" title="Messages & notifications">🔔</a>
+        <a asp-controller="Student" asp-action="Messages" class="icon-btn" title="Messages" style="position:relative;">
+            🔔
+            @if (unreadCount > 0)
+            {
+                <span style="position:absolute; top:-2px; right:-2px; width:9px; height:9px; border-radius:50%; background:var(--danger, #d9534f); border:1px solid #fff;"></span>
+            }
+        </a>
         <div class="topbar-avatar" title="@name">@initials</div>
     </div>
 </header>

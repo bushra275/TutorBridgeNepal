@@ -44,10 +44,16 @@ public class StudentController : Controller
         var subMeta = string.Join(" · ", new[] { studentProfile?.GradeLevel, user.District }
             .Where(x => !string.IsNullOrWhiteSpace(x)));
 
+        var unreadCount = studentProfile == null
+            ? 0
+            : await _context.Messages.CountAsync(m =>
+                m.StudentProfileId == studentProfile.Id && m.SenderRole == "Tutor" && !m.IsRead);
+
         ViewData["SidebarName"] = user.FullName;
         ViewData["SidebarInitials"] = GetInitials(user.FullName);
         ViewData["SidebarMeta"] = string.IsNullOrWhiteSpace(subMeta) ? "Student" : subMeta;
         ViewData["ActiveNav"] = activeNav;
+        ViewData["UnreadMessageCount"] = unreadCount;
 
         return user;
     }
@@ -106,6 +112,13 @@ public class StudentController : Controller
             .OrderByDescending(s => s.CompletedSessions)
             .ToList();
 
+        var recentMessages = await _context.Messages
+            .Include(m => m.TutorProfile).ThenInclude(t => t.User)
+            .Where(m => m.StudentProfileId == studentProfile.Id)
+            .OrderByDescending(m => m.SentAt)
+            .Take(5)
+            .ToListAsync();
+
         var vm = new StudentDashboardViewModel
         {
             FullName = user.FullName,
@@ -145,7 +158,16 @@ public class StudentController : Controller
                 Subjects = t.Subjects,
                 AverageRating = t.AverageRating
             }).ToList(),
-            SubjectProgress = subjectProgress
+            SubjectProgress = subjectProgress,
+            RecentMessages = recentMessages.Select(m => new RecentMessageViewModel
+            {
+                TutorProfileId = m.TutorProfileId,
+                TutorName = m.TutorProfile.User.FullName,
+                TutorInitials = GetInitials(m.TutorProfile.User.FullName),
+                Preview = m.Content,
+                SentAt = m.SentAt,
+                IsFromStudent = m.SenderRole == "Student"
+            }).ToList()
         };
 
         return View(vm);
@@ -206,6 +228,13 @@ public class StudentController : Controller
             .Take(pageSize)
             .ToListAsync();
 
+        var pageTutorIds = pageItems.Select(t => t.Id).ToList();
+        var completedCounts = await _context.Bookings
+            .Where(b => pageTutorIds.Contains(b.TutorProfileId) && b.Status == "Completed")
+            .GroupBy(b => b.TutorProfileId)
+            .Select(g => new { TutorProfileId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.TutorProfileId, x => x.Count);
+
         var vm = new StudentFindTutorsViewModel
         {
             Query = q,
@@ -226,7 +255,8 @@ public class StudentController : Controller
                 District = t.User.District,
                 YearsOfExperience = t.YearsOfExperience,
                 AverageRating = t.AverageRating,
-                IsVerified = t.IsVerified
+                IsVerified = t.IsVerified,
+                CompletedSessionsCount = completedCounts.GetValueOrDefault(t.Id, 0)
             }).ToList()
         };
 
@@ -247,8 +277,11 @@ public class StudentController : Controller
         var slots = await _context.TutorAvailabilitySlots
             .Where(s => s.TutorProfileId == id && !s.IsBooked && s.StartTime >= now)
             .OrderBy(s => s.StartTime)
-            .Take(12)
+            .Take(60)
             .ToListAsync();
+
+        var completedSessionsCount = await _context.Bookings
+            .CountAsync(b => b.TutorProfileId == id && b.Status == "Completed");
 
         var vm = new TutorProfileDetailViewModel
         {
@@ -258,9 +291,11 @@ public class StudentController : Controller
             Subjects = tutor.Subjects,
             District = tutor.User.District,
             Bio = tutor.Bio,
+            TeachingStyle = tutor.TeachingStyle,
             YearsOfExperience = tutor.YearsOfExperience,
             AverageRating = tutor.AverageRating,
             IsVerified = tutor.IsVerified,
+            CompletedSessionsCount = completedSessionsCount,
             AvailableSlots = slots.Select(s => new AvailableSlotViewModel
             {
                 SlotId = s.Id,
@@ -419,5 +454,129 @@ public class StudentController : Controller
         }
 
         return returnTo == "Sessions" ? RedirectToAction("Sessions") : RedirectToAction("Dashboard");
+    }
+
+    public async Task<IActionResult> Messages(int? tutorProfileId)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("Index", "Home");
+
+        await SetSidebarContextAsync("messages");
+
+        // Conversations = tutors this student has actually booked (a real relationship),
+        // same set as "My Tutors" - you can only message tutors you've booked.
+        var myTutors = await _context.Bookings
+            .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+            .Where(b => b.StudentProfileId == studentProfile.Id)
+            .Select(b => b.TutorProfile)
+            .Distinct()
+            .ToListAsync();
+
+        var tutorIds = myTutors.Select(t => t.Id).ToList();
+
+        var allMessages = await _context.Messages
+            .Where(m => m.StudentProfileId == studentProfile.Id && tutorIds.Contains(m.TutorProfileId))
+            .OrderByDescending(m => m.SentAt)
+            .ToListAsync();
+
+        var conversations = myTutors.Select(t =>
+        {
+            var threadMessages = allMessages.Where(m => m.TutorProfileId == t.Id).ToList();
+            var last = threadMessages.FirstOrDefault();
+            return new ConversationListItemViewModel
+            {
+                TutorProfileId = t.Id,
+                TutorName = t.User.FullName,
+                TutorInitials = GetInitials(t.User.FullName),
+                Subjects = t.Subjects,
+                LastMessagePreview = last?.Content,
+                LastMessageAt = last?.SentAt,
+                UnreadCount = threadMessages.Count(m => m.SenderRole == "Tutor" && !m.IsRead)
+            };
+        })
+        .OrderByDescending(c => c.LastMessageAt ?? DateTime.MinValue)
+        .ToList();
+
+        var activeTutorId = tutorProfileId ?? conversations.FirstOrDefault()?.TutorProfileId;
+
+        var vm = new MessagesPageViewModel
+        {
+            Conversations = conversations,
+            TotalUnread = conversations.Sum(c => c.UnreadCount)
+        };
+
+        if (activeTutorId.HasValue)
+        {
+            var activeTutor = myTutors.FirstOrDefault(t => t.Id == activeTutorId.Value);
+            if (activeTutor != null)
+            {
+                var threadMessages = allMessages
+                    .Where(m => m.TutorProfileId == activeTutorId.Value)
+                    .OrderBy(m => m.SentAt)
+                    .ToList();
+
+                // Mark unread tutor messages in this thread as read now that the student is viewing it.
+                var unreadFromTutor = threadMessages.Where(m => m.SenderRole == "Tutor" && !m.IsRead).ToList();
+                if (unreadFromTutor.Any())
+                {
+                    var idsToMark = unreadFromTutor.Select(m => m.Id).ToList();
+                    var toUpdate = await _context.Messages.Where(m => idsToMark.Contains(m.Id)).ToListAsync();
+                    foreach (var m in toUpdate) m.IsRead = true;
+                    await _context.SaveChangesAsync();
+                }
+
+                vm.ActiveTutorProfileId = activeTutor.Id;
+                vm.ActiveTutorName = activeTutor.User.FullName;
+                vm.ActiveTutorInitials = GetInitials(activeTutor.User.FullName);
+                vm.ActiveTutorSubjects = activeTutor.Subjects;
+                vm.Messages = threadMessages.Select(m => new MessageBubbleViewModel
+                {
+                    Id = m.Id,
+                    SenderRole = m.SenderRole,
+                    Content = m.Content,
+                    SentAt = m.SentAt,
+                    IsRead = m.IsRead
+                }).ToList();
+
+                // Recompute unread count for the sidebar list now that this thread is read.
+                vm.Conversations.First(c => c.TutorProfileId == activeTutorId.Value).UnreadCount = 0;
+                vm.TotalUnread = vm.Conversations.Sum(c => c.UnreadCount);
+            }
+        }
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendMessage(int tutorProfileId, string content)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return RedirectToAction("Messages", new { tutorProfileId });
+        }
+
+        // Only allow messaging a tutor the student actually has a booking relationship with.
+        var hasRelationship = await _context.Bookings
+            .AnyAsync(b => b.StudentProfileId == studentProfile.Id && b.TutorProfileId == tutorProfileId);
+
+        if (!hasRelationship) return RedirectToAction("Messages");
+
+        _context.Messages.Add(new Message
+        {
+            StudentProfileId = studentProfile.Id,
+            TutorProfileId = tutorProfileId,
+            SenderRole = "Student",
+            Content = content.Trim(),
+            SentAt = DateTime.Now,
+            IsRead = false
+        });
+
+        await _context.SaveChangesAsync();
+
+        return RedirectToAction("Messages", new { tutorProfileId });
     }
 }

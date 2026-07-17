@@ -3,6 +3,7 @@
     var initials = ViewData["SidebarInitials"] as string ?? "?";
     var meta = ViewData["SidebarMeta"] as string ?? "Student";
     var activeNav = ViewData["ActiveNav"] as string ?? "";
+    var unreadCount = ViewData["UnreadMessageCount"] as int? ?? 0;
 }
 <aside class="dash-sidebar">
     <div class="dash-user">
@@ -18,7 +19,15 @@
         <li><a asp-controller="Student" asp-action="Dashboard" class="@(activeNav == "dashboard" ? "active" : "")"><span class="nav-icon">🏠</span> Dashboard</a></li>
         <li><a asp-controller="Student" asp-action="FindTutors" class="@(activeNav == "findtutors" ? "active" : "")"><span class="nav-icon">🔍</span> Find Tutors</a></li>
         <li><a asp-controller="Student" asp-action="Sessions" class="@(activeNav == "sessions" ? "active" : "")"><span class="nav-icon">📅</span> My Sessions</a></li>
-        <li><a asp-controller="Student" asp-action="Dashboard" asp-fragment="messages-panel" class="@(activeNav == "messages" ? "active" : "")"><span class="nav-icon">💬</span> Messages</a></li>
+        <li>
+            <a asp-controller="Student" asp-action="Messages" class="@(activeNav == "messages" ? "active" : "")">
+                <span class="nav-icon">💬</span> Messages
+                @if (unreadCount > 0)
+                {
+                    <span class="unread-count-badge" style="margin-left:auto;">@unreadCount</span>
+                }
+            </a>
+        </li>
         <li><a asp-controller="Student" asp-action="Dashboard" asp-fragment="tutors-panel" class="@(activeNav == "tutors" ? "active" : "")"><span class="nav-icon">👥</span> My Tutors</a></li>
         <li><a asp-controller="Student" asp-action="Dashboard" asp-fragment="progress-panel" class="@(activeNav == "progress" ? "active" : "")"><span class="nav-icon">📈</span> Progress</a></li>
     </ul>

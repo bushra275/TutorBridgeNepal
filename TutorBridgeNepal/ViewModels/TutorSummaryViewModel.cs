@@ -10,6 +10,7 @@ public class TutorSummaryViewModel
     public int YearsOfExperience { get; set; }
     public decimal AverageRating { get; set; }
     public bool IsVerified { get; set; }
+    public int CompletedSessionsCount { get; set; }
 
     public List<string> SubjectTags =>
         Subjects.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();

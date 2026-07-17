@@ -5,6 +5,7 @@ public class StudentFindTutorsViewModel
     public string? Query { get; set; }
     public string? Subject { get; set; }
     public string? District { get; set; }
+    public int? MinExperience { get; set; }
     public string Sort { get; set; } = "rating";
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 6;

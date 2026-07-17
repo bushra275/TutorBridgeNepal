@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TutorBridgeNepal.Data;
 
@@ -11,9 +12,11 @@ using TutorBridgeNepal.Data;
 namespace TutorBridgeNepal.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260716045833_AddTeachingStyle")]
+    partial class AddTeachingStyle
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -274,43 +277,6 @@ namespace TutorBridgeNepal.Migrations
                     b.ToTable("Bookings");
                 });
 
-            modelBuilder.Entity("TutorBridgeNepal.Models.Message", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("SenderRole")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("SentAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("StudentProfileId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("TutorProfileId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TutorProfileId");
-
-                    b.HasIndex("StudentProfileId", "TutorProfileId", "SentAt");
-
-                    b.ToTable("Messages");
-                });
-
             modelBuilder.Entity("TutorBridgeNepal.Models.StudentProfile", b =>
                 {
                     b.Property<int>("Id")
@@ -475,25 +441,6 @@ namespace TutorBridgeNepal.Migrations
                     b.Navigation("StudentProfile");
 
                     b.Navigation("TutorAvailabilitySlot");
-
-                    b.Navigation("TutorProfile");
-                });
-
-            modelBuilder.Entity("TutorBridgeNepal.Models.Message", b =>
-                {
-                    b.HasOne("TutorBridgeNepal.Models.StudentProfile", "StudentProfile")
-                        .WithMany()
-                        .HasForeignKey("StudentProfileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("TutorBridgeNepal.Models.TutorProfile", "TutorProfile")
-                        .WithMany()
-                        .HasForeignKey("TutorProfileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("StudentProfile");
 
                     b.Navigation("TutorProfile");
                 });
