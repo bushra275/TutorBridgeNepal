@@ -150,13 +150,13 @@
                                     }
                                 </div>
                                 <div class="tutor-card-actions">
-                                    <form asp-controller="Student" asp-action="SaveTutor" method="post" style="margin:0; width:100%;">
+                                    <form asp-controller="Student" asp-action="SaveTutor" method="post" style="margin:0; flex:1;">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="tutorProfileId" value="@tutor.TutorProfileId" />
                                         <input type="hidden" name="returnTo" value="FindTutors" />
                                         <button type="submit" class="save-tutor-btn" style="width:100%;">Save tutor</button>
                                     </form>
-                                    <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@tutor.TutorProfileId" class="btn-solid-sm">View profile</a>
+                                    <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@tutor.TutorProfileId" class="btn-solid-sm" style="flex:1;">View profile</a>
                                 </div>
                             </article>
                         }
