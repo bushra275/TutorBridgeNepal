@@ -1,0 +1,225 @@
+﻿@model TutorBridgeNepal.ViewModels.MyTutorsPageViewModel
+@{
+    ViewData["Title"] = "My Tutors";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Tutors - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_StudentTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_StudentSidebar")
+
+            <main class="dash-main">
+                @if (TempData["SavedMessage"] != null)
+                {
+                    <div class="toast-success" id="savedToast">@TempData["SavedMessage"]</div>
+                }
+                <div class="page-head">
+                    <div>
+                        <h1>My Tutors</h1>
+                        <p>Tutors you have saved or booked sessions with</p>
+                    </div>
+                    <a asp-controller="Student" asp-action="FindTutors" class="tb-btn">+ Find new tutor</a>
+                </div>
+
+                <div class="stat-cards">
+                    <div class="stat-card">
+                        <div class="label">Active tutors</div>
+                        <div class="value">@Model.ActiveTutorsCount</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Saved tutors</div>
+                        <div class="value">@Model.SavedTutorsCount</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Sessions done</div>
+                        <div class="value">@Model.SessionsDoneCount</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Hours learned</div>
+                        <div class="value">@Model.HoursLearned.ToString("0.#")h</div>
+                    </div>
+                </div>
+
+                <div class="tab-bar">
+                    <a class="tab-btn @(Model.ActiveTab == "active" ? "active" : "")" asp-action="MyTutors" asp-route-tab="active">Active tutors (@Model.ActiveTutorsCount)</a>
+                    <a class="tab-btn @(Model.ActiveTab == "saved" ? "active" : "")" asp-action="MyTutors" asp-route-tab="saved">Saved (@Model.SavedTutorsCount)</a>
+                    <a class="tab-btn @(Model.ActiveTab == "past" ? "active" : "")" asp-action="MyTutors" asp-route-tab="past">Past tutors (@Model.PastTutorsCount)</a>
+                    <a class="tab-btn @(Model.ActiveTab == "all" ? "active" : "")" asp-action="MyTutors" asp-route-tab="all">All (@Model.AllTutorsCount)</a>
+                </div>
+
+                <form method="get" asp-controller="Student" asp-action="MyTutors">
+                    <input type="hidden" name="tab" value="@Model.ActiveTab" />
+                    <div class="filter-bar">
+                        <input class="filter-search" type="text" id="tutorSearchBox" placeholder="Search tutors..." />
+
+                        <select class="filter-select" name="subject" onchange="this.form.submit()">
+                            <option value="">Subject</option>
+                            @foreach (var s in Model.SubjectOptions)
+                            {
+                                <option value="@s" selected="@(Model.Subject == s)">@s</option>
+                            }
+                        </select>
+
+                        <select class="filter-select" name="sort" onchange="this.form.submit()">
+                            <option value="recent" selected="@(Model.Sort == "recent")">Sort: Recent</option>
+                            <option value="rating" selected="@(Model.Sort == "rating")">Sort: Rating</option>
+                            <option value="name" selected="@(Model.Sort == "name")">Sort: Name</option>
+                        </select>
+                    </div>
+                </form>
+
+                @if (!Model.Tutors.Any())
+                {
+                    <p class="empty-state">
+                        @(Model.ActiveTab switch
+                        {
+                            "saved" => "You haven't saved any tutors yet. Save one from Find Tutors or a tutor's profile.",
+                            "past" => "No past tutors yet.",
+                            _ => "No tutors here yet."
+                        })
+                        <a asp-controller="Student" asp-action="FindTutors">Browse tutors</a>
+                    </p>
+                }
+                else
+                {
+                    <div class="tutor-list-grid" id="myTutorsGrid">
+                        @foreach (var tutor in Model.Tutors)
+                        {
+                            <article class="my-tutor-card" data-name="@tutor.FullName.ToLower()">
+                                <div class="my-tutor-card-top"></div>
+                                <div class="my-tutor-card-body">
+                                    <div class="tutor-list-head">
+                                        <div class="avatar">@tutor.Initials</div>
+                                        <div>
+                                            <strong>@tutor.FullName</strong>
+                                            <div class="tutor-meta">@string.Join(" · ", tutor.SubjectTags.Take(2))</div>
+                                            <div class="tutor-meta">@(string.IsNullOrWhiteSpace(tutor.District) ? "" : tutor.District + " · ")@tutor.YearsOfExperience yrs exp</div>
+                                            <div class="stars">
+                                                @if (tutor.AverageRating > 0)
+                                                {
+                                                    @:★★★★★ <span class="tutor-meta">@tutor.AverageRating.ToString("0.0")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="tutor-meta">New tutor</span>
+                                                }
+                                            </div>
+                                            @if (tutor.IsVerified)
+                                            {
+                                                <span class="verified-inline">✓ Verified</span>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <div class="tutor-session-stats">
+                                        <div><span>Sessions with you</span><strong>@tutor.SessionsWithStudent session@(tutor.SessionsWithStudent == 1 ? "" : "s")</strong></div>
+                                        <div><span>Last session</span><strong>@(tutor.LastSessionAt.HasValue ? tutor.LastSessionAt.Value.ToString("d MMM yyyy") : "—")</strong></div>
+                                        <div><span>Next session</span><strong>@(tutor.NextSessionAt.HasValue ? tutor.NextSessionAt.Value.ToString("d MMM, h:mm tt") : "Not scheduled")</strong></div>
+                                    </div>
+
+                                    <div class="my-tutor-card-actions">
+                                        <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@tutor.TutorProfileId" class="tb-btn" style="flex:1; text-align:center;">Book session</a>
+                                        <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@tutor.TutorProfileId" class="mini-btn" style="flex:1; justify-content:center;">Message</a>
+                                        <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@tutor.TutorProfileId" class="mini-btn" style="flex:1; justify-content:center;">Profile</a>
+                                    </div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+
+                @if (Model.ActiveTab != "saved" && Model.SavedPreview.Any())
+                {
+                    <div class="section-subhead">
+                        <h2>Saved tutors <span class="tag-count">@Model.SavedTutorsCount tutor@(Model.SavedTutorsCount == 1 ? "" : "s") saved</span></h2>
+                        <a asp-action="MyTutors" asp-route-tab="saved">View all →</a>
+                    </div>
+                    <div class="tutor-list-grid" style="grid-template-columns: repeat(3, 1fr);">
+                        @foreach (var tutor in Model.SavedPreview)
+                        {
+                            <article class="saved-mini-card">
+                                <div class="avatar">@tutor.Initials</div>
+                                <div style="flex:1; min-width:0;">
+                                    <strong>@tutor.FullName</strong>
+                                    <div class="tutor-meta">@string.Join(" · ", tutor.SubjectTags.Take(2))</div>
+                                    <div class="stars">
+                                        @if (tutor.AverageRating > 0)
+                                        {
+                                            @:★★★★★ <span class="tutor-meta">@tutor.AverageRating.ToString("0.0")</span>
+                                        }
+                                    </div>
+                                </div>
+                                <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@tutor.TutorProfileId" class="mini-btn green">Book now</a>
+                            </article>
+                        }
+                    </div>
+                }
+
+                @if (Model.RecentHistory.Any())
+                {
+                    <div class="section-subhead">
+                        <h2>Recent session history</h2>
+                        <a asp-controller="Student" asp-action="Sessions" asp-route-tab="completed">View full session history →</a>
+                    </div>
+                    <table class="dash-table">
+                        <thead>
+                            <tr><th>Tutor</th><th>Subject</th><th>Date</th><th>Duration</th><th>Status</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.RecentHistory)
+                            {
+                                var duration = row.EndTime - row.StartTime;
+                                <tr>
+                                    <td>@row.TutorName</td>
+                                    <td>@row.Subject</td>
+                                    <td>@row.StartTime.ToString("d MMM yyyy")</td>
+                                    <td>@($"{(int)duration.TotalHours}h {duration.Minutes:D2}m")</td>
+                                    <td><span class="status-text completed">Completed</span></td>
+                                    <td>
+                                        <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@row.TutorProfileId" class="mini-btn">Rebook</a>
+                                        <span class="disabled-btn" title="Reviews aren't available yet">Leave review</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            document.getElementById('tutorSearchBox')?.addEventListener('input', function () {
+                var term = this.value.toLowerCase();
+                document.querySelectorAll('#myTutorsGrid .my-tutor-card').forEach(function (card) {
+                    var name = card.getAttribute('data-name') || '';
+                    card.style.display = name.indexOf(term) !== -1 ? '' : 'none';
+                });
+            });
+    </script>
+    <script>
+            var savedToast = document.getElementById('savedToast');
+            if (savedToast) {
+                setTimeout(function() { savedToast.classList.add('hide'); }, 2500);
+                setTimeout(function() { savedToast.remove(); }, 3000);
+            }
+    </script>
+</body>
+</html>

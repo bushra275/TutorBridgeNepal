@@ -16,6 +16,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<TutorAvailabilitySlot> TutorAvailabilitySlots => Set<TutorAvailabilitySlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<SavedTutor> SavedTutors => Set<SavedTutor>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -60,5 +61,21 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<Message>()
             .HasIndex(m => new { m.StudentProfileId, m.TutorProfileId, m.SentAt });
+
+        builder.Entity<SavedTutor>()
+            .HasOne(s => s.StudentProfile)
+            .WithMany()
+            .HasForeignKey(s => s.StudentProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SavedTutor>()
+            .HasOne(s => s.TutorProfile)
+            .WithMany()
+            .HasForeignKey(s => s.TutorProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SavedTutor>()
+            .HasIndex(s => new { s.StudentProfileId, s.TutorProfileId })
+            .IsUnique();
     }
 }

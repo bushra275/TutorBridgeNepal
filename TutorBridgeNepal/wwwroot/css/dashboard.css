@@ -1597,3 +1597,114 @@ span.mini-btn {
     font-size: .9rem;
     padding: 2rem;
 }
+
+/* ===== My Tutors page ===== */
+
+.my-tutor-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.my-tutor-card-top {
+    height: 4px;
+    background: var(--green);
+}
+
+.my-tutor-card-body {
+    padding: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .8rem;
+}
+
+.tutor-session-stats {
+    background: #f8f9f6;
+    border-radius: 8px;
+    padding: .7rem .9rem;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    font-size: .82rem;
+}
+
+    .tutor-session-stats div {
+        display: flex;
+        justify-content: space-between;
+        gap: .5rem;
+    }
+
+    .tutor-session-stats span {
+        color: var(--muted);
+    }
+
+    .tutor-session-stats strong {
+        font-weight: 700;
+    }
+
+.my-tutor-card-actions {
+    display: flex;
+    gap: .5rem;
+}
+
+.saved-mini-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+}
+
+    .saved-mini-card strong {
+        font-size: .88rem;
+        display: block;
+    }
+
+/* Save tutor button - real clickable look, not the muted disabled style */
+.save-tutor-btn {
+    min-height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: #fff;
+    padding: 0 1rem;
+    font-weight: 700;
+    font-size: .82rem;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+    .save-tutor-btn:hover {
+        background: var(--mint);
+        border-color: #78ddc0;
+        color: var(--green);
+    }
+
+/* Success toast */
+.toast-success {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    background: var(--green);
+    color: #fff;
+    padding: .8rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: .88rem;
+    box-shadow: 0 6px 18px rgba(0,0,0,.18);
+    z-index: 999;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity .4s ease, transform .4s ease;
+}
+
+    .toast-success.hide {
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+    }

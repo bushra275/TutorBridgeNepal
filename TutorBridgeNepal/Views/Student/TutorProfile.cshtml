@@ -36,6 +36,10 @@
             @await Html.PartialAsync("_StudentSidebar")
 
             <main class="dash-main">
+                @if (TempData["SavedMessage"] != null)
+                {
+                    <div class="toast-success" id="savedToast">@TempData["SavedMessage"]</div>
+                }
                 <p class="tutor-meta mb-3">
                     <a asp-controller="Student" asp-action="FindTutors" style="color:var(--muted); text-decoration:none;">Find Tutors</a>
                     / <span style="color:var(--ink); font-weight:600;">@Model.FullName</span>
@@ -74,7 +78,12 @@
                         <a href="#booking-panel" class="tb-btn">Book a session</a>
                         <div class="action-row" style="margin-top:.6rem;">
                             <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@Model.TutorProfileId" class="tb-btn-outline">Message</a>
-                            <span class="disabled-btn" title="Saving tutors isn't available yet">Save tutor</span>
+                            <form asp-controller="Student" asp-action="SaveTutor" method="post" style="display:inline;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="tutorProfileId" value="@Model.TutorProfileId" />
+                                <input type="hidden" name="returnTo" value="TutorProfile" />
+                                <button type="submit" class="save-tutor-btn">Save tutor</button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -278,6 +287,13 @@
         });
         });
         })();
+    </script>
+    <script>
+            var savedToast = document.getElementById('savedToast');
+            if (savedToast) {
+                setTimeout(function() { savedToast.classList.add('hide'); }, 2500);
+                setTimeout(function() { savedToast.remove(); }, 3000);
+            }
     </script>
 </body>
 </html>

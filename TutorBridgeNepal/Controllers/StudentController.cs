@@ -579,4 +579,181 @@ public class StudentController : Controller
 
         return RedirectToAction("Messages", new { tutorProfileId });
     }
+    public async Task<IActionResult> MyTutors(string tab = "active", string? subject = null, string sort = "recent")
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("Index", "Home");
+
+        await SetSidebarContextAsync("tutors");
+
+        var now = DateTime.Now;
+
+        var bookings = await _context.Bookings
+            .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.StudentProfileId == studentProfile.Id)
+            .ToListAsync();
+
+        var savedTutorIds = await _context.SavedTutors
+            .Where(s => s.StudentProfileId == studentProfile.Id)
+            .Select(s => s.TutorProfileId)
+            .ToListAsync();
+
+        var bookedTutorIds = bookings.Select(b => b.TutorProfileId).Distinct().ToList();
+        var allRelevantTutorIds = bookedTutorIds.Union(savedTutorIds).ToList();
+
+        var allRelevantTutors = await _context.TutorProfiles
+            .Include(t => t.User)
+            .Where(t => allRelevantTutorIds.Contains(t.Id))
+            .ToListAsync();
+
+        MyTutorCardViewModel BuildCard(TutorProfile tutor)
+        {
+            var tutorBookings = bookings.Where(b => b.TutorProfileId == tutor.Id).ToList();
+            var upcoming = tutorBookings
+                .Where(b => b.TutorAvailabilitySlot.StartTime >= now && b.Status != "Cancelled")
+                .OrderBy(b => b.TutorAvailabilitySlot.StartTime)
+                .ToList();
+            var past = tutorBookings
+                .Where(b => b.TutorAvailabilitySlot.StartTime < now)
+                .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+                .ToList();
+
+            return new MyTutorCardViewModel
+            {
+                TutorProfileId = tutor.Id,
+                FullName = tutor.User.FullName,
+                Initials = GetInitials(tutor.User.FullName),
+                Subjects = tutor.Subjects,
+                District = tutor.User.District,
+                YearsOfExperience = tutor.YearsOfExperience,
+                AverageRating = tutor.AverageRating,
+                IsVerified = tutor.IsVerified,
+                IsSaved = savedTutorIds.Contains(tutor.Id),
+                SessionsWithStudent = tutorBookings.Count(b => b.Status != "Cancelled"),
+                LastSessionAt = past.FirstOrDefault()?.TutorAvailabilitySlot.StartTime,
+                NextSessionAt = upcoming.FirstOrDefault()?.TutorAvailabilitySlot.StartTime
+            };
+        }
+
+        var allCards = allRelevantTutors.Select(BuildCard).ToList();
+
+        var activeCards = allCards.Where(c => c.NextSessionAt.HasValue).ToList();
+        var savedCards = allCards.Where(c => c.IsSaved).ToList();
+        var pastCards = allCards.Where(c => c.SessionsWithStudent > 0 && !c.NextSessionAt.HasValue).ToList();
+
+        IEnumerable<MyTutorCardViewModel> scoped = tab switch
+        {
+            "saved" => savedCards,
+            "past" => pastCards,
+            "all" => allCards,
+            _ => activeCards
+        };
+
+        if (!string.IsNullOrWhiteSpace(subject))
+        {
+            scoped = scoped.Where(c => c.SubjectTags.Contains(subject));
+        }
+
+        scoped = sort switch
+        {
+            "name" => scoped.OrderBy(c => c.FullName),
+            "rating" => scoped.OrderByDescending(c => c.AverageRating),
+            _ => scoped.OrderByDescending(c => c.LastSessionAt ?? c.NextSessionAt ?? DateTime.MinValue)
+        };
+
+        var completed = bookings.Where(b => b.Status == "Completed").ToList();
+        var hoursLearned = completed.Sum(b => (b.TutorAvailabilitySlot.EndTime - b.TutorAvailabilitySlot.StartTime).TotalHours);
+
+        var vm = new MyTutorsPageViewModel
+        {
+            ActiveTab = tab,
+            Subject = subject,
+            Sort = sort,
+            ActiveTutorsCount = activeCards.Count,
+            SavedTutorsCount = savedCards.Count,
+            PastTutorsCount = pastCards.Count,
+            AllTutorsCount = allCards.Count,
+            SessionsDoneCount = completed.Count,
+            HoursLearned = Math.Round(hoursLearned, 1),
+            Tutors = scoped.ToList(),
+            SavedPreview = savedCards.Take(3).ToList(),
+            SubjectOptions = allCards.SelectMany(c => c.SubjectTags).Distinct().OrderBy(s => s).ToList(),
+            RecentHistory = completed
+                .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+                .Take(5)
+                .Select(b => new TutorSessionHistoryRow
+                {
+                    TutorProfileId = b.TutorProfileId,
+                    TutorName = b.TutorProfile.User.FullName,
+                    TutorInitials = GetInitials(b.TutorProfile.User.FullName),
+                    Subject = b.Subject,
+                    StartTime = b.TutorAvailabilitySlot.StartTime,
+                    EndTime = b.TutorAvailabilitySlot.EndTime,
+                    Status = b.Status
+                }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveTutor(int tutorProfileId, string returnTo = "FindTutors")
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        var tutor = await _context.TutorProfiles
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.Id == tutorProfileId);
+
+        if (tutor == null) return RedirectToAction(returnTo == "TutorProfile" ? "FindTutors" : returnTo);
+
+        var alreadySaved = await _context.SavedTutors
+            .AnyAsync(s => s.StudentProfileId == studentProfile.Id && s.TutorProfileId == tutorProfileId);
+
+        if (!alreadySaved)
+        {
+            _context.SavedTutors.Add(new SavedTutor
+            {
+                StudentProfileId = studentProfile.Id,
+                TutorProfileId = tutorProfileId
+            });
+            await _context.SaveChangesAsync();
+        }
+
+        TempData["SavedMessage"] = $"{tutor.User.FullName} has been saved";
+
+        return returnTo switch
+        {
+            "TutorProfile" => RedirectToAction("TutorProfile", new { id = tutorProfileId }),
+            "MyTutors" => RedirectToAction("MyTutors"),
+            _ => RedirectToAction("FindTutors")
+        };
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UnsaveTutor(int tutorProfileId, string returnTo = "MyTutors")
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        var existing = await _context.SavedTutors
+            .FirstOrDefaultAsync(s => s.StudentProfileId == studentProfile.Id && s.TutorProfileId == tutorProfileId);
+
+        if (existing != null)
+        {
+            _context.SavedTutors.Remove(existing);
+            await _context.SaveChangesAsync();
+        }
+
+        return returnTo switch
+        {
+            "TutorProfile" => RedirectToAction("TutorProfile", new { id = tutorProfileId }),
+            "FindTutors" => RedirectToAction("FindTutors"),
+            _ => RedirectToAction("MyTutors")
+        };
+    }
 }
