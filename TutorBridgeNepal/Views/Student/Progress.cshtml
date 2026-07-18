@@ -1,0 +1,254 @@
+﻿@model TutorBridgeNepal.ViewModels.ProgressPageViewModel
+@{
+    ViewData["Title"] = "My Progress";
+    Layout = null;
+
+    var trendColors = new[] { "#127a5b", "#169a70", "#c87913" };
+    var maxTrendCount = Model.MonthlyTrend.Any(s => s.Points.Any())
+        ? Model.MonthlyTrend.SelectMany(s => s.Points).Max(p => p.CompletedSessions)
+        : 0;
+    var trendMax = Math.Max(maxTrendCount, 1);
+    var chartWidth = 520;
+    var chartHeight = 150;
+    var monthLabels = Model.MonthlyTrend.FirstOrDefault()?.Points.Select(p => p.MonthLabel).ToList() ?? new List<string>();
+    var stepX = monthLabels.Count > 1 ? chartWidth / (double)(monthLabels.Count - 1) : chartWidth;
+    var maxWeeklyHours = Model.WeeklyHours.Any() ? Math.Max(Model.WeeklyHours.Max(w => w.Hours), 1) : 1;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Progress - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_StudentTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_StudentSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>My Progress</h1>
+                        <p>Track your learning journey across all subjects</p>
+                    </div>
+                </div>
+
+                <div class="stat-cards-6">
+                    <div class="stat-card">
+                        <div class="label">Total hours learned</div>
+                        <div class="value">@Model.TotalHoursLearned.ToString("0.#")h</div>
+                        <div class="delta">+@Model.HoursLearnedThisWeek.ToString("0.#")h this week</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Sessions completed</div>
+                        <div class="value">@Model.SessionsCompleted</div>
+                        <div class="delta">+@Model.SessionsCompletedThisMonth this month</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Subjects active</div>
+                        <div class="value">@Model.SubjectsActiveCount</div>
+                        <div class="sub">Across all bookings</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Study streak</div>
+                        <div class="value">🔥 @Model.CurrentStreakDays</div>
+                        <div class="sub">day@(Model.CurrentStreakDays == 1 ? "" : "s") in a row</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Goal completion</div>
+                        <div class="value">@Model.GoalCompletionPercent%</div>
+                        <div class="sub">@Model.Goals.Count(g => g.Status == "Completed") of @Model.Goals.Count goals</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Sessions this month</div>
+                        <div class="value">@Model.SessionsCompletedThisMonth</div>
+                        <div class="sub">@DateTime.Now.ToString("MMMM yyyy")</div>
+                    </div>
+                </div>
+
+                <div class="progress-layout">
+                    <!-- Left column -->
+                    <div>
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Subject progress</h2>
+                            </div>
+                            <p class="tutor-meta mb-3" style="margin-top:-.6rem;">% shown is the share of booked sessions in that subject you've completed</p>
+
+                            @if (!Model.SubjectCards.Any())
+                            {
+                                <p class="empty-state">Complete a session to start tracking progress by subject.</p>
+                            }
+                            else
+                            {
+                                @foreach (var subj in Model.SubjectCards)
+                                {
+                                    <div class="subject-progress-card">
+                                        <div class="spc-head">
+                                            <h3>@subj.Subject</h3>
+                                            <span class="spc-pct">@subj.CompletionRatePercent%</span>
+                                        </div>
+                                        <div class="spc-bar-track">
+                                            <div class="spc-bar-fill" style="width:@(subj.CompletionRatePercent)%;"></div>
+                                        </div>
+                                        <div class="spc-meta-row">
+                                            <span>Tutor: @subj.TutorName</span>
+                                            <span>@subj.SessionsCount session@(subj.SessionsCount == 1 ? "" : "s") · @subj.HoursLearned.ToString("0.#")h learned</span>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Learning goals</h2>
+                            </div>
+
+                            <form asp-controller="Student" asp-action="AddGoal" method="post" class="add-goal-form">
+                                @Html.AntiForgeryToken()
+                                <input type="text" name="description" placeholder="e.g. Finish Biology Chapter 6 &amp; 7" required maxlength="200" />
+                                <input type="text" name="subject" placeholder="Subject (optional)" style="max-width:150px;" maxlength="60" />
+                                <input type="date" name="dueDate" />
+                                <button type="submit" class="tb-btn">+ Add goal</button>
+                            </form>
+
+                            @if (!Model.Goals.Any())
+                            {
+                                <p class="empty-state">No goals yet. Add one above to start tracking it.</p>
+                            }
+                            else
+                            {
+                                @foreach (var goal in Model.Goals)
+                                {
+                                    <div class="goal-row">
+                                        <form asp-controller="Student" asp-action="UpdateGoalStatus" method="post" style="margin:0;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="goalId" value="@goal.GoalId" />
+                                            <input type="hidden" name="status" value="@(goal.Status == "Completed" ? "NotStarted" : "Completed")" />
+                                            <button type="submit" class="goal-check @(goal.Status == "Completed" ? "completed" : "")" title="Toggle complete">@(goal.Status == "Completed" ? "✓" : "")</button>
+                                        </form>
+                                        <div class="goal-row-desc">
+                                            @goal.Description
+                                            @if (!string.IsNullOrWhiteSpace(goal.Subject))
+                                            {
+                                                <div class="tutor-meta">@goal.Subject</div>
+                                            }
+                                        </div>
+                                        <span class="goal-status-pill @goal.Status">@(goal.Status == "InProgress" ? "In progress" : goal.Status == "Completed" ? "Completed" : "Not started")</span>
+                                        @if (goal.DueDate.HasValue)
+                                        {
+                                            <span class="goal-row-due">Due: @goal.DueDate.Value.ToString("d MMM")</span>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Right column -->
+                    <div>
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Weekly learning hours</h2>
+                                <span class="tag-count">This week</span>
+                            </div>
+                            <div class="weekly-bar-chart">
+                                @foreach (var point in Model.WeeklyHours)
+                                {
+                                    var heightPct = Math.Round((point.Hours / maxWeeklyHours) * 100, 1);
+                                    <div class="bar-col">
+                                        <div class="bar @(point.Hours > 0 ? "has-hours" : "")" style="height:@(heightPct.ToString(System.Globalization.CultureInfo.InvariantCulture))%;" title="@point.Hours h"></div>
+                                        <div class="bar-label">@point.DayLabel</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Monthly trend</h2>
+                            </div>
+                            <p class="tutor-meta mb-2" style="margin-top:-.6rem;">Completed sessions per month, last 6 months</p>
+
+                            @if (!Model.MonthlyTrend.Any())
+                            {
+                                <p class="empty-state">Complete a few sessions to see your trend here.</p>
+                            }
+                            else
+                            {
+                                <div class="trend-legend">
+                                    @for (int i = 0; i < Model.MonthlyTrend.Count; i++)
+                                    {
+                                        <span><span class="dot" style="background:@trendColors[i % trendColors.Length];"></span>@Model.MonthlyTrend[i].Subject</span>
+                                    }
+                                </div>
+                                <svg viewBox="0 0 @chartWidth @(chartHeight + 24)" style="width:100%; height:auto;">
+                                    @for (int i = 0; i < Model.MonthlyTrend.Count; i++)
+                                    {
+                                        var series = Model.MonthlyTrend[i];
+                                        var color = trendColors[i % trendColors.Length];
+                                        var pointsStr = string.Join(" ", series.Points.Select((p, idx) =>
+                                            $"{(idx * stepX).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)},{(chartHeight - (p.CompletedSessions / (double)trendMax) * (chartHeight - 10)).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)}"));
+                                        <polyline points="@pointsStr" fill="none" stroke="@color" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                                        @foreach (var (p, idx) in series.Points.Select((p, idx) => (p, idx)))
+                                        {
+                                            var cx = (idx * stepX).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+                                            var cy = (chartHeight - (p.CompletedSessions / (double)trendMax) * (chartHeight - 10)).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+                                            <circle cx="@cx" cy="@cy" r="3.5" fill="@color" />
+                                        }
+                                    }
+                                    @for (int idx = 0; idx < monthLabels.Count; idx++)
+                                    {
+                                        var lx = (idx * stepX).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+                                        var labelSafe = System.Net.WebUtility.HtmlEncode(monthLabels[idx]);
+                                        var textMarkup = $"<text x=\"{lx}\" y=\"{chartHeight + 18}\" font-size=\"10\" style=\"fill:var(--muted);\" text-anchor=\"middle\">{labelSafe}</text>";
+                                        @Html.Raw(textMarkup)
+                                    }
+                                </svg>
+                            }
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Achievements</h2>
+                            </div>
+                            <div class="achievements-grid">
+                                @foreach (var ach in Model.Achievements)
+                                {
+                                    <div class="achievement-badge @(ach.Unlocked ? "" : "locked")">
+                                        <div class="ach-icon">@(ach.Unlocked ? ach.Icon : "🔒")</div>
+                                        <div class="ach-title">@ach.Title</div>
+                                        <div class="ach-subtitle">
+                                            @if (ach.Unlocked)
+                                            {
+                                                @ach.Subtitle
+                                            }
+                                            else
+                                            {
+                                                @:Locked@(string.IsNullOrEmpty(ach.LockedProgressText) ? "" : " · " + ach.LockedProgressText)
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

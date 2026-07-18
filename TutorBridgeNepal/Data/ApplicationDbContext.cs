@@ -17,6 +17,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<SavedTutor> SavedTutors => Set<SavedTutor>();
+    public DbSet<Goal> Goals => Set<Goal>();
+    public DbSet<StudentAchievement> StudentAchievements => Set<StudentAchievement>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -75,7 +77,26 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<SavedTutor>()
-            .HasIndex(s => new { s.StudentProfileId, s.TutorProfileId })
+             .HasIndex(s => new { s.StudentProfileId, s.TutorProfileId })
+             .IsUnique();
+
+        builder.Entity<Goal>()
+            .HasOne(g => g.StudentProfile)
+            .WithMany()
+            .HasForeignKey(g => g.StudentProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<Goal>()
+            .HasIndex(g => g.StudentProfileId);
+
+        builder.Entity<StudentAchievement>()
+            .HasOne(a => a.StudentProfile)
+            .WithMany()
+            .HasForeignKey(a => a.StudentProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<StudentAchievement>()
+            .HasIndex(a => new { a.StudentProfileId, a.AchievementKey })
             .IsUnique();
     }
 }

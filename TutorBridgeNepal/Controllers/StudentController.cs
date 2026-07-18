@@ -756,4 +756,282 @@ public class StudentController : Controller
             _ => RedirectToAction("MyTutors")
         };
     }
+
+    public async Task<IActionResult> Progress()
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("Index", "Home");
+
+        await SetSidebarContextAsync("progress");
+
+        var now = DateTime.Now;
+        var today = DateTime.Today;
+
+        var bookings = await _context.Bookings
+            .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.StudentProfileId == studentProfile.Id)
+            .ToListAsync();
+
+        var completed = bookings.Where(b => b.Status == "Completed").ToList();
+
+        double totalHoursLearned = completed
+            .Sum(b => (b.TutorAvailabilitySlot.EndTime - b.TutorAvailabilitySlot.StartTime).TotalHours);
+
+        // Monday..Sunday of the current calendar week
+        int diffToMonday = ((int)today.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var weekStart = today.AddDays(-diffToMonday);
+        var weekEnd = weekStart.AddDays(7);
+
+        var completedThisWeek = completed
+            .Where(b => b.TutorAvailabilitySlot.StartTime >= weekStart && b.TutorAvailabilitySlot.StartTime < weekEnd)
+            .ToList();
+        double hoursThisWeek = completedThisWeek
+            .Sum(b => (b.TutorAvailabilitySlot.EndTime - b.TutorAvailabilitySlot.StartTime).TotalHours);
+
+        var completedThisMonth = completed
+            .Where(b => b.TutorAvailabilitySlot.StartTime.Year == now.Year && b.TutorAvailabilitySlot.StartTime.Month == now.Month)
+            .ToList();
+
+        var subjectsActiveCount = bookings
+            .Where(b => b.Status != "Cancelled")
+            .Select(b => b.Subject)
+            .Distinct()
+            .Count();
+
+        // Per-subject cards: sessions/hours completed, and % of that subject's
+        // non-cancelled bookings that were completed (a real completion rate,
+        // not a fabricated mastery score - there is no topic-level data model).
+        var subjectCards = completed
+            .GroupBy(b => b.Subject)
+            .Select(g =>
+            {
+                var subjectBookings = bookings.Where(b => b.Subject == g.Key && b.Status != "Cancelled").ToList();
+                var totalForSubject = subjectBookings.Count;
+                var completedForSubject = g.Count();
+                var lastTutorName = g.OrderByDescending(b => b.TutorAvailabilitySlot.StartTime).First().TutorProfile.User.FullName;
+
+                return new SubjectProgressCardViewModel
+                {
+                    Subject = g.Key,
+                    TutorName = lastTutorName,
+                    SessionsCount = completedForSubject,
+                    HoursLearned = Math.Round(g.Sum(b => (b.TutorAvailabilitySlot.EndTime - b.TutorAvailabilitySlot.StartTime).TotalHours), 1),
+                    CompletionRatePercent = totalForSubject == 0 ? 0 : (int)Math.Round(completedForSubject * 100.0 / totalForSubject)
+                };
+            })
+            .OrderByDescending(s => s.SessionsCount)
+            .ToList();
+
+        // Weekly hours: Mon-Sun of the current week
+        var weeklyHours = new List<WeeklyHoursPointViewModel>();
+        string[] dayLabels = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+        for (int i = 0; i < 7; i++)
+        {
+            var day = weekStart.AddDays(i);
+            var hoursOnDay = completed
+                .Where(b => b.TutorAvailabilitySlot.StartTime.Date == day)
+                .Sum(b => (b.TutorAvailabilitySlot.EndTime - b.TutorAvailabilitySlot.StartTime).TotalHours);
+            weeklyHours.Add(new WeeklyHoursPointViewModel { DayLabel = dayLabels[i], Hours = Math.Round(hoursOnDay, 1) });
+        }
+
+        // Monthly trend: completed sessions per month, last 6 months, top 3 subjects
+        var topSubjects = subjectCards.Take(3).Select(s => s.Subject).ToList();
+        var monthlyTrend = new List<MonthlyTrendSeriesViewModel>();
+        foreach (var subject in topSubjects)
+        {
+            var points = new List<MonthlyTrendPointViewModel>();
+            for (int m = 5; m >= 0; m--)
+            {
+                var monthDate = new DateTime(now.Year, now.Month, 1).AddMonths(-m);
+                var count = completed.Count(b => b.Subject == subject
+                    && b.TutorAvailabilitySlot.StartTime.Year == monthDate.Year
+                    && b.TutorAvailabilitySlot.StartTime.Month == monthDate.Month);
+                points.Add(new MonthlyTrendPointViewModel { MonthLabel = monthDate.ToString("MMM"), CompletedSessions = count });
+            }
+            monthlyTrend.Add(new MonthlyTrendSeriesViewModel { Subject = subject, Points = points });
+        }
+
+        // Current streak: consecutive days with a completed session, only "live"
+        // if the most recent completed day was today or yesterday.
+        var completedDatesDesc = completed
+            .Select(b => b.TutorAvailabilitySlot.StartTime.Date)
+            .Distinct()
+            .OrderByDescending(d => d)
+            .ToList();
+
+        int currentStreak = 0;
+        if (completedDatesDesc.Any() && completedDatesDesc[0] >= today.AddDays(-1))
+        {
+            currentStreak = 1;
+            for (int i = 1; i < completedDatesDesc.Count; i++)
+            {
+                if (completedDatesDesc[i - 1].AddDays(-1) == completedDatesDesc[i]) currentStreak++;
+                else break;
+            }
+        }
+
+        // Best streak ever - used for the achievement badge so it doesn't
+        // "un-earn" itself once the live streak eventually breaks.
+        var completedDatesAsc = completed
+            .Select(b => b.TutorAvailabilitySlot.StartTime.Date)
+            .Distinct()
+            .OrderBy(d => d)
+            .ToList();
+
+        int bestStreak = 0, run = 0;
+        DateTime? prevDate = null;
+        foreach (var d in completedDatesAsc)
+        {
+            run = (prevDate.HasValue && prevDate.Value.AddDays(1) == d) ? run + 1 : 1;
+            bestStreak = Math.Max(bestStreak, run);
+            prevDate = d;
+        }
+
+        // Goals - real, student-entered
+        var goals = await _context.Goals
+            .Where(g => g.StudentProfileId == studentProfile.Id)
+            .OrderBy(g => g.DueDate ?? DateTime.MaxValue)
+            .ThenByDescending(g => g.CreatedAt)
+            .ToListAsync();
+
+        int goalCompletionPercent = goals.Any()
+            ? (int)Math.Round(goals.Count(g => g.Status == "Completed") * 100.0 / goals.Count)
+            : 0;
+
+        // Achievements: check real conditions, award (idempotently, same
+        // pattern as DbSeeder) the first time each one is genuinely met.
+        var existingAchievementKeys = await _context.StudentAchievements
+            .Where(a => a.StudentProfileId == studentProfile.Id)
+            .Select(a => a.AchievementKey)
+            .ToListAsync();
+
+        var monthStart = new DateTime(now.Year, now.Month, 1);
+        var studentMonthlyCounts = await _context.Bookings
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.Status == "Completed" && b.TutorAvailabilitySlot.StartTime >= monthStart)
+            .GroupBy(b => b.StudentProfileId)
+            .Select(g => new { StudentProfileId = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        bool isTopStudentThisMonth = false;
+        if (studentMonthlyCounts.Any())
+        {
+            var maxCount = studentMonthlyCounts.Max(x => x.Count);
+            isTopStudentThisMonth = maxCount > 0
+                && studentMonthlyCounts.Where(x => x.Count == maxCount).Select(x => x.StudentProfileId).Contains(studentProfile.Id);
+        }
+
+        var achievementChecks = new (string Key, string Title, string Subtitle, string Icon, bool Met, string LockedProgress)[]
+        {
+            ("sessions_10", "10 sessions", "Milestone", "🎯",
+                completed.Count >= 10, completed.Count >= 10 ? "" : $"{10 - completed.Count} more session{(10 - completed.Count == 1 ? "" : "s")}"),
+            ("streak_7", "7-day streak", "Consistency", "🔥",
+                bestStreak >= 7, bestStreak >= 7 ? "" : $"{7 - bestStreak} more day{(7 - bestStreak == 1 ? "" : "s")}"),
+            ("top_student_month", "Top student", now.ToString("MMMM yyyy"), "⭐",
+                isTopStudentThisMonth, isTopStudentThisMonth ? "" : "Most completed sessions this month"),
+            ("sessions_25", "25 sessions", "Milestone", "🏅",
+                completed.Count >= 25, completed.Count >= 25 ? "" : $"{25 - completed.Count} more session{(25 - completed.Count == 1 ? "" : "s")}"),
+        };
+
+        var newlyEarned = achievementChecks
+            .Where(a => a.Met && !existingAchievementKeys.Contains(a.Key))
+            .Select(a => new StudentAchievement { StudentProfileId = studentProfile.Id, AchievementKey = a.Key, UnlockedAt = DateTime.Now })
+            .ToList();
+
+        if (newlyEarned.Any())
+        {
+            _context.StudentAchievements.AddRange(newlyEarned);
+            await _context.SaveChangesAsync();
+        }
+
+        var allAchievementRows = await _context.StudentAchievements
+            .Where(a => a.StudentProfileId == studentProfile.Id)
+            .ToListAsync();
+
+        var achievementVms = achievementChecks.Select(a =>
+        {
+            var row = allAchievementRows.FirstOrDefault(r => r.AchievementKey == a.Key);
+            return new AchievementViewModel
+            {
+                Key = a.Key,
+                Title = a.Title,
+                Subtitle = a.Subtitle,
+                Icon = a.Icon,
+                Unlocked = row != null,
+                UnlockedAt = row?.UnlockedAt,
+                LockedProgressText = row != null ? null : a.LockedProgress
+            };
+        }).ToList();
+
+        var vm = new ProgressPageViewModel
+        {
+            TotalHoursLearned = Math.Round(totalHoursLearned, 1),
+            HoursLearnedThisWeek = Math.Round(hoursThisWeek, 1),
+            SessionsCompleted = completed.Count,
+            SessionsCompletedThisMonth = completedThisMonth.Count,
+            SubjectsActiveCount = subjectsActiveCount,
+            CurrentStreakDays = currentStreak,
+            GoalCompletionPercent = goalCompletionPercent,
+            SubjectCards = subjectCards,
+            WeeklyHours = weeklyHours,
+            MonthlyTrend = monthlyTrend,
+            Goals = goals.Select(g => new GoalRowViewModel
+            {
+                GoalId = g.Id,
+                Subject = g.Subject,
+                Description = g.Description,
+                Status = g.Status,
+                DueDate = g.DueDate
+            }).ToList(),
+            Achievements = achievementVms
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddGoal(string description, string? subject, DateTime? dueDate)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            _context.Goals.Add(new Goal
+            {
+                StudentProfileId = studentProfile.Id,
+                Subject = string.IsNullOrWhiteSpace(subject) ? null : subject.Trim(),
+                Description = description.Trim(),
+                Status = "NotStarted",
+                DueDate = dueDate,
+                CreatedAt = DateTime.Now
+            });
+            await _context.SaveChangesAsync();
+        }
+
+        return RedirectToAction("Progress");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateGoalStatus(int goalId, string status)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        if (status is not ("NotStarted" or "InProgress" or "Completed")) return RedirectToAction("Progress");
+
+        var goal = await _context.Goals
+            .FirstOrDefaultAsync(g => g.Id == goalId && g.StudentProfileId == studentProfile.Id);
+
+        if (goal != null)
+        {
+            goal.Status = status;
+            await _context.SaveChangesAsync();
+        }
+
+        return RedirectToAction("Progress");
+    }
 }
