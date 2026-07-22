@@ -1,0 +1,339 @@
+﻿@model TutorBridgeNepal.ViewModels.SettingsPageViewModel
+@{
+    ViewData["Title"] = "Settings";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_StudentTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_StudentSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>Settings</h1>
+                        <p>Manage your account, preferences and learning profile</p>
+                    </div>
+                </div>
+
+                @if (TempData["SettingsSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                }
+                @if (TempData["SettingsError"] != null)
+                {
+                    <div class="status-banner error mb-3">@TempData["SettingsError"]</div>
+                }
+
+                <div class="settings-layout">
+                    <!-- Left jump nav -->
+                    <div class="settings-nav" id="settingsNav">
+                        <a href="#profile-section" data-target="profile-section" class="active">Profile</a>
+                        <a href="#academic-section" data-target="academic-section">Academic details</a>
+                        <a href="#security-section" data-target="security-section">Account &amp; security</a>
+                        <a href="#notifications-section" data-target="notifications-section">Notification preferences</a>
+                        <a href="#privacy-section" data-target="privacy-section">Privacy</a>
+                        <a href="#delete-section" data-target="delete-section" class="danger-link">Delete account</a>
+                    </div>
+
+                    <!-- Right content -->
+                    <div class="settings-content">
+                        <div class="panel" id="profile-section">
+                            <div class="panel-head">
+                                <h2>Profile settings</h2>
+                            </div>
+
+                            <div class="settings-avatar-row">
+                                <div class="avatar-circle-lg">@Model.Initials</div>
+                                <button type="button" class="tb-btn-outline" disabled title="Photo upload isn't built yet">Change photo</button>
+                                <button type="button" class="tb-btn-danger-outline" disabled title="Photo upload isn't built yet">Remove</button>
+                            </div>
+
+                            <form asp-controller="Student" asp-action="UpdateProfile" method="post" class="settings-form-grid">
+                                @Html.AntiForgeryToken()
+                                <div class="field">
+                                    <label>Full name</label>
+                                    <input type="text" name="FullName" class="tb-input" value="@Model.Profile.FullName" required maxlength="150" />
+                                </div>
+                                <div class="field">
+                                    <label>Email address</label>
+                                    <input type="email" name="Email" class="tb-input" value="@Model.Profile.Email" required maxlength="256" />
+                                </div>
+                                <div class="field">
+                                    <label>Phone number</label>
+                                    <input type="text" name="PhoneNumber" class="tb-input" value="@Model.Profile.PhoneNumber" placeholder="+977 98XXXXXXXX" maxlength="20" />
+                                </div>
+                                <div class="field">
+                                    <label>Grade / Level</label>
+                                    <input type="text" name="GradeLevel" class="tb-input" value="@Model.Profile.GradeLevel" placeholder="e.g. Grade 11" maxlength="60" />
+                                </div>
+                                <div class="field">
+                                    <label>District</label>
+                                    <select name="District" class="tb-select">
+                                        <option value="">Select district</option>
+                                        @foreach (var d in new[] { "Kathmandu", "Lalitpur", "Bhaktapur", "Pokhara", "Chitwan", "Biratnagar" })
+                                        {
+                                            <option selected="@(Model.Profile.District == d)">@d</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label>Account type</label>
+                                    <input type="text" class="tb-input" value="Student (cannot be changed)" disabled />
+                                </div>
+                                <div class="field full settings-actions">
+                                    <button type="submit" class="tb-btn">Save changes</button>
+                                    <a href="#profile-section" class="tb-btn-outline">Cancel</a>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="panel" id="academic-section">
+                            <div class="panel-head">
+                                <h2>Academic details</h2>
+                            </div>
+
+                            <form asp-controller="Student" asp-action="UpdateAcademic" method="post" class="settings-form-grid cols-3" id="academicForm">
+                                @Html.AntiForgeryToken()
+                                <div class="field">
+                                    <label>School / College</label>
+                                    <input type="text" name="schoolName" class="tb-input" value="@Model.Academic.SchoolName" maxlength="150" />
+                                </div>
+                                <div class="field">
+                                    <label>Curriculum / Board</label>
+                                    <select name="curriculumBoard" class="tb-select">
+                                        <option value="">Select curriculum</option>
+                                        @foreach (var c in new[] { "NEB Board", "SEE", "Cambridge (A-Levels)", "IB", "Other" })
+                                        {
+                                            <option selected="@(Model.Academic.CurriculumBoard == c)">@c</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label>Subjects enrolled</label>
+                                    <div class="tag-input-box">
+                                        <div id="subjectTagList" style="display:contents;"></div>
+                                        <input type="text" id="subjectTagInput" placeholder="+ Add" maxlength="40" />
+                                    </div>
+                                    <input type="hidden" name="subjectsEnrolled" id="subjectsEnrolledHidden" value="@Model.Academic.SubjectsEnrolled" />
+                                </div>
+                                <div class="field full settings-actions">
+                                    <button type="submit" class="tb-btn">Save changes</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="panel" id="security-section">
+                            <div class="panel-head">
+                                <h2>Account &amp; security</h2>
+                            </div>
+
+                            <form asp-controller="Student" asp-action="ChangePassword" method="post" class="settings-form-grid">
+                                @Html.AntiForgeryToken()
+                                <div class="field">
+                                    <label>Current password</label>
+                                    <input type="password" name="currentPassword" class="tb-input" required />
+                                </div>
+                                <div class="field"></div>
+                                <div class="field">
+                                    <label>New password</label>
+                                    <input type="password" name="newPassword" class="tb-input" required minlength="6" />
+                                </div>
+                                <div class="field">
+                                    <label>Confirm new password</label>
+                                    <input type="password" name="confirmNewPassword" class="tb-input" required minlength="6" />
+                                </div>
+                                <div class="field full settings-actions">
+                                    <button type="submit" class="tb-btn">Change password</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="panel" id="notifications-section">
+                            <div class="panel-head">
+                                <h2>Notification preferences</h2>
+                            </div>
+                            <p class="tutor-meta mb-3" style="margin-top:-.6rem;">Saved for real, but emails/push aren't wired up yet - these just control what would be sent once that's built.</p>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Session reminders</div>
+                                    <div class="settings-toggle-sub">Get notified 1 hour before a scheduled session</div>
+                                </div>
+                                <form asp-controller="Student" asp-action="UpdateNotificationPreference" method="post" class="toggle-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="key" value="SessionReminders" />
+                                    <input type="hidden" name="value" value="@(!Model.Notifications.SessionReminders)" />
+                                    <button type="submit" class="toggle-switch @(Model.Notifications.SessionReminders ? "on" : "")" aria-label="Toggle session reminders"><span class="toggle-knob"></span></button>
+                                </form>
+                            </div>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">New messages</div>
+                                    <div class="settings-toggle-sub">Email and push alerts when a tutor messages you</div>
+                                </div>
+                                <form asp-controller="Student" asp-action="UpdateNotificationPreference" method="post" class="toggle-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="key" value="NewMessages" />
+                                    <input type="hidden" name="value" value="@(!Model.Notifications.NewMessages)" />
+                                    <button type="submit" class="toggle-switch @(Model.Notifications.NewMessages ? "on" : "")" aria-label="Toggle new message alerts"><span class="toggle-knob"></span></button>
+                                </form>
+                            </div>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Progress &amp; goal updates</div>
+                                    <div class="settings-toggle-sub">Weekly summary of your learning progress</div>
+                                </div>
+                                <form asp-controller="Student" asp-action="UpdateNotificationPreference" method="post" class="toggle-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="key" value="ProgressUpdates" />
+                                    <input type="hidden" name="value" value="@(!Model.Notifications.ProgressUpdates)" />
+                                    <button type="submit" class="toggle-switch @(Model.Notifications.ProgressUpdates ? "on" : "")" aria-label="Toggle progress update emails"><span class="toggle-knob"></span></button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="panel" id="privacy-section">
+                            <div class="panel-head">
+                                <h2>Privacy</h2>
+                            </div>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Show my profile to tutors before booking</div>
+                                    <div class="settings-toggle-sub">Tutors can see your name, grade and district when you message them</div>
+                                </div>
+                                <form asp-controller="Student" asp-action="UpdatePrivacy" method="post" class="toggle-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="showProfileToTutors" value="@(!Model.ShowProfileToTutors)" />
+                                    <button type="submit" class="toggle-switch @(Model.ShowProfileToTutors ? "on" : "")" aria-label="Toggle profile visibility"><span class="toggle-knob"></span></button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="panel danger-panel" id="delete-section">
+                            <div class="panel-head">
+                                <h2>Delete account</h2>
+                            </div>
+                            <p class="tutor-meta mb-3">This permanently deletes your account, bookings, messages, saved tutors, goals and achievements. This cannot be undone.</p>
+
+                            <form asp-controller="Student" asp-action="DeleteAccount" method="post" id="deleteAccountForm" class="settings-form-grid">
+                                @Html.AntiForgeryToken()
+                                <div class="field full">
+                                    <label>Type <strong>DELETE</strong> to confirm</label>
+                                    <input type="text" name="confirmText" class="tb-input" placeholder="DELETE" autocomplete="off" />
+                                </div>
+                                <div class="field full settings-actions">
+                                    <button type="submit" class="tb-btn-danger">Delete my account</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            // Subject tag chips - syncs to a comma-separated hidden input
+            (function() {
+                var hidden = document.getElementById('subjectsEnrolledHidden');
+                var list = document.getElementById('subjectTagList');
+                var input = document.getElementById('subjectTagInput');
+
+                function currentTags() {
+                    return (hidden.value || '')
+                        .split(',')
+                        .map(function(t) { return t.trim(); })
+                        .filter(function(t) { return t.length > 0; });
+                }
+
+                function render() {
+                    var tags = currentTags();
+                    list.innerHTML = '';
+                    tags.forEach(function(tag) {
+                        var chip = document.createElement('span');
+                        chip.className = 'subject-chip';
+                        chip.textContent = tag + ' ';
+                        var remove = document.createElement('button');
+                        remove.type = 'button';
+                        remove.className = 'tag-remove-btn';
+                        remove.textContent = '×';
+                        remove.addEventListener('click', function() {
+                            var updated = currentTags().filter(function(t) { return t !== tag; });
+                            hidden.value = updated.join(',');
+                            render();
+                        });
+                        chip.appendChild(remove);
+                        list.appendChild(chip);
+                    });
+                }
+
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        var val = input.value.trim();
+                        if (val.length === 0) return;
+                        var tags = currentTags();
+                        if (tags.indexOf(val) === -1) {
+                            tags.push(val);
+                            hidden.value = tags.join(',');
+                            render();
+                        }
+                        input.value = '';
+                    }
+                });
+
+                render();
+            })();
+
+            // Scroll-spy: highlight the settings-nav item for whichever section is in view
+            (function() {
+                var navLinks = document.querySelectorAll('#settingsNav a[data-target]');
+                var sections = Array.prototype.slice.call(navLinks)
+                    .map(function(a) { return document.getElementById(a.dataset.target); })
+                    .filter(Boolean);
+
+                function setActive(id) {
+                    navLinks.forEach(function(a) {
+                        a.classList.toggle('active', a.dataset.target === id);
+                    });
+                }
+
+                var observer = new IntersectionObserver(function(entries) {
+                    entries.forEach(function(entry) {
+                        if (entry.isIntersecting) setActive(entry.target.id);
+                    });
+                }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+
+                sections.forEach(function(s) { observer.observe(s); });
+            })();
+
+            // Confirm before submitting account deletion
+            document.getElementById('deleteAccountForm').addEventListener('submit', function(e) {
+                if (!confirm('This will permanently delete your account and all your data. Are you absolutely sure?')) {
+                    e.preventDefault();
+                }
+            });
+    </script>
+</body>
+</html>

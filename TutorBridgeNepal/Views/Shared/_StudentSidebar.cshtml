@@ -33,8 +33,8 @@
     </ul>
 
     <ul class="dash-nav-secondary">
-        <li><a asp-area="Identity" asp-page="/Account/Manage/Index"><span class="nav-icon">⚙️</span> Settings</a></li>
-        <li><a asp-controller="Home" asp-action="Contact"><span class="nav-icon">❓</span> Help &amp; Support</a></li>
+        <li><a asp-controller="Student" asp-action="Settings" class="@(activeNav == "settings" ? "active" : "")"><span class="nav-icon">⚙️</span> Settings</a></li>
+        <li><a asp-controller="Student" asp-action="HelpSupport" class="@(activeNav == "help" ? "active" : "")"><span class="nav-icon">❓</span> Help &amp; Support</a></li>
         <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
     </ul>
 </aside>

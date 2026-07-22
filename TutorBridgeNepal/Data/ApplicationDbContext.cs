@@ -19,6 +19,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<SavedTutor> SavedTutors => Set<SavedTutor>();
     public DbSet<Goal> Goals => Set<Goal>();
     public DbSet<StudentAchievement> StudentAchievements => Set<StudentAchievement>();
+    public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -96,7 +97,16 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<StudentAchievement>()
-            .HasIndex(a => new { a.StudentProfileId, a.AchievementKey })
-            .IsUnique();
+                    .HasIndex(a => new { a.StudentProfileId, a.AchievementKey })
+                    .IsUnique();
+
+        builder.Entity<SupportTicket>()
+            .HasOne(t => t.StudentProfile)
+            .WithMany()
+            .HasForeignKey(t => t.StudentProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<SupportTicket>()
+            .HasIndex(t => t.StudentProfileId);
     }
 }

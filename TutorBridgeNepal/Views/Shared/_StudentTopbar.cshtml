@@ -1,7 +1,10 @@
-﻿@{
+﻿@using TutorBridgeNepal.ViewModels
+@{
     var initials = ViewData["SidebarInitials"] as string ?? "?";
     var name = ViewData["SidebarName"] as string ?? "";
-    var unreadCount = ViewData["UnreadMessageCount"] as int? ?? 0;
+    var meta = ViewData["SidebarMeta"] as string ?? "";
+    var notifications = ViewData["Notifications"] as List<NotificationItemViewModel> ?? new List<NotificationItemViewModel>();
+    var notificationCount = ViewData["NotificationCount"] as int? ?? 0;
 }
 <header class="dash-topbar">
     <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
@@ -11,13 +14,74 @@
     </form>
 
     <div class="dash-topbar-right">
-        <a asp-controller="Student" asp-action="Messages" class="icon-btn" title="Messages" style="position:relative;">
-            🔔
-            @if (unreadCount > 0)
-            {
-                <span style="position:absolute; top:-2px; right:-2px; width:9px; height:9px; border-radius:50%; background:var(--danger, #d9534f); border:1px solid #fff;"></span>
-            }
-        </a>
-        <div class="topbar-avatar" title="@name">@initials</div>
+        <div class="topbar-dropdown-wrap">
+            <button type="button" class="icon-btn" id="notifBellBtn" title="Notifications" style="position:relative;">
+                🔔
+                @if (notificationCount > 0)
+                {
+                    <span class="topbar-badge">@(notificationCount > 9 ? "9+" : notificationCount.ToString())</span>
+                }
+            </button>
+            <div class="topbar-dropdown notif-dropdown" id="notifDropdown">
+                <div class="topbar-dropdown-head">Notifications</div>
+                @if (!notifications.Any())
+                {
+                    <div class="notif-empty">You're all caught up - nothing new right now.</div>
+                }
+                else
+                {
+                    @foreach (var n in notifications)
+                    {
+                        <a class="notif-item" asp-controller="@n.LinkController" asp-action="@n.LinkAction" asp-route-tutorProfileId="@n.RouteId">
+                            <span class="notif-icon">@n.Icon</span>
+                            <span class="notif-body">
+                                <span class="notif-title">@n.Title</span>
+                                <span class="notif-sub">@n.Subtitle</span>
+                            </span>
+                        </a>
+                    }
+                }
+            </div>
+        </div>
+
+        <div class="topbar-dropdown-wrap">
+            <button type="button" class="topbar-avatar" id="profileAvatarBtn" title="@name">@initials</button>
+            <div class="topbar-dropdown profile-dropdown" id="profileDropdown">
+                <div class="profile-dropdown-head">
+                    <div class="avatar-circle-lg" style="width:42px;height:42px;font-size:.95rem;">@initials</div>
+                    <div>
+                        <div class="profile-dropdown-name">@name</div>
+                        <div class="profile-dropdown-meta">@meta</div>
+                    </div>
+                </div>
+                <a class="topbar-dropdown-link" asp-controller="Student" asp-action="Settings">⚙️ Settings</a>
+                <a class="topbar-dropdown-link" asp-controller="Student" asp-action="Progress">📈 My progress</a>
+                <a class="topbar-dropdown-link danger" asp-controller="Account" asp-action="Logout">↩️ Log out</a>
+            </div>
+        </div>
     </div>
 </header>
+
+<script>
+    (function() {
+        function wireDropdown(btnId, dropdownId) {
+            var btn = document.getElementById(btnId);
+            var dropdown = document.getElementById(dropdownId);
+            if (!btn || !dropdown) return;
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var isOpen = dropdown.classList.contains('open');
+                document.querySelectorAll('.topbar-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+                if (!isOpen) dropdown.classList.add('open');
+            });
+        }
+
+        wireDropdown('notifBellBtn', 'notifDropdown');
+        wireDropdown('profileAvatarBtn', 'profileDropdown');
+
+        document.addEventListener('click', function() {
+            document.querySelectorAll('.topbar-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+        });
+    })();
+</script>

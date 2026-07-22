@@ -13,11 +13,13 @@ public class StudentController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
 
-    public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+    public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager)
     {
         _context = context;
         _userManager = userManager;
+        _signInManager = signInManager;
     }
 
     private static string GetInitials(string fullName)
@@ -54,6 +56,104 @@ public class StudentController : Controller
         ViewData["SidebarMeta"] = string.IsNullOrWhiteSpace(subMeta) ? "Student" : subMeta;
         ViewData["ActiveNav"] = activeNav;
         ViewData["UnreadMessageCount"] = unreadCount;
+
+        var notifications = new List<NotificationItemViewModel>();
+
+        if (studentProfile != null)
+        {
+            var now = DateTime.Now;
+
+            // Sessions starting within the next 24 hours - most urgent, shown first
+            var soonSessions = await _context.Bookings
+                .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+                .Include(b => b.TutorAvailabilitySlot)
+                .Where(b => b.StudentProfileId == studentProfile.Id
+                    && b.Status == "Confirmed"
+                    && b.TutorAvailabilitySlot.StartTime >= now
+                    && b.TutorAvailabilitySlot.StartTime <= now.AddHours(24))
+                .OrderBy(b => b.TutorAvailabilitySlot.StartTime)
+                .Take(5)
+                .ToListAsync();
+
+            notifications.AddRange(soonSessions.Select(b => new NotificationItemViewModel
+            {
+                Type = "Session",
+                Icon = "📅",
+                Title = $"{b.Subject} with {b.TutorProfile.User.FullName}",
+                Subtitle = $"Starts {b.TutorAvailabilitySlot.StartTime:ddd, d MMM h:mm tt}",
+                Timestamp = b.TutorAvailabilitySlot.StartTime,
+                LinkController = "Student",
+                LinkAction = "Sessions"
+            }));
+
+            // Unread messages, one entry per tutor with the most recent unread one
+            var unreadMessages = await _context.Messages
+                .Include(m => m.TutorProfile).ThenInclude(t => t.User)
+                .Where(m => m.StudentProfileId == studentProfile.Id && m.SenderRole == "Tutor" && !m.IsRead)
+                .OrderByDescending(m => m.SentAt)
+                .ToListAsync();
+
+            notifications.AddRange(unreadMessages
+                .GroupBy(m => m.TutorProfileId)
+                .Select(g => g.First())
+                .Take(5)
+                .Select(m => new NotificationItemViewModel
+                {
+                    Type = "Message",
+                    Icon = "💬",
+                    Title = $"New message from {m.TutorProfile.User.FullName}",
+                    Subtitle = m.Content.Length > 60 ? m.Content.Substring(0, 60) + "…" : m.Content,
+                    Timestamp = m.SentAt,
+                    LinkController = "Student",
+                    LinkAction = "Messages",
+                    RouteId = m.TutorProfileId
+                }));
+
+            // Goals due within the next 3 days (includes overdue) and not completed
+            var dueSoonGoals = await _context.Goals
+                .Where(g => g.StudentProfileId == studentProfile.Id
+                    && g.Status != "Completed"
+                    && g.DueDate != null
+                    && g.DueDate <= now.AddDays(3))
+                .OrderBy(g => g.DueDate)
+                .Take(5)
+                .ToListAsync();
+
+            notifications.AddRange(dueSoonGoals.Select(g => new NotificationItemViewModel
+            {
+                Type = "Goal",
+                Icon = "🎯",
+                Title = g.Description,
+                Subtitle = g.DueDate!.Value.Date < now.Date ? "Overdue" : $"Due {g.DueDate.Value:d MMM}",
+                Timestamp = g.DueDate!.Value,
+                LinkController = "Student",
+                LinkAction = "Progress"
+            }));
+
+            // Achievements unlocked in the last 7 days
+            var recentAchievements = await _context.StudentAchievements
+                .Where(a => a.StudentProfileId == studentProfile.Id && a.UnlockedAt >= now.AddDays(-7))
+                .OrderByDescending(a => a.UnlockedAt)
+                .Take(5)
+                .ToListAsync();
+
+            notifications.AddRange(recentAchievements.Select(a =>
+            {
+                var meta = AchievementCatalog.Items.TryGetValue(a.AchievementKey, out var m) ? m : (Title: "Achievement", Icon: "🏆"); return new NotificationItemViewModel
+                {
+                    Type = "Achievement",
+                    Icon = meta.Icon,
+                    Title = $"Achievement unlocked: {meta.Title}",
+                    Subtitle = $"Earned {a.UnlockedAt:d MMM}",
+                    Timestamp = a.UnlockedAt,
+                    LinkController = "Student",
+                    LinkAction = "Progress"
+                };
+            }));
+        }
+
+        ViewData["Notifications"] = notifications.Take(8).ToList();
+        ViewData["NotificationCount"] = notifications.Count;
 
         return user;
     }
@@ -923,16 +1023,16 @@ public class StudentController : Controller
         }
 
         var achievementChecks = new (string Key, string Title, string Subtitle, string Icon, bool Met, string LockedProgress)[]
-        {
-            ("sessions_10", "10 sessions", "Milestone", "🎯",
+         {
+            ("sessions_10", AchievementCatalog.Items["sessions_10"].Title, "Milestone", AchievementCatalog.Items["sessions_10"].Icon,
                 completed.Count >= 10, completed.Count >= 10 ? "" : $"{10 - completed.Count} more session{(10 - completed.Count == 1 ? "" : "s")}"),
-            ("streak_7", "7-day streak", "Consistency", "🔥",
+            ("streak_7", AchievementCatalog.Items["streak_7"].Title, "Consistency", AchievementCatalog.Items["streak_7"].Icon,
                 bestStreak >= 7, bestStreak >= 7 ? "" : $"{7 - bestStreak} more day{(7 - bestStreak == 1 ? "" : "s")}"),
-            ("top_student_month", "Top student", now.ToString("MMMM yyyy"), "⭐",
+            ("top_student_month", AchievementCatalog.Items["top_student_month"].Title, now.ToString("MMMM yyyy"), AchievementCatalog.Items["top_student_month"].Icon,
                 isTopStudentThisMonth, isTopStudentThisMonth ? "" : "Most completed sessions this month"),
-            ("sessions_25", "25 sessions", "Milestone", "🏅",
+            ("sessions_25", AchievementCatalog.Items["sessions_25"].Title, "Milestone", AchievementCatalog.Items["sessions_25"].Icon,
                 completed.Count >= 25, completed.Count >= 25 ? "" : $"{25 - completed.Count} more session{(25 - completed.Count == 1 ? "" : "s")}"),
-        };
+         };
 
         var newlyEarned = achievementChecks
             .Where(a => a.Met && !existingAchievementKeys.Contains(a.Key))
@@ -1033,5 +1133,267 @@ public class StudentController : Controller
         }
 
         return RedirectToAction("Progress");
+    }
+    public async Task<IActionResult> Settings()
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return RedirectToAction("Index", "Home");
+
+        var studentProfile = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
+        if (studentProfile == null) return RedirectToAction("Index", "Home");
+
+        await SetSidebarContextAsync("settings");
+
+        var vm = new SettingsPageViewModel
+        {
+            Initials = GetInitials(user.FullName),
+            Profile = new SettingsProfileFormModel
+            {
+                FullName = user.FullName,
+                Email = user.Email ?? "",
+                PhoneNumber = user.PhoneNumber,
+                GradeLevel = studentProfile.GradeLevel,
+                District = user.District
+            },
+            Academic = new SettingsAcademicFormModel
+            {
+                SchoolName = studentProfile.SchoolName,
+                CurriculumBoard = studentProfile.CurriculumBoard,
+                SubjectsEnrolled = studentProfile.SubjectsEnrolled
+            },
+            Notifications = new SettingsNotificationsModel
+            {
+                SessionReminders = studentProfile.NotifySessionReminders,
+                NewMessages = studentProfile.NotifyNewMessages,
+                ProgressUpdates = studentProfile.NotifyProgressUpdates
+            },
+            ShowProfileToTutors = studentProfile.ShowProfileToTutors
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateProfile(SettingsProfileFormModel model)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return RedirectToAction("StudentLogin", "Account");
+
+        var studentProfile = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
+        if (studentProfile == null) return RedirectToAction("Index", "Home");
+
+        if (string.IsNullOrWhiteSpace(model.FullName) || string.IsNullOrWhiteSpace(model.Email))
+        {
+            TempData["SettingsError"] = "Full name and email are required.";
+            return RedirectToAction("Settings");
+        }
+
+        user.FullName = model.FullName.Trim();
+        user.District = string.IsNullOrWhiteSpace(model.District) ? null : model.District.Trim();
+        user.PhoneNumber = string.IsNullOrWhiteSpace(model.PhoneNumber) ? null : model.PhoneNumber.Trim();
+
+        if (!string.Equals(user.Email, model.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var setEmailResult = await _userManager.SetEmailAsync(user, model.Email.Trim());
+            if (!setEmailResult.Succeeded)
+            {
+                TempData["SettingsError"] = "Could not update email: " + string.Join(" ", setEmailResult.Errors.Select(e => e.Description));
+                return RedirectToAction("Settings");
+            }
+            await _userManager.SetUserNameAsync(user, model.Email.Trim());
+        }
+
+        studentProfile.GradeLevel = string.IsNullOrWhiteSpace(model.GradeLevel) ? null : model.GradeLevel.Trim();
+
+        var updateResult = await _userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            TempData["SettingsError"] = "Could not save profile changes.";
+            return RedirectToAction("Settings");
+        }
+
+        await _context.SaveChangesAsync();
+        await _signInManager.RefreshSignInAsync(user);
+
+        TempData["SettingsSuccess"] = "Profile updated.";
+        return RedirectToAction("Settings");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateAcademic(string? schoolName, string? curriculumBoard, string? subjectsEnrolled)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        studentProfile.SchoolName = string.IsNullOrWhiteSpace(schoolName) ? null : schoolName.Trim();
+        studentProfile.CurriculumBoard = string.IsNullOrWhiteSpace(curriculumBoard) ? null : curriculumBoard.Trim();
+        studentProfile.SubjectsEnrolled = string.IsNullOrWhiteSpace(subjectsEnrolled) ? null : subjectsEnrolled.Trim(' ', ',');
+
+        await _context.SaveChangesAsync();
+        TempData["SettingsSuccess"] = "Academic details updated.";
+        return RedirectToAction("Settings");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateNotificationPreference(string key, bool value)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        switch (key)
+        {
+            case "SessionReminders": studentProfile.NotifySessionReminders = value; break;
+            case "NewMessages": studentProfile.NotifyNewMessages = value; break;
+            case "ProgressUpdates": studentProfile.NotifyProgressUpdates = value; break;
+        }
+
+        await _context.SaveChangesAsync();
+        return RedirectToAction("Settings");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdatePrivacy(bool showProfileToTutors)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        studentProfile.ShowProfileToTutors = showProfileToTutors;
+        await _context.SaveChangesAsync();
+        return RedirectToAction("Settings");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(string currentPassword, string newPassword, string confirmNewPassword)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return RedirectToAction("StudentLogin", "Account");
+
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword != confirmNewPassword)
+        {
+            TempData["SettingsError"] = "New password and confirmation do not match.";
+            return RedirectToAction("Settings");
+        }
+
+        var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+        if (!result.Succeeded)
+        {
+            TempData["SettingsError"] = string.Join(" ", result.Errors.Select(e => e.Description));
+            return RedirectToAction("Settings");
+        }
+
+        await _signInManager.RefreshSignInAsync(user);
+        TempData["SettingsSuccess"] = "Password changed.";
+        return RedirectToAction("Settings");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteAccount(string confirmText)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return RedirectToAction("StudentLogin", "Account");
+
+        if (!string.Equals(confirmText?.Trim(), "DELETE", StringComparison.Ordinal))
+        {
+            TempData["SettingsError"] = "Type DELETE exactly to confirm account deletion.";
+            return RedirectToAction("Settings");
+        }
+
+        var studentProfile = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
+        if (studentProfile == null) return RedirectToAction("Index", "Home");
+
+        // Booking/Message/SavedTutor all use DeleteBehavior.Restrict against
+        // StudentProfile, so they must be cleaned up manually before the
+        // profile itself can be removed. Goal/StudentAchievement cascade
+        // automatically (configured with DeleteBehavior.Cascade).
+        using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var activeSlotIds = await _context.Bookings
+            .Where(b => b.StudentProfileId == studentProfile.Id && b.Status != "Cancelled" && b.Status != "Completed")
+            .Select(b => b.TutorAvailabilitySlotId)
+            .ToListAsync();
+
+        if (activeSlotIds.Any())
+        {
+            var slots = await _context.TutorAvailabilitySlots.Where(s => activeSlotIds.Contains(s.Id)).ToListAsync();
+            foreach (var slot in slots) slot.IsBooked = false;
+        }
+
+        _context.Messages.RemoveRange(_context.Messages.Where(m => m.StudentProfileId == studentProfile.Id));
+        _context.SavedTutors.RemoveRange(_context.SavedTutors.Where(s => s.StudentProfileId == studentProfile.Id));
+        _context.Bookings.RemoveRange(_context.Bookings.Where(b => b.StudentProfileId == studentProfile.Id));
+        _context.StudentProfiles.Remove(studentProfile);
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        await _signInManager.SignOutAsync();
+        await _userManager.DeleteAsync(user);
+
+        return RedirectToAction("Index", "Home");
+    }
+
+public async Task<IActionResult> HelpSupport()
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("Index", "Home");
+
+        await SetSidebarContextAsync("help");
+
+        var tickets = await _context.SupportTickets
+            .Where(t => t.StudentProfileId == studentProfile.Id)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+
+        var vm = new HelpSupportPageViewModel
+        {
+            MyTickets = tickets.Select(t => new SupportTicketRowViewModel
+            {
+                Id = t.Id,
+                Category = t.Category,
+                Subject = t.Subject,
+                Message = t.Message,
+                Status = t.Status,
+                CreatedAt = t.CreatedAt
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SubmitSupportTicket(string category, string subject, string message)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        if (string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(message))
+        {
+            TempData["SettingsError"] = "Please fill in both a subject and a message.";
+            return RedirectToAction("HelpSupport");
+        }
+
+        var validCategories = new[] { "Booking", "Messaging", "Account", "Other" };
+
+        _context.SupportTickets.Add(new SupportTicket
+        {
+            StudentProfileId = studentProfile.Id,
+            Category = validCategories.Contains(category) ? category : "Other",
+            Subject = subject.Trim(),
+            Message = message.Trim(),
+            Status = "Open",
+            CreatedAt = DateTime.Now
+        });
+
+        await _context.SaveChangesAsync();
+
+        TempData["SettingsSuccess"] = "Your request has been submitted. We'll get back to you by email.";
+        return RedirectToAction("HelpSupport");
     }
 }
