@@ -11,4 +11,6 @@ public class TutorProfile
     public string? TeachingStyle { get; set; }
     public bool IsVerified { get; set; }
     public decimal AverageRating { get; set; }
+    public int ReviewCount { get; set; }
+    public bool IsAvailableNow { get; set; }
 }

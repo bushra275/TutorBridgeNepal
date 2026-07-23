@@ -38,6 +38,14 @@
                 {
                     <div class="status-banner success mb-3">@TempData["BookingSuccess"]</div>
                 }
+                @if (TempData["SettingsSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                }
+                @if (TempData["SettingsError"] != null)
+                {
+                    <div class="status-banner error mb-3">@TempData["SettingsError"]</div>
+                }
 
                 <div class="tab-bar">
                     <a class="tab-btn @(Model.ActiveTab == "upcoming" ? "active" : "")" asp-action="Sessions" asp-route-tab="upcoming">Upcoming (@Model.UpcomingCount)</a>
@@ -153,8 +161,15 @@
                                         <td>@s.StartTime.ToString("d MMM yyyy, h:mm tt")</td>
                                         <td>@($"{(int)duration.TotalHours}h {duration.Minutes:D2}m")</td>
                                         <td><span class="status-text completed">Completed</span></td>
-                                        <td><span class="disabled-btn" title="Reviews aren't available yet">Leave review</span></td>
-                                        <td>
+                                @if (s.MyReviewRating.HasValue)
+                                {
+                                    <td><span class="review-stars-inline">@(new string('★', s.MyReviewRating.Value))@(new string('☆', 5 - s.MyReviewRating.Value))</span></td>
+                                }
+                                else
+                                {
+                                    <td><button type="button" class="mini-btn leave-review-btn" data-booking-id="@s.BookingId" data-tutor-name="@s.TutorName">Leave review</button></td>
+                                }
+                                <td>
                                             <span class="disabled-btn" title="Session notes aren't available yet">View notes</span>
                                             <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@s.TutorProfileId" class="mini-btn">Rebook</a>
                                         </td>
@@ -242,7 +257,67 @@
         </div>
     </div>
 
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Shared "Leave a review" modal -->
+<div class="review-modal-backdrop" id="reviewModalBackdrop">
+    <div class="review-modal">
+        <h3>Review <span id="reviewModalTutorName"></span></h3>
+        <form asp-controller="Student" asp-action="SubmitReview" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="bookingId" id="reviewModalBookingId" />
+            <input type="hidden" name="rating" id="reviewModalRatingInput" value="0" />
+
+            <div class="star-picker" id="starPicker">
+                <button type="button" class="star-btn" data-value="1">★</button>
+                <button type="button" class="star-btn" data-value="2">★</button>
+                <button type="button" class="star-btn" data-value="3">★</button>
+                <button type="button" class="star-btn" data-value="4">★</button>
+                <button type="button" class="star-btn" data-value="5">★</button>
+            </div>
+
+            <textarea name="comment" class="tb-input" style="min-height:90px; padding:.8rem 1.1rem; margin-top:.8rem;" maxlength="1000" placeholder="Optional comment..."></textarea>
+
+            <div class="settings-actions" style="margin-top:1rem;">
+                <button type="submit" class="tb-btn">Submit review</button>
+                <button type="button" class="tb-btn-outline" onclick="closeReviewModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+        function openReviewModal(bookingId, tutorName) {
+            document.getElementById('reviewModalBookingId').value = bookingId;
+            document.getElementById('reviewModalTutorName').textContent = tutorName;
+            document.getElementById('reviewModalRatingInput').value = 0;
+            document.querySelectorAll('#starPicker .star-btn').forEach(function(b) { b.classList.remove('selected'); });
+            document.getElementById('reviewModalBackdrop').classList.add('open');
+        }
+
+        document.querySelectorAll('.leave-review-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                openReviewModal(btn.dataset.bookingId, btn.dataset.tutorName);
+            });
+        });
+
+        function closeReviewModal() {
+            document.getElementById('reviewModalBackdrop').classList.remove('open');
+        }
+
+        document.querySelectorAll('#starPicker .star-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var value = parseInt(btn.dataset.value, 10);
+                document.getElementById('reviewModalRatingInput').value = value;
+                document.querySelectorAll('#starPicker .star-btn').forEach(function(b) {
+                    b.classList.toggle('selected', parseInt(b.dataset.value, 10) <= value);
+                });
+            });
+        });
+
+        document.getElementById('reviewModalBackdrop').addEventListener('click', function(e) {
+            if (e.target === this) closeReviewModal();
+        });
+</script>
 </body>
 </html>

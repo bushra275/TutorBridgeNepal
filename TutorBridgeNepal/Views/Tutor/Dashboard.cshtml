@@ -1,6 +1,11 @@
-﻿@{
+﻿@model TutorBridgeNepal.ViewModels.TutorDashboardViewModel
+@{
     ViewData["Title"] = "Tutor Dashboard";
     Layout = null;
+
+    var now = DateTime.Now;
+    var greeting = now.Hour < 12 ? "Good morning" : now.Hour < 17 ? "Good afternoon" : "Good evening";
+    var firstName = Model.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? Model.FullName;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -18,76 +23,46 @@
 </head>
 <body>
     <div class="dash-shell">
-
-        <header class="dash-topbar">
-            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
-            <div class="dash-search">
-                <input type="text" placeholder="Search students, sessions..." />
-            </div>
-            <span class="badge-soft availability-pill"><span class="avail-dot"></span> Available now</span>
-            <div class="dash-topbar-right">
-                <a href="#" class="icon-btn" title="Notifications">
-                    🔔
-                    <span class="dot"></span>
-                </a>
-                <div class="topbar-avatar">RP</div>
-            </div>
-        </header>
+        @await Html.PartialAsync("_TutorTopbar")
 
         <div class="dash-body">
-            <aside class="dash-sidebar">
-                <div class="dash-user">
-                    <div class="avatar">RP</div>
-                    <div>
-                        <div class="name">Ram Prasad Shrestha</div>
-                        <div class="meta">Mathematics · Kathmandu</div>
-                        <span class="role-chip">Tutor</span>
-                    </div>
-                </div>
-
-                <ul class="dash-nav">
-                    <li><a href="#" class="active"><span class="nav-icon">🏠</span> Dashboard</a></li>
-                    <li><a href="#"><span class="nav-icon">🗓️</span> My Schedule</a></li>
-                    <li><a href="#"><span class="nav-icon">📥</span> Session Requests <span class="badge-count">2</span></a></li>
-                    <li><a href="#"><span class="nav-icon">👥</span> My Students</a></li>
-                    <li><a href="#"><span class="nav-icon">💬</span> Messages <span class="badge-count">4</span></a></li>
-                    <li><a href="#"><span class="nav-icon">⭐</span> Reviews</a></li>
-                    <li><a href="#"><span class="nav-icon">👤</span> My Profile</a></li>
-                </ul>
-
-                <ul class="dash-nav-secondary">
-                    <li><a href="#"><span class="nav-icon">⚙️</span> Settings</a></li>
-                    <li><a href="#"><span class="nav-icon">❓</span> Help &amp; Support</a></li>
-                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
-                </ul>
-            </aside>
+            @await Html.PartialAsync("_TutorSidebar")
 
             <main class="dash-main">
                 <div class="dash-greeting">
-                    <h1>Good morning, Ram Prasad 👋</h1>
-                    <p>Tuesday, 10 June 2025 · You have 2 sessions today</p>
+                    <h1>@greeting, @firstName 👋</h1>
+                    <p>@now.ToString("dddd, d MMMM yyyy") · You have @Model.TodaySessionsCount session@(Model.TodaySessionsCount == 1 ? "" : "s") today</p>
                 </div>
 
                 <div class="stat-cards">
                     <div class="stat-card">
                         <div class="label">Total sessions</div>
-                        <div class="value">312</div>
-                        <div class="delta">+8 this month</div>
+                        <div class="value">@Model.TotalSessions</div>
+                        <div class="delta">+@Model.TotalSessionsThisMonth this month</div>
                     </div>
                     <div class="stat-card">
                         <div class="label">Active students</div>
-                        <div class="value">18</div>
-                        <div class="delta">+2 this month</div>
+                        <div class="value">@Model.ActiveStudentsCount</div>
+                        <div class="delta">+@Model.NewStudentsThisMonth this month</div>
                     </div>
                     <div class="stat-card">
                         <div class="label">Hours taught</div>
-                        <div class="value">412h</div>
+                        <div class="value">@Model.HoursTaught.ToString("0.#")h</div>
                         <div class="sub">Lifetime total</div>
                     </div>
                     <div class="stat-card">
-                        <div class="label">Avg rating</div>
-                        <div class="rating-value"><span class="value">4.9</span><span class="star">★</span></div>
-                        <div class="sub">128 reviews</div>
+                        @if (Model.ReviewCount > 0)
+                        {
+                            <div class="label">Avg rating</div>
+                            <div class="rating-value"><span class="value">@Model.AverageRating.ToString("0.0")</span><span class="star">★</span></div>
+                            <div class="sub">@Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s")</div>
+                        }
+                        else
+                        {
+                            <div class="label">Avg rating</div>
+                            <div class="value">—</div>
+                            <div class="sub">No reviews yet</div>
+                        }
                     </div>
                 </div>
 
@@ -96,90 +71,122 @@
                         <div class="panel">
                             <div class="panel-head">
                                 <h2>Today's schedule</h2>
-                                <span class="tag-count">2 today</span>
-                                <a href="#" class="view-all-link panel-action" style="margin:0;">View calendar →</a>
+                                <span class="tag-count">@Model.TodaySessionsCount today</span>
                             </div>
 
-                            <div class="session-card">
-                                <div class="avatar">AS</div>
-                                <div class="session-info">
-                                    <div class="name">Aayusha Shrestha</div>
-                                    <div class="meta">Mathematics · Grade 11</div>
-                                    <div class="time">Today, 4:00 PM – 5:00 PM</div>
-                                </div>
-                                <div class="session-actions">
-                                    <span class="pill pill-confirmed">Confirmed</span>
-                                    <div class="session-btn-row">
-                                        <a href="#" class="mini-btn green">Start session</a>
-                                        <a href="#" class="mini-btn">Message student</a>
+                            @if (!Model.TodaySchedule.Any())
+                            {
+                                <p class="empty-state">No confirmed sessions today.</p>
+                            }
+                            else
+                            {
+                                @foreach (var s in Model.TodaySchedule)
+                                {
+                                    var started = s.StartTime <= now;
+                                    <div class="session-card">
+                                        <div class="avatar">@s.StudentInitials</div>
+                                        <div class="session-info">
+                                            <div class="name">@s.StudentName</div>
+                                            <div class="meta">@s.Subject@(string.IsNullOrWhiteSpace(s.StudentGradeLevel) ? "" : " · " + s.StudentGradeLevel)</div>
+                                            <div class="time">Today, @s.StartTime.ToString("h:mm tt") – @s.EndTime.ToString("h:mm tt")</div>
+                                        </div>
+                                        <div class="session-actions">
+                                            <span class="pill pill-confirmed">Confirmed</span>
+                                            <div class="session-btn-row">
+                                                @if (started)
+                                                {
+                                                    <form asp-controller="Tutor" asp-action="MarkSessionCompleted" method="post" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@s.BookingId" />
+                                                        <button type="submit" class="mini-btn green">Mark completed</button>
+                                                    </form>
+                                                }
+                                                else
+                                                {
+                                                    <span class="disabled-btn" title="Session hasn't started yet">Not started</span>
+                                                }
+                                                <span class="disabled-btn" title="Tutor-side messaging isn't built yet">Message student</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-
-                            <div class="session-card">
-                                <div class="avatar yellow">SK</div>
-                                <div class="session-info">
-                                    <div class="name">Suman Karki</div>
-                                    <div class="meta">Physics · Grade 12</div>
-                                    <div class="time">Today, 6:00 PM – 7:00 PM</div>
-                                </div>
-                                <div class="session-actions">
-                                    <span class="pill pill-confirmed">Confirmed</span>
-                                    <div class="session-btn-row">
-                                        <a href="#" class="mini-btn">View details</a>
-                                        <a href="#" class="mini-btn">Message student</a>
-                                    </div>
-                                </div>
-                            </div>
+                                }
+                            }
                         </div>
 
-                        <div class="panel">
+                        <div class="panel" id="pending-requests">
                             <div class="panel-head">
                                 <h2>Pending session requests</h2>
-                                <span class="tag-count" style="background:#fff1d5;color:#a96808;">2</span>
+                                @if (Model.PendingRequestsCount > 0)
+                                {
+                                    <span class="tag-count" style="background:#fff1d5;color:#a96808;">@Model.PendingRequestsCount</span>
+                                }
                             </div>
 
-                            <div class="request-card">
-                                <div class="avatar purple">PT</div>
-                                <div class="request-info">
-                                    <div class="name">Priya Tamang</div>
-                                    <div class="meta">Mathematics · Requested for 12 Jun, 3:00 PM</div>
-                                    <div class="ago">Requested 20 minutes ago</div>
-                                </div>
-                                <div class="request-actions">
-                                    <a href="#" class="mini-btn green">Accept</a>
-                                    <a href="#" class="mini-btn danger">Decline</a>
-                                    <a href="#" class="mini-btn">Propose new time</a>
-                                </div>
-                            </div>
-
-                            <div class="request-card">
-                                <div class="avatar">RB</div>
-                                <div class="request-info">
-                                    <div class="name">Rina Bhattarai</div>
-                                    <div class="meta">Mathematics · Requested for 13 Jun, 10:00 AM</div>
-                                    <div class="ago">Requested 1 hour ago</div>
-                                </div>
-                                <div class="request-actions">
-                                    <a href="#" class="mini-btn green">Accept</a>
-                                    <a href="#" class="mini-btn danger">Decline</a>
-                                    <a href="#" class="mini-btn">Propose new time</a>
-                                </div>
-                            </div>
+                            @if (!Model.PendingRequests.Any())
+                            {
+                                <p class="empty-state">No pending requests right now.</p>
+                            }
+                            else
+                            {
+                                @foreach (var r in Model.PendingRequests)
+                                {
+                                    var minutesAgo = (int)(now - r.RequestedAt).TotalMinutes;
+                                    var agoText = minutesAgo < 1 ? "just now"
+                                        : minutesAgo < 60 ? $"{minutesAgo} minute{(minutesAgo == 1 ? "" : "s")} ago"
+                                        : minutesAgo < 1440 ? $"{minutesAgo / 60} hour{(minutesAgo / 60 == 1 ? "" : "s")} ago"
+                                        : $"{minutesAgo / 1440} day{(minutesAgo / 1440 == 1 ? "" : "s")} ago";
+                                    <div class="request-card">
+                                        <div class="avatar">@r.StudentInitials</div>
+                                        <div class="request-info">
+                                            <div class="name">@r.StudentName</div>
+                                            <div class="meta">@r.Subject · Requested for @r.StartTime.ToString("d MMM, h:mm tt")</div>
+                                            <div class="ago">Requested @agoText</div>
+                                        </div>
+                                        <div class="request-actions">
+                                            <form asp-controller="Tutor" asp-action="AcceptBooking" method="post" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@r.BookingId" />
+                                                <button type="submit" class="mini-btn green" style="width:100%;">Accept</button>
+                                            </form>
+                                            <form asp-controller="Tutor" asp-action="DeclineBooking" method="post" style="margin:0;" onsubmit="return confirm('Decline this request?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@r.BookingId" />
+                                                <button type="submit" class="mini-btn danger" style="width:100%;">Decline</button>
+                                            </form>
+                                            <span class="disabled-btn" title="Proposing a new time isn't built yet">Propose new time</span>
+                                        </div>
+                                    </div>
+                                }
+                            }
                         </div>
 
                         <div class="panel">
                             <div class="panel-head"><h2>Recent sessions</h2></div>
-                            <table class="dash-table">
-                                <thead>
-                                    <tr><th>Student</th><th>Date</th><th>Duration</th><th>Status</th></tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td>Aayusha Shrestha</td><td>7 Jun 2025</td><td>1h 00m</td><td><span class="status-text completed">Completed</span></td></tr>
-                                    <tr><td>Anisha Maharjan</td><td>9 Jun 2025</td><td>1h 00m</td><td><span class="status-text completed">Completed</span></td></tr>
-                                    <tr><td>Bishal Shrestha</td><td>5 Jun 2025</td><td>1h 00m</td><td><span class="status-text missed">Missed</span></td></tr>
-                                </tbody>
-                            </table>
+                            @if (!Model.RecentSessions.Any())
+                            {
+                                <p class="empty-state">No past sessions yet.</p>
+                            }
+                            else
+                            {
+                                <table class="dash-table">
+                                    <thead>
+                                        <tr><th>Student</th><th>Date</th><th>Duration</th><th>Status</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var s in Model.RecentSessions)
+                                        {
+                                            var duration = s.EndTime - s.StartTime;
+                                            var statusClass = s.Status == "Completed" ? "completed" : "missed";
+                                            <tr>
+                                                <td>@s.StudentName</td>
+                                                <td>@s.StartTime.ToString("d MMM yyyy")</td>
+                                                <td>@($"{(int)duration.TotalHours}h {duration.Minutes:D2}m")</td>
+                                                <td><span class="status-text @statusClass">@s.Status</span></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
                         </div>
                     </div>
 
@@ -187,56 +194,57 @@
                         <div class="panel">
                             <div class="panel-head">
                                 <h2>My students</h2>
-                                <a href="#" class="view-all-link panel-action" style="margin:0;">View all (18) →</a>
                             </div>
 
-                            <div class="student-row">
-                                <div class="avatar">AS</div>
-                                <div class="student-info">
-                                    <div class="name">Aayusha Shrestha</div>
-                                    <div class="meta">Grade 11 · 12 sessions</div>
-                                    <div class="next">Next: Today 4:00 PM</div>
-                                </div>
-                                <a href="#" class="mini-btn">Message</a>
-                            </div>
-
-                            <div class="student-row">
-                                <div class="avatar yellow">AM</div>
-                                <div class="student-info">
-                                    <div class="name">Anisha Maharjan</div>
-                                    <div class="meta">Grade 10 · 8 sessions</div>
-                                    <div class="next">Next: 12 Jun, 2:00 PM</div>
-                                </div>
-                                <a href="#" class="mini-btn">Message</a>
-                            </div>
-
-                            <div class="student-row">
-                                <div class="avatar purple">BS</div>
-                                <div class="student-info">
-                                    <div class="name">Bishal Shrestha</div>
-                                    <div class="meta">Grade 11 · 6 sessions</div>
-                                    <div class="next">Next: Not scheduled</div>
-                                </div>
-                                <a href="#" class="mini-btn">Message</a>
-                            </div>
+                            @if (!Model.MyStudents.Any())
+                            {
+                                <p class="empty-state">No students yet.</p>
+                            }
+                            else
+                            {
+                                @foreach (var s in Model.MyStudents)
+                                {
+                                    <div class="student-row">
+                                        <div class="avatar">@s.Initials</div>
+                                        <div class="student-info">
+                                            <div class="name">@s.FullName</div>
+                                            <div class="meta">@(string.IsNullOrWhiteSpace(s.GradeLevel) ? "" : s.GradeLevel + " · ")@s.SessionsCount session@(s.SessionsCount == 1 ? "" : "s")</div>
+                                            <div class="next">Next: @(s.NextSessionAt.HasValue ? s.NextSessionAt.Value.ToString("d MMM, h:mm tt") : "Not scheduled")</div>
+                                        </div>
+                                        <span class="disabled-btn" title="Tutor-side messaging isn't built yet">Message</span>
+                                    </div>
+                                }
+                            }
                         </div>
 
                         <div class="panel">
                             <div class="panel-head">
                                 <h2>Recent reviews</h2>
-                                <a href="#" class="view-all-link panel-action" style="margin:0;">View all (128) →</a>
                             </div>
-                            <div class="review-card">
-                                <div class="avatar">AS</div>
-                                <div class="review-body">
-                                    <div class="review-top">
-                                        <span class="name">Aayusha Shrestha</span>
-                                        <span class="when">2 days ago</span>
+                            @if (!Model.RecentReviews.Any())
+                            {
+                                <p class="empty-state">No reviews yet - they'll show up here once students start leaving them.</p>
+                            }
+                            else
+                            {
+                                @foreach (var r in Model.RecentReviews)
+                                {
+                                    <div class="review-card" style="margin-bottom:1rem;">
+                                        <div class="avatar">@r.StudentInitials</div>
+                                        <div class="review-body">
+                                            <div class="review-top">
+                                                <span class="name">@r.StudentName</span>
+                                                <span class="when">@r.CreatedAt.ToString("d MMM yyyy")</span>
+                                            </div>
+                                            <div class="review-stars">@(new string('★', r.Rating))@(new string('☆', 5 - r.Rating))</div>
+                                            @if (!string.IsNullOrWhiteSpace(r.Comment))
+                                            {
+                                                <p class="review-text">"@r.Comment"</p>
+                                            }
+                                        </div>
                                     </div>
-                                    <div class="review-stars">★★★★★</div>
-                                    <p class="review-text">"Explains concepts so clearly! My SEE score improved from 68 to 89."</p>
-                                </div>
-                            </div>
+                                }
+                            }
                         </div>
                     </div>
                 </div>

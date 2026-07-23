@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Goal> Goals => Set<Goal>();
     public DbSet<StudentAchievement> StudentAchievements => Set<StudentAchievement>();
     public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
+    public DbSet<Review> Reviews => Set<Review>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -107,6 +108,31 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<SupportTicket>()
-            .HasIndex(t => t.StudentProfileId);
+                    .HasIndex(t => t.StudentProfileId);
+
+        // Restrict (not Cascade) on all three FKs, consistent with Booking/Message/
+        // SavedTutor - avoids multiple-cascade-path conflicts and requires the
+        // explicit manual cleanup already used elsewhere (see DeleteAccount).
+        builder.Entity<Review>()
+            .HasOne(r => r.Booking)
+            .WithMany()
+            .HasForeignKey(r => r.BookingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Review>()
+            .HasOne(r => r.StudentProfile)
+            .WithMany()
+            .HasForeignKey(r => r.StudentProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Review>()
+            .HasOne(r => r.TutorProfile)
+            .WithMany()
+            .HasForeignKey(r => r.TutorProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Review>()
+            .HasIndex(r => r.BookingId)
+            .IsUnique();
     }
 }

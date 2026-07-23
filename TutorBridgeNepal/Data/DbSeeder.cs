@@ -81,7 +81,8 @@ public static class DbSeeder
                     UserId = user.Id,
                     Subjects = sample.Subjects,
                     YearsOfExperience = sample.Years,
-                    AverageRating = sample.Rating,
+                    AverageRating = 0m,
+                    ReviewCount = 0,
                     IsVerified = true
                 });
             }

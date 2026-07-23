@@ -492,6 +492,11 @@ public class StudentController : Controller
         var decided = completedList.Count + cancelledList.Count;
         var completionRate = decided == 0 ? 0 : (int)Math.Round(completedList.Count * 100.0 / decided);
 
+        var completedBookingIds = completedList.Select(b => b.Id).ToList();
+        var myReviewRatings = await _context.Reviews
+            .Where(r => r.StudentProfileId == studentProfile.Id && completedBookingIds.Contains(r.BookingId))
+            .ToDictionaryAsync(r => r.BookingId, r => r.Rating);
+
         var vm = new StudentSessionsViewModel
         {
             ActiveTab = tab,
@@ -507,7 +512,8 @@ public class StudentController : Controller
                 Subject = b.Subject,
                 StartTime = b.TutorAvailabilitySlot.StartTime,
                 EndTime = b.TutorAvailabilitySlot.EndTime,
-                Status = b.Status
+                Status = b.Status,
+                MyReviewRating = myReviewRatings.TryGetValue(b.Id, out var myRating) ? myRating : (int?)null
             }).ToList(),
             SubjectOptions = allBookings.Select(b => b.Subject).Distinct().OrderBy(s => s).ToList(),
             TutorOptions = allBookings
@@ -554,6 +560,64 @@ public class StudentController : Controller
         }
 
         return returnTo == "Sessions" ? RedirectToAction("Sessions") : RedirectToAction("Dashboard");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SubmitReview(int bookingId, int rating, string? comment)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        if (rating < 1 || rating > 5)
+        {
+            TempData["SettingsError"] = "Rating must be between 1 and 5 stars.";
+            return RedirectToAction("Sessions", new { tab = "completed" });
+        }
+
+        var booking = await _context.Bookings
+            .FirstOrDefaultAsync(b => b.Id == bookingId && b.StudentProfileId == studentProfile.Id && b.Status == "Completed");
+
+        if (booking == null)
+        {
+            TempData["SettingsError"] = "That session can't be reviewed.";
+            return RedirectToAction("Sessions", new { tab = "completed" });
+        }
+
+        var alreadyReviewed = await _context.Reviews.AnyAsync(r => r.BookingId == bookingId);
+        if (alreadyReviewed)
+        {
+            return RedirectToAction("Sessions", new { tab = "completed" });
+        }
+
+        _context.Reviews.Add(new Review
+        {
+            BookingId = booking.Id,
+            StudentProfileId = studentProfile.Id,
+            TutorProfileId = booking.TutorProfileId,
+            Rating = rating,
+            Comment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim(),
+            CreatedAt = DateTime.Now
+        });
+        await _context.SaveChangesAsync();
+
+        // Recompute the tutor's real average from actual reviews - no more
+        // manually-set placeholder ratings once a genuine review exists.
+        var tutor = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.Id == booking.TutorProfileId);
+        if (tutor != null)
+        {
+            var tutorRatings = await _context.Reviews
+                .Where(r => r.TutorProfileId == tutor.Id)
+                .Select(r => r.Rating)
+                .ToListAsync();
+
+            tutor.ReviewCount = tutorRatings.Count;
+            tutor.AverageRating = tutorRatings.Count == 0 ? 0m : Math.Round((decimal)tutorRatings.Average(), 2);
+            await _context.SaveChangesAsync();
+        }
+
+        TempData["SettingsSuccess"] = "Thanks for your review!";
+        return RedirectToAction("Sessions", new { tab = "completed" });
     }
 
     public async Task<IActionResult> Messages(int? tutorProfileId)
@@ -1324,8 +1388,8 @@ public class StudentController : Controller
             foreach (var slot in slots) slot.IsBooked = false;
         }
 
-        _context.Messages.RemoveRange(_context.Messages.Where(m => m.StudentProfileId == studentProfile.Id));
-        _context.SavedTutors.RemoveRange(_context.SavedTutors.Where(s => s.StudentProfileId == studentProfile.Id));
+        _context.Reviews.RemoveRange(_context.Reviews.Where(r => r.StudentProfileId == studentProfile.Id));
+        _context.Messages.RemoveRange(_context.Messages.Where(m => m.StudentProfileId == studentProfile.Id)); _context.SavedTutors.RemoveRange(_context.SavedTutors.Where(s => s.StudentProfileId == studentProfile.Id));
         _context.Bookings.RemoveRange(_context.Bookings.Where(b => b.StudentProfileId == studentProfile.Id));
         _context.StudentProfiles.Remove(studentProfile);
 
