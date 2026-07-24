@@ -406,39 +406,6 @@ public class StudentController : Controller
 
         return View(vm);
     }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> BookSlot(int slotId, string subject, int tutorProfileId)
-    {
-        var studentProfile = await GetCurrentStudentProfileAsync();
-        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
-
-        var slot = await _context.TutorAvailabilitySlots
-            .FirstOrDefaultAsync(s => s.Id == slotId && !s.IsBooked);
-
-        if (slot == null)
-        {
-            TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
-            return RedirectToAction("TutorProfile", new { id = tutorProfileId });
-        }
-
-        _context.Bookings.Add(new Booking
-        {
-            StudentProfileId = studentProfile.Id,
-            TutorProfileId = slot.TutorProfileId,
-            TutorAvailabilitySlotId = slot.Id,
-            Subject = string.IsNullOrWhiteSpace(subject) ? "General" : subject,
-            Status = "Pending"
-        });
-
-        slot.IsBooked = true;
-        await _context.SaveChangesAsync();
-
-        TempData["BookingSuccess"] = "Session requested! Your tutor will confirm it shortly.";
-        return RedirectToAction("Sessions");
-    }
-
     public async Task<IActionResult> Sessions(string tab = "upcoming", string? subject = null, int? tutorProfileId = null, string sort = "newest")
     {
         var studentProfile = await GetCurrentStudentProfileAsync();
@@ -552,10 +519,17 @@ public class StudentController : Controller
             .Include(b => b.TutorAvailabilitySlot)
             .FirstOrDefaultAsync(b => b.Id == id && b.StudentProfileId == studentProfile.Id);
 
-        if (booking != null && booking.Status != "Completed" && booking.Status != "Cancelled")
+        if (booking != null && booking.Status is not ("Completed" or "Cancelled" or "Missed"))
         {
             booking.Status = "Cancelled";
-            booking.TutorAvailabilitySlot.IsBooked = false;
+
+            // Recompute fullness rather than blindly freeing the slot - a group
+            // session may still have other students booked into it.
+            var remainingActive = await _context.Bookings
+                .CountAsync(b => b.TutorAvailabilitySlotId == booking.TutorAvailabilitySlotId
+                    && b.Id != booking.Id && b.Status != "Cancelled");
+            booking.TutorAvailabilitySlot.IsBooked = remainingActive >= booking.TutorAvailabilitySlot.Capacity;
+
             await _context.SaveChangesAsync();
         }
 
@@ -1378,18 +1352,31 @@ public class StudentController : Controller
         using var transaction = await _context.Database.BeginTransactionAsync();
 
         var activeSlotIds = await _context.Bookings
-            .Where(b => b.StudentProfileId == studentProfile.Id && b.Status != "Cancelled" && b.Status != "Completed")
+            .Where(b => b.StudentProfileId == studentProfile.Id
+                && b.Status != "Cancelled" && b.Status != "Completed" && b.Status != "Missed")
             .Select(b => b.TutorAvailabilitySlotId)
+            .Distinct()
             .ToListAsync();
 
         if (activeSlotIds.Any())
         {
             var slots = await _context.TutorAvailabilitySlots.Where(s => activeSlotIds.Contains(s.Id)).ToListAsync();
-            foreach (var slot in slots) slot.IsBooked = false;
+            foreach (var slot in slots)
+            {
+                // Count remaining active bookings from OTHER students on this slot -
+                // this student's own bookings are removed right after this, but a
+                // group slot may still have other students on it.
+                var remainingActive = await _context.Bookings.CountAsync(b =>
+                    b.TutorAvailabilitySlotId == slot.Id
+                    && b.StudentProfileId != studentProfile.Id
+                    && b.Status != "Cancelled");
+                slot.IsBooked = remainingActive >= slot.Capacity;
+            }
         }
 
         _context.Reviews.RemoveRange(_context.Reviews.Where(r => r.StudentProfileId == studentProfile.Id));
-        _context.Messages.RemoveRange(_context.Messages.Where(m => m.StudentProfileId == studentProfile.Id)); _context.SavedTutors.RemoveRange(_context.SavedTutors.Where(s => s.StudentProfileId == studentProfile.Id));
+        _context.Messages.RemoveRange(_context.Messages.Where(m => m.StudentProfileId == studentProfile.Id)); 
+        _context.SavedTutors.RemoveRange(_context.SavedTutors.Where(s => s.StudentProfileId == studentProfile.Id));
         _context.Bookings.RemoveRange(_context.Bookings.Where(b => b.StudentProfileId == studentProfile.Id));
         _context.StudentProfiles.Remove(studentProfile);
 

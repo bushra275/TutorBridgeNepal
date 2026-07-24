@@ -17,10 +17,10 @@
     </div>
 
     <ul class="dash-nav">
-        <li><a asp-controller="Tutor" asp-action="Dashboard" class="@(activeNav == "dashboard" ? "active" : "")"><span class="nav-icon">🏠</span> Dashboard</a></li>
-        <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🗓️</span> My Schedule</span></li>
+        <li><a id="navDashboard" asp-controller="Tutor" asp-action="Dashboard" class="@(activeNav == "dashboard" ? "active" : "")"><span class="nav-icon">🏠</span> Dashboard</a></li>
+        <li><a asp-controller="Tutor" asp-action="Schedule" class="@(activeNav == "schedule" ? "active" : "")"><span class="nav-icon">🗓️</span> My Schedule</a></li>
         <li>
-            <a asp-controller="Tutor" asp-action="Dashboard" asp-fragment="pending-requests" class="@(activeNav == "dashboard" ? "active" : "")">
+            <a id="navSessionRequests" asp-controller="Tutor" asp-action="Dashboard" asp-fragment="pending-requests">
                 <span class="nav-icon">📥</span> Session Requests
                 @if (pendingCount > 0)
                 {

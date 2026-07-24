@@ -254,5 +254,33 @@
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            // Toggle "Dashboard" vs "Session Requests" active state based on which
+            // section is actually in view, since both nav items point to this same page.
+            (function() {
+                var pendingSection = document.getElementById('pending-requests');
+                var navDashboard = document.getElementById('navDashboard');
+                var navSessionRequests = document.getElementById('navSessionRequests');
+                if (!pendingSection || !navDashboard || !navSessionRequests) return;
+
+                function setActive(isPending) {
+                    navDashboard.classList.toggle('active', !isPending);
+                    navSessionRequests.classList.toggle('active', isPending);
+                }
+
+                if (window.location.hash === '#pending-requests') {
+                    setActive(true);
+                    pendingSection.scrollIntoView({ block: 'start' });
+                }
+
+                var observer = new IntersectionObserver(function(entries) {
+                    entries.forEach(function(entry) {
+                        setActive(entry.isIntersecting);
+                    });
+                }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+
+                observer.observe(pendingSection);
+            })();
+    </script>
 </body>
 </html>

@@ -21,7 +21,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<StudentAchievement> StudentAchievements => Set<StudentAchievement>();
     public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
     public DbSet<Review> Reviews => Set<Review>();
-
+    public DbSet<TutorWeeklyAvailabilityRule> TutorWeeklyAvailabilityRules => Set<TutorWeeklyAvailabilityRule>();
+    public DbSet<TutorTimeOff> TutorTimeOffs => Set<TutorTimeOff>();
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -29,9 +30,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<TutorAvailabilitySlot>()
             .HasIndex(s => new { s.TutorProfileId, s.StartTime, s.EndTime });
 
-        builder.Entity<Booking>()
-            .HasIndex(b => b.TutorAvailabilitySlotId)
-            .IsUnique();
+
 
         builder.Entity<Booking>()
             .HasOne(b => b.StudentProfile)
@@ -132,7 +131,28 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Review>()
-            .HasIndex(r => r.BookingId)
+                    .HasIndex(r => r.BookingId)
+                    .IsUnique();
+
+        // These belong entirely to the tutor (no other student/booking data
+        // hangs off them), so Cascade is safe and appropriate here.
+        builder.Entity<TutorWeeklyAvailabilityRule>()
+            .HasOne(r => r.TutorProfile)
+            .WithMany()
+            .HasForeignKey(r => r.TutorProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TutorWeeklyAvailabilityRule>()
+            .HasIndex(r => new { r.TutorProfileId, r.DayOfWeek })
             .IsUnique();
+
+        builder.Entity<TutorTimeOff>()
+            .HasOne(t => t.TutorProfile)
+            .WithMany()
+            .HasForeignKey(t => t.TutorProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TutorTimeOff>()
+            .HasIndex(t => t.TutorProfileId);
     }
 }

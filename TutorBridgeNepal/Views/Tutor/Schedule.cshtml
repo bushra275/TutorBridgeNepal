@@ -1,0 +1,338 @@
+﻿@model TutorBridgeNepal.ViewModels.SchedulePageViewModel
+@{
+    ViewData["Title"] = "My Schedule";
+    Layout = null;
+
+    var isWeek = Model.ViewMode == "week";
+    var now = DateTime.Now;
+
+    DateTime prevDate, nextDate;
+    if (isWeek)
+    {
+        prevDate = Model.RangeStart.AddDays(-7);
+        nextDate = Model.RangeStart.AddDays(7);
+    }
+    else
+    {
+        prevDate = Model.AnchorDate.AddMonths(-1);
+        nextDate = Model.AnchorDate.AddMonths(1);
+    }
+
+    const int dayStartHour = 8;
+    const int dayEndHour = 21;
+    const double totalMinutes = (dayEndHour - dayStartHour) * 60.0;
+
+    string EventClass(TutorBridgeNepal.ViewModels.ScheduleEventViewModel ev, DateTime dayDate)
+    {
+        if (ev.IsGroup) return "ev-group";
+        var status = ev.Bookings.FirstOrDefault()?.Status ?? "";
+        if (status == "Pending") return "ev-pending";
+        if (status == "Missed") return "ev-missed";
+        if (dayDate.Date == now.Date) return "ev-today";
+        return "ev-confirmed";
+    }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Schedule - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_TutorTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_TutorSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>My Schedule</h1>
+                        <p>Manage your availability and view upcoming sessions</p>
+                    </div>
+                    <button type="button" class="tb-btn" onclick="document.getElementById('blockTimeOffBackdrop').classList.add('open')">+ Block time off</button>
+                </div>
+
+                @if (TempData["ScheduleSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["ScheduleSuccess"]</div>
+                }
+                @if (TempData["ScheduleError"] != null)
+                {
+                    <div class="status-banner error mb-3">@TempData["ScheduleError"]</div>
+                }
+
+                <div class="schedule-toolbar">
+                    <div class="view-toggle">
+                        <a asp-action="Schedule" asp-route-view="week" class="@(isWeek ? "active" : "")">Week</a>
+                        <a asp-action="Schedule" asp-route-view="month" class="@(!isWeek ? "active" : "")">Month</a>
+                    </div>
+                    <div class="range-nav">
+                        <a asp-action="Schedule" asp-route-view="@Model.ViewMode" asp-route-date="@prevDate.ToString("yyyy-MM-dd")">‹</a>
+                        <span>@Model.RangeLabel</span>
+                        <a asp-action="Schedule" asp-route-view="@Model.ViewMode" asp-route-date="@nextDate.ToString("yyyy-MM-dd")">›</a>
+                    </div>
+                    <a asp-action="Schedule" asp-route-view="@Model.ViewMode" class="today-btn">Today</a>
+                </div>
+
+                @if (isWeek)
+                {
+                    <div class="week-grid">
+                        <div class="week-grid-head">
+                            <div></div>
+                            @foreach (var day in Model.Days)
+                            {
+                                <div class="@(day.IsToday ? "today-col" : "")">
+                                    @day.Date.ToString("ddd d")@(day.IsToday ? " · Today" : "")
+                                </div>
+                            }
+                        </div>
+                        <div class="week-grid-body" style="height:@((dayEndHour - dayStartHour) * 60)px;">
+                            <div class="week-time-col">
+                                @for (int h = dayStartHour; h < dayEndHour; h++)
+                                {
+                                    var label = h < 12 ? $"{h} AM" : h == 12 ? "12 PM" : $"{h - 12} PM";
+                                    <div class="hour-label">@label</div>
+                                }
+                            </div>
+                            @foreach (var day in Model.Days)
+                            {
+                                <div class="week-day-col @(day.IsDayOff ? "unavailable-col" : "")">
+                                    @if (day.IsDayOff && !day.Events.Any() && !day.BlockedRanges.Any())
+                                    {
+                                        <div class="week-empty-note">Unavailable<br />(Day off)</div>
+                                    }
+                                    else if (!day.Events.Any() && !day.BlockedRanges.Any())
+                                    {
+                                        <div class="week-empty-note">No sessions<br />scheduled</div>
+                                    }
+
+                                    @foreach (var block in day.BlockedRanges)
+                                    {
+                                        var bStart = block.StartAt.Date == day.Date ? block.StartAt.TimeOfDay.TotalMinutes : dayStartHour * 60;
+                                        var bEnd = block.EndAt.Date == day.Date ? block.EndAt.TimeOfDay.TotalMinutes : dayEndHour * 60;
+                                        var topPct = Math.Max(0, (bStart - dayStartHour * 60) / totalMinutes * 100);
+                                        var heightPct = Math.Max(2, (bEnd - bStart) / totalMinutes * 100);
+                                        <div class="week-event ev-blocked" style="top:@(topPct.ToString("0.##"))%; height:@(heightPct.ToString("0.##"))%;">
+                                            <span class="we-name">Blocked</span>
+                                            <span class="we-meta">@(string.IsNullOrWhiteSpace(block.Reason) ? "Time off" : block.Reason)</span>
+                                        </div>
+                                    }
+
+                                    @foreach (var ev in day.Events)
+                                    {
+                                        var startMin = ev.StartTime.TimeOfDay.TotalMinutes;
+                                        var endMin = ev.EndTime.TimeOfDay.TotalMinutes;
+                                        var topPct = Math.Max(0, (startMin - dayStartHour * 60) / totalMinutes * 100);
+                                        var heightPct = Math.Max(4, (endMin - startMin) / totalMinutes * 100);
+                                        var cls = EventClass(ev, day.Date);
+                                        var primary = ev.Bookings.FirstOrDefault();
+                                        <div class="week-event @cls" style="top:@(topPct.ToString("0.##"))%; height:@(heightPct.ToString("0.##"))%;">
+                                            @if (ev.IsGroup)
+                                            {
+                                                <span class="we-name">Group session (@ev.Bookings.Count)</span>
+                                                <span class="we-meta">@primary?.Subject · @ev.StartTime.ToString("h:mm tt")-@ev.EndTime.ToString("h:mm tt")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="we-name">@primary?.StudentName</span>
+                                                <span class="we-meta">@primary?.Subject · @ev.StartTime.ToString("h:mm tt")-@ev.EndTime.ToString("h:mm tt")@(primary?.Status == "Pending" ? " · Pending" : "")</span>
+                                            }
+
+                                            @if (primary != null && primary.Status == "Confirmed" && ev.StartTime <= now)
+                                            {
+                                                <div style="margin-top:.3rem; display:flex; gap:.3rem;">
+                                                    <form asp-controller="Tutor" asp-action="MarkSessionCompleted" method="post" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@primary.BookingId" />
+                                                        <button type="submit" class="mini-btn green" style="font-size:.65rem; padding:.2rem .4rem;">Done</button>
+                                                    </form>
+                                                    <form asp-controller="Tutor" asp-action="MarkSessionMissed" method="post" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@primary.BookingId" />
+                                                        <button type="submit" class="mini-btn danger" style="font-size:.65rem; padding:.2rem .4rem;">Missed</button>
+                                                    </form>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="schedule-legend">
+                        <span class="swatch"><span class="dot" style="background:#e6f6ee;border-color:var(--green-2);"></span>Today's confirmed session</span>
+                        <span class="swatch"><span class="dot" style="background:#f2fbf7;border-color:#bfe9d4;"></span>Upcoming confirmed</span>
+                        <span class="swatch"><span class="dot" style="background:#fffaf0;border-color:#f0d999;"></span>Pending request</span>
+                        <span class="swatch"><span class="dot" style="background:#f5f1ff;border-color:#d9c9ff;"></span>Group session</span>
+                        <span class="swatch"><span class="dot" style="background:#f1f0eb;border-color:#ded9cb;"></span>Blocked / time off</span>
+                        <span class="swatch"><span class="dot" style="background:#fff0f0;border-color:#f0c0c0;"></span>Missed session</span>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h2>Weekly availability</h2>
+                        </div>
+                        <p class="tutor-meta mb-3" style="margin-top:-.6rem;">Set your recurring hours - this automatically keeps your bookable calendar filled 30 days ahead.</p>
+                        <form asp-controller="Tutor" asp-action="UpdateWeeklyAvailability" method="post">
+                            @Html.AntiForgeryToken()
+                            @foreach (var d in Model.WeeklyAvailability)
+                            {
+                                <input type="hidden" name="dayOfWeek" value="@d.DayOfWeek" />
+                                <div class="weekly-avail-row">
+                                    <strong>@d.DayLabel</strong>
+                                    <div style="display:flex; gap:.5rem; align-items:center;">
+                                        <input type="time" name="startTime" value="@(d.StartTime.HasValue ? d.StartTime.Value.ToString(@"hh\:mm") : "09:00")" class="tb-input" style="min-height:38px; padding:.3rem .6rem; width:120px;" />
+                                        <span>–</span>
+                                        <input type="time" name="endTime" value="@(d.EndTime.HasValue ? d.EndTime.Value.ToString(@"hh\:mm") : "17:00")" class="tb-input" style="min-height:38px; padding:.3rem .6rem; width:120px;" />
+                                    </div>
+                                    <label style="display:flex; align-items:center; gap:.4rem; font-size:.8rem;">
+                                        <input type="checkbox" name="__dayoff_@d.DayOfWeek" onchange="document.getElementById('isDayOff_@d.DayOfWeek').value = this.checked ? 'true' : 'false';" checked="@d.IsDayOff" />
+                                        Day off
+                                    </label>
+                                    <input type="hidden" name="isDayOff" id="isDayOff_@d.DayOfWeek" value="@(d.IsDayOff ? "true" : "false")" />
+                                </div>
+                            }
+                            <div class="settings-actions" style="margin-top:1rem;">
+                                <button type="submit" class="tb-btn">Save availability</button>
+                            </div>
+                        </form>
+                    </div>
+                }
+                else
+                {
+                    <div class="month-grid">
+                        <div class="month-grid-head" style="display:contents;">
+                            @foreach (var lbl in new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" })
+                            {
+                                <div>@lbl</div>
+                            }
+                        </div>
+                        @foreach (var day in Model.Days)
+                        {
+                            <div class="month-cell @(day.IsCurrentPeriod ? "" : "not-current") @(day.IsToday ? "is-today" : "")">
+                                <span class="day-num">@day.Date.Day</span>
+                                @if (day.BlockedRanges.Any())
+                                {
+                                    <span class="month-chip ev-blocked">@(string.IsNullOrWhiteSpace(day.BlockedRanges[0].Reason) ? "Blocked" : day.BlockedRanges[0].Reason)</span>
+                                }
+                                @foreach (var ev in day.Events.Take(3))
+                                {
+                                    var cls = EventClass(ev, day.Date);
+                                    var primary = ev.Bookings.FirstOrDefault();
+                                    var label = ev.IsGroup ? $"{ev.StartTime:h tt} Group ({ev.Bookings.Count})" : $"{ev.StartTime:h tt} {primary?.StudentName}";
+                                    <span class="month-chip @cls">@label</span>
+                                }
+                                @if (day.Events.Count > 3)
+                                {
+                                    <span class="month-chip" style="border:none;color:var(--muted);">+@(day.Events.Count - 3) more</span>
+                                }
+                                @if (!day.IsCurrentPeriod && day.IsDayOff && !day.Events.Any() && !day.BlockedRanges.Any())
+                                {
+                                    <span style="font-size:.7rem;color:var(--muted);">Flexible</span>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="schedule-legend">
+                        <span class="swatch"><span class="dot" style="background:#e6f6ee;border-color:var(--green-2);"></span>Today's session</span>
+                        <span class="swatch"><span class="dot" style="background:#f2fbf7;border-color:#bfe9d4;"></span>Confirmed</span>
+                        <span class="swatch"><span class="dot" style="background:#fffaf0;border-color:#f0d999;"></span>Pending request</span>
+                        <span class="swatch"><span class="dot" style="background:#f5f1ff;border-color:#d9c9ff;"></span>Group session</span>
+                        <span class="swatch"><span class="dot" style="background:#f1f0eb;border-color:#ded9cb;"></span>Blocked / leave</span>
+                        <span class="swatch"><span class="dot" style="background:#fff0f0;border-color:#f0c0c0;"></span>Missed session</span>
+                    </div>
+
+                    <div class="stat-cards">
+                        <div class="stat-card">
+                            <div class="label">Sessions scheduled</div>
+                            <div class="value">@Model.SessionsScheduledCount</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Pending requests</div>
+                            <div class="value">@Model.PendingRequestsCount</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Blocked days</div>
+                            <div class="value">@Model.BlockedDaysCount</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Missed sessions</div>
+                            <div class="value">@Model.MissedSessionsCount</div>
+                        </div>
+                    </div>
+                }
+
+                @if (Model.UpcomingTimeOff.Any())
+                {
+                    <div class="panel">
+                        <div class="panel-head"><h2>Upcoming blocked time</h2></div>
+                        @foreach (var t in Model.UpcomingTimeOff)
+                        {
+                            <div class="timeoff-row">
+                                <div>
+                                    <strong>@t.StartAt.ToString("d MMM, h:mm tt") – @t.EndAt.ToString("d MMM, h:mm tt")</strong>
+                                    @if (!string.IsNullOrWhiteSpace(t.Reason))
+                                    {
+                                        <span style="color:var(--muted);"> · @t.Reason</span>
+                                    }
+                                </div>
+                                <form asp-controller="Tutor" asp-action="RemoveTimeOff" method="post" style="margin:0;" onsubmit="return confirm('Remove this blocked period?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@t.Id" />
+                                    <button type="submit" class="mini-btn danger">Remove</button>
+                                </form>
+                            </div>
+                        }
+                    </div>
+                }
+            </main>
+        </div>
+    </div>
+
+    <!-- Block time off modal (reuses review-modal styles) -->
+    <div class="review-modal-backdrop" id="blockTimeOffBackdrop">
+        <div class="review-modal" style="width:420px;">
+            <h3>Block time off</h3>
+            <form asp-controller="Tutor" asp-action="AddTimeOff" method="post">
+                @Html.AntiForgeryToken()
+                <div class="field" style="margin-bottom:.8rem;">
+                    <label>From</label>
+                    <input type="datetime-local" name="startAt" class="tb-input" required style="min-height:42px;" />
+                </div>
+                <div class="field" style="margin-bottom:.8rem;">
+                    <label>To</label>
+                    <input type="datetime-local" name="endAt" class="tb-input" required style="min-height:42px;" />
+                </div>
+                <div class="field">
+                    <label>Reason (optional)</label>
+                    <input type="text" name="reason" class="tb-input" maxlength="150" placeholder="e.g. Personal leave" />
+                </div>
+                <div class="settings-actions" style="margin-top:1rem;">
+                    <button type="submit" class="tb-btn">Block this time</button>
+                    <button type="button" class="tb-btn-outline" onclick="document.getElementById('blockTimeOffBackdrop').classList.remove('open')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            document.getElementById('blockTimeOffBackdrop').addEventListener('click', function (e) {
+                if (e.target === this) this.classList.remove('open');
+            });
+    </script>
+</body>
+</html>
