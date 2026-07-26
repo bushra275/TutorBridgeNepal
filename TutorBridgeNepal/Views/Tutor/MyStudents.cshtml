@@ -1,0 +1,176 @@
+﻿@model TutorBridgeNepal.ViewModels.MyStudentsPageViewModel
+@{
+    ViewData["Title"] = "My Students";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Students - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_TutorTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_TutorSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>My Students</h1>
+                        <p>All students you've taught, past and present</p>
+                    </div>
+                    <span class="disabled-btn" title="Export isn't built yet">Export list</span>
+                </div>
+
+                <div class="stat-cards">
+                    <div class="stat-card">
+                        <div class="label">Active students</div>
+                        <div class="value">@Model.ActiveCount</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Past students</div>
+                        <div class="value">@Model.PastCount</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Total sessions</div>
+                        <div class="value">@Model.TotalSessions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Avg sessions/student</div>
+                        <div class="value">@Model.AvgSessionsPerStudent.ToString("0.#")</div>
+                    </div>
+                    <div class="stat-card">
+                        @if (Model.RatingCount > 0)
+                        {
+                            <div class="label">Avg rating given to you</div>
+                            <div class="rating-value"><span class="value">@Model.AvgRatingGivenToTutor.ToString("0.0")</span><span class="star">★</span></div>
+                        }
+                        else
+                        {
+                            <div class="label">Avg rating given to you</div>
+                            <div class="value">—</div>
+                            <div class="sub">No reviews yet</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="tab-bar">
+                    <a asp-action="MyStudents" asp-route-tab="active" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "active" ? "active" : "")">Active (@Model.ActiveCount)</a>
+                    <a asp-action="MyStudents" asp-route-tab="past" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "past" ? "active" : "")">Past (@Model.PastCount)</a>
+                    <a asp-action="MyStudents" asp-route-tab="all" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "all" ? "active" : "")">All</a>
+                </div>
+
+                <form method="get" asp-action="MyStudents" class="filter-bar">
+                    <input type="hidden" name="tab" value="@Model.Tab" />
+                    <input type="text" name="search" value="@Model.Search" placeholder="Search students..." />
+                    <select name="grade" class="sort-select" onchange="this.form.submit()">
+                        <option value="">All grades</option>
+                        @foreach (var g in Model.GradeOptions)
+                        {
+                            <option value="@g" selected="@(Model.Grade == g)">@g</option>
+                        }
+                    </select>
+                    <select name="subject" class="sort-select" onchange="this.form.submit()">
+                        <option value="">All subjects</option>
+                        @foreach (var s in Model.SubjectOptions)
+                        {
+                            <option value="@s" selected="@(Model.Subject == s)">@s</option>
+                        }
+                    </select>
+                    <button type="submit" class="tb-btn-outline">Search</button>
+                    <select name="sort" class="sort-select" style="margin-left:auto;" onchange="this.form.submit()">
+                        <option value="recent" selected="@(Model.Sort == "recent")">Most recent</option>
+                        <option value="name" selected="@(Model.Sort == "name")">Name</option>
+                        <option value="sessions" selected="@(Model.Sort == "sessions")">Most sessions</option>
+                    </select>
+                </form>
+
+                @if (!Model.Students.Any())
+                {
+                    <p class="empty-state">No students in this view.</p>
+                }
+                else
+                {
+                    <div class="my-students-grid">
+                        @foreach (var s in Model.Students)
+                        {
+                            var cardClass = s.HasPendingRequest ? "pending-student" : s.IsNew ? "new-student" : "";
+                            <div class="my-student-card @cardClass">
+                                <div class="msc-head">
+                                    <div class="avatar">@s.Initials</div>
+                                    <div>
+                                        <div class="msc-name-row">@s.FullName</div>
+                                        <div class="msc-meta">@(string.IsNullOrWhiteSpace(s.GradeLevel) ? "" : s.GradeLevel + " · ")@s.District</div>
+                                        <div class="msc-tags">
+                                            @foreach (var subj in s.Subjects)
+                                            {
+                                                <span class="msc-badge" style="background:var(--mint);color:var(--green-dark);">@subj</span>
+                                            }
+                                            @if (s.IsNew && !s.HasPendingRequest)
+                                            {
+                                                <span class="msc-badge new">New</span>
+                                            }
+                                            @if (s.HasPendingRequest)
+                                            {
+                                                <span class="msc-badge pending">Pending request</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="msc-stats">
+                                    <div class="row"><span class="lbl">Sessions completed</span><span class="val">@s.SessionsCompleted</span></div>
+                                    <div class="row"><span class="lbl">Last session</span><span class="val">@(s.LastSessionAt.HasValue ? s.LastSessionAt.Value.ToString("d MMM yyyy") : "—")</span></div>
+                                    @if (s.HasPendingRequest)
+                                    {
+                                        <div class="row"><span class="lbl">Requested for</span><span class="val">@(s.PendingRequestedFor.HasValue ? s.PendingRequestedFor.Value.ToString("d MMM, h:mm tt") : "—")</span></div>
+                                    }
+                                    else
+                                    {
+                                        <div class="row"><span class="lbl">Next session</span><span class="val">@(s.NextSessionAt.HasValue ? s.NextSessionAt.Value.ToString("d MMM, h:mm tt") : "Not scheduled")</span></div>
+                                    }
+                                    <div class="row">
+                                        <span class="lbl">Rating given</span>
+                                        <span class="val">@(s.RatingGiven.HasValue ? new string('★', s.RatingGiven.Value) + new string('☆', 5 - s.RatingGiven.Value) : "—")</span>
+                                    </div>
+                                </div>
+
+                                <div class="msc-actions">
+                                    @if (s.HasPendingRequest && s.PendingBookingId.HasValue)
+                                    {
+                                        <form asp-controller="Tutor" asp-action="AcceptBooking" method="post" style="grid-column: span 2;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@s.PendingBookingId" />
+                                            <input type="hidden" name="returnTo" value="MyStudents" />
+                                            <button type="submit" class="tb-btn" style="width:100%;">Accept request</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="disabled-btn" title="Tutor-side messaging isn't built yet" style="text-align:center;">Message</span>
+                                    }
+                                    <span class="disabled-btn" title="Viewing full student profiles isn't built yet" style="text-align:center; @(s.HasPendingRequest ? "grid-column: span 2;" : "")">View profile</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

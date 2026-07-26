@@ -191,7 +191,12 @@ public class TutorController : Controller
             await _context.SaveChangesAsync();
         }
 
-        return returnTo == "SessionRequests" ? RedirectToAction("SessionRequests") : RedirectToAction("Dashboard");
+        return returnTo switch
+        {
+            "SessionRequests" => RedirectToAction("SessionRequests"),
+            "MyStudents" => RedirectToAction("MyStudents"),
+            _ => RedirectToAction("Dashboard")
+        };
     }
 
     [HttpPost]
@@ -759,5 +764,126 @@ public class TutorController : Controller
         }
 
         return RedirectToAction("Schedule");
+    }
+
+    public async Task<IActionResult> MyStudents(string tab = "active", string? search = null, string? grade = null, string? subject = null, string sort = "recent")
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await SetTutorSidebarContextAsync("mystudents", tutor);
+
+        var now = DateTime.Now;
+
+        var allBookings = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.TutorProfileId == tutor.Id)
+            .ToListAsync();
+
+        var reviewsGivenToTutor = await _context.Reviews
+            .Where(r => r.TutorProfileId == tutor.Id)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+
+        var studentGroups = allBookings
+            .GroupBy(b => b.StudentProfileId)
+            .ToList();
+
+        TutorStudentCardViewModel BuildCard(IGrouping<int, Booking> g)
+        {
+            var studentBookings = g.ToList();
+            var nonCancelled = studentBookings.Where(b => b.Status != "Cancelled").ToList();
+            var student = studentBookings.First().StudentProfile;
+
+            var completed = nonCancelled.Where(b => b.Status == "Completed").ToList();
+            var lastSession = completed.OrderByDescending(b => b.TutorAvailabilitySlot.StartTime).FirstOrDefault();
+            var nextConfirmed = nonCancelled
+                .Where(b => b.Status == "Confirmed" && b.TutorAvailabilitySlot.StartTime >= now)
+                .OrderBy(b => b.TutorAvailabilitySlot.StartTime)
+                .FirstOrDefault();
+            var pending = nonCancelled.Where(b => b.Status == "Pending").OrderBy(b => b.CreatedAt).FirstOrDefault();
+            var lastReview = reviewsGivenToTutor.FirstOrDefault(r => r.StudentProfileId == g.Key);
+
+            var hasFutureOrPending = nextConfirmed != null || pending != null;
+
+            return new TutorStudentCardViewModel
+            {
+                StudentProfileId = student.Id,
+                FullName = student.User.FullName,
+                Initials = GetInitials(student.User.FullName),
+                GradeLevel = student.GradeLevel,
+                District = student.User.District,
+                Subjects = nonCancelled.Select(b => b.Subject).Distinct().OrderBy(s => s).ToList(),
+                SessionsCompleted = completed.Count,
+                LastSessionAt = lastSession?.TutorAvailabilitySlot.StartTime,
+                NextSessionAt = nextConfirmed?.TutorAvailabilitySlot.StartTime,
+                RatingGiven = lastReview?.Rating,
+                IsNew = completed.Count == 0,
+                HasPendingRequest = pending != null,
+                PendingBookingId = pending?.Id,
+                PendingRequestedFor = pending?.TutorAvailabilitySlot.StartTime,
+                StatusLabel = hasFutureOrPending ? "Active" : (completed.Count > 0 ? "Past" : "Active")
+            };
+        }
+
+        var allCards = studentGroups.Select(BuildCard).ToList();
+
+        var activeCards = allCards.Where(c => c.StatusLabel == "Active").ToList();
+        var pastCards = allCards.Where(c => c.StatusLabel == "Past").ToList();
+
+        IEnumerable<TutorStudentCardViewModel> scoped = tab switch
+        {
+            "past" => pastCards,
+            "all" => allCards,
+            _ => activeCards
+        };
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            scoped = scoped.Where(c => c.FullName.Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(grade))
+        {
+            scoped = scoped.Where(c => c.GradeLevel == grade);
+        }
+
+        if (!string.IsNullOrWhiteSpace(subject))
+        {
+            scoped = scoped.Where(c => c.Subjects.Contains(subject));
+        }
+
+        scoped = sort switch
+        {
+            "name" => scoped.OrderBy(c => c.FullName),
+            "sessions" => scoped.OrderByDescending(c => c.SessionsCompleted),
+            _ => scoped.OrderByDescending(c => c.NextSessionAt ?? c.LastSessionAt ?? DateTime.MinValue)
+        };
+
+        var totalSessions = allBookings.Count(b => b.Status != "Cancelled");
+        var avgSessionsPerStudent = allCards.Any() ? Math.Round((double)totalSessions / allCards.Count, 1) : 0;
+
+        var vm = new MyStudentsPageViewModel
+        {
+            Tab = tab,
+            Search = search,
+            Grade = grade,
+            Subject = subject,
+            Sort = sort,
+            ActiveCount = activeCards.Count,
+            PastCount = pastCards.Count,
+            AllCount = allCards.Count,
+            TotalSessions = totalSessions,
+            AvgSessionsPerStudent = avgSessionsPerStudent,
+            AvgRatingGivenToTutor = tutor.AverageRating,
+            RatingCount = tutor.ReviewCount,
+            GradeOptions = allCards.Where(c => !string.IsNullOrWhiteSpace(c.GradeLevel)).Select(c => c.GradeLevel!).Distinct().OrderBy(x => x).ToList(),
+            SubjectOptions = allCards.SelectMany(c => c.Subjects).Distinct().OrderBy(x => x).ToList(),
+            Students = scoped.ToList()
+        };
+
+        return View(vm);
     }
 }

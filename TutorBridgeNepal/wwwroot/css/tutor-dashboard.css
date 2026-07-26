@@ -508,3 +508,137 @@
     }
 
 /* Block time off modal reuses .review-modal-backdrop / .review-modal from dashboard.css */
+
+
+
+/* ===== My Students page ===== */
+.my-students-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.my-student-card {
+    background: #fff;
+    border: 1px solid var(--line, #deded7);
+    border-top: 3px solid var(--green-2, #169a70);
+    border-radius: 12px;
+    padding: 1.1rem 1.2rem;
+}
+
+    .my-student-card.new-student {
+        border-top-color: #a98bff;
+    }
+
+    .my-student-card.pending-student {
+        border-top-color: var(--orange, #c87913);
+    }
+
+.msc-head {
+    display: flex;
+    gap: .8rem;
+    align-items: flex-start;
+    margin-bottom: .6rem;
+}
+
+.msc-name-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-weight: 800;
+    font-size: .95rem;
+}
+
+.msc-meta {
+    font-size: .8rem;
+    color: var(--muted, #8c8d87);
+    font-weight: 600;
+    margin-top: .1rem;
+}
+
+.msc-tags {
+    display: flex;
+    gap: .35rem;
+    flex-wrap: wrap;
+    margin-top: .4rem;
+}
+
+.msc-badge {
+    font-size: .66rem;
+    font-weight: 700;
+    padding: .1rem .5rem;
+    border-radius: 999px;
+}
+
+    .msc-badge.new {
+        background: #f1eaff;
+        color: #6b3fd6;
+    }
+
+    .msc-badge.pending {
+        background: #fff1d5;
+        color: #a96808;
+    }
+
+.msc-stats {
+    margin: .8rem 0;
+    font-size: .82rem;
+}
+
+    .msc-stats .row {
+        display: flex;
+        justify-content: space-between;
+        padding: .3rem 0;
+        border-bottom: 1px dashed var(--line, #deded7);
+    }
+
+        .msc-stats .row:last-child {
+            border-bottom: none;
+        }
+
+        .msc-stats .row .lbl {
+            color: var(--muted, #8c8d87);
+        }
+
+        .msc-stats .row .val {
+            font-weight: 700;
+        }
+
+.msc-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .5rem;
+    margin-top: .8rem;
+}
+
+    .msc-actions form {
+        margin: 0;
+    }
+
+.filter-bar {
+    display: flex;
+    gap: .6rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin: 1rem 0;
+}
+
+    .filter-bar input[type="text"] {
+        border: 1px solid var(--line, #deded7);
+        border-radius: 8px;
+        padding: .5rem .8rem;
+        font-size: .82rem;
+        min-width: 200px;
+    }
+
+@media (max-width: 1100px) {
+    .my-students-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 760px) {
+    .my-students-grid {
+        grid-template-columns: 1fr;
+    }
+}

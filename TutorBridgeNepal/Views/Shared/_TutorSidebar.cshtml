@@ -28,7 +28,7 @@
                 }
             </a>
         </li>
-        <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">👥</span> My Students</span></li>
+        <li><a asp-controller="Tutor" asp-action="MyStudents" class="@(activeNav == "mystudents" ? "active" : "")"><span class="nav-icon">👥</span> My Students</a></li>
         <li>
             <span class="disabled-nav-link" title="Tutor-side messaging isn't built yet">
                 <span class="nav-icon">💬</span> Messages
