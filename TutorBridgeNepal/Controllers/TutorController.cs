@@ -176,7 +176,7 @@ public class TutorController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AcceptBooking(int id)
+    public async Task<IActionResult> AcceptBooking(int id, string returnTo = "Dashboard")
     {
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
@@ -187,15 +187,16 @@ public class TutorController : Controller
         if (booking != null)
         {
             booking.Status = "Confirmed";
+            booking.DecidedAt = DateTime.Now;
             await _context.SaveChangesAsync();
         }
 
-        return RedirectToAction("Dashboard");
+        return returnTo == "SessionRequests" ? RedirectToAction("SessionRequests") : RedirectToAction("Dashboard");
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeclineBooking(int id)
+    public async Task<IActionResult> DeclineBooking(int id, string returnTo = "Dashboard")
     {
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
@@ -207,6 +208,8 @@ public class TutorController : Controller
         if (booking != null)
         {
             booking.Status = "Cancelled";
+            booking.DeclinedByTutor = true;
+            booking.DecidedAt = DateTime.Now;
 
             var remainingActive = await _context.Bookings.CountAsync(b =>
                 b.TutorAvailabilitySlotId == booking.TutorAvailabilitySlotId
@@ -216,7 +219,7 @@ public class TutorController : Controller
             await _context.SaveChangesAsync();
         }
 
-        return RedirectToAction("Dashboard");
+        return returnTo == "SessionRequests" ? RedirectToAction("SessionRequests") : RedirectToAction("Dashboard");
     }
 
     [HttpPost]
@@ -253,6 +256,122 @@ public class TutorController : Controller
 
         return RedirectToAction("Dashboard");
     }
+
+    public async Task<IActionResult> SessionRequests(string tab = "pending", string sort = "newest")
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await SetTutorSidebarContextAsync("sessionrequests", tutor);
+
+        var now = DateTime.Now;
+        var monthStart = new DateTime(now.Year, now.Month, 1);
+        var monthEnd = monthStart.AddMonths(1);
+
+        var allBookings = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.TutorProfileId == tutor.Id)
+            .OrderBy(b => b.CreatedAt)
+            .ToListAsync();
+
+        var reviewsGivenToThisTutor = await _context.Reviews
+            .Where(r => r.TutorProfileId == tutor.Id)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+
+        SessionRequestRowViewModel BuildRow(Booking b)
+        {
+            var priorBookings = allBookings
+                .Where(x => x.StudentProfileId == b.StudentProfileId && x.CreatedAt < b.CreatedAt)
+                .ToList();
+
+            var lastCompleted = priorBookings
+                .Where(x => x.Status == "Completed")
+                .OrderByDescending(x => x.TutorAvailabilitySlot.StartTime)
+                .FirstOrDefault();
+
+            var lastReview = reviewsGivenToThisTutor
+                .FirstOrDefault(r => r.StudentProfileId == b.StudentProfileId);
+
+            return new SessionRequestRowViewModel
+            {
+                BookingId = b.Id,
+                StudentName = b.StudentProfile.User.FullName,
+                StudentInitials = GetInitials(b.StudentProfile.User.FullName),
+                GradeLevel = b.StudentProfile.GradeLevel,
+                District = b.StudentProfile.User.District,
+                IsReturningStudent = priorBookings.Any(),
+                PriorSessionsCount = priorBookings.Count(x => x.Status != "Cancelled"),
+                LastSessionAt = lastCompleted?.TutorAvailabilitySlot.StartTime,
+                LastRatingGiven = lastReview?.Rating,
+                Subject = b.Subject,
+                StartTime = b.TutorAvailabilitySlot.StartTime,
+                EndTime = b.TutorAvailabilitySlot.EndTime,
+                Note = b.Note,
+                CreatedAt = b.CreatedAt,
+                Status = b.Status,
+                DeclinedByTutor = b.DeclinedByTutor
+            };
+        }
+
+        IEnumerable<Booking> scoped = tab switch
+        {
+            "accepted" => allBookings.Where(b => b.DecidedAt != null && !b.DeclinedByTutor),
+            "declined" => allBookings.Where(b => b.DeclinedByTutor),
+            "all" => allBookings,
+            _ => allBookings.Where(b => b.Status == "Pending")
+        };
+
+        scoped = sort == "oldest" ? scoped.OrderBy(b => b.CreatedAt) : scoped.OrderByDescending(b => b.CreatedAt);
+
+        var decidedThisMonth = allBookings
+            .Where(b => b.DecidedAt.HasValue && b.DecidedAt.Value >= monthStart && b.DecidedAt.Value < monthEnd)
+            .ToList();
+
+        var createdThisMonth = allBookings
+            .Where(b => b.CreatedAt >= monthStart && b.CreatedAt < monthEnd)
+            .ToList();
+
+        var decidedAndCreatedThisMonth = createdThisMonth.Count(b => b.DecidedAt.HasValue);
+        var responseRate = createdThisMonth.Any()
+            ? (int)Math.Round(decidedAndCreatedThisMonth * 100.0 / createdThisMonth.Count)
+            : (int?)null;
+
+        var avgResponseMinutes = decidedThisMonth.Any()
+            ? decidedThisMonth.Average(b => (b.DecidedAt!.Value - b.CreatedAt).TotalMinutes)
+            : (double?)null;
+
+        var recentlyAccepted = allBookings
+            .Where(b => b.DecidedAt != null && !b.DeclinedByTutor)
+            .OrderByDescending(b => b.DecidedAt)
+            .Take(10)
+            .Select(b => new RecentlyAcceptedRowViewModel
+            {
+                StudentName = b.StudentProfile.User.FullName,
+                Subject = b.Subject,
+                SessionDate = b.TutorAvailabilitySlot.StartTime,
+                AcceptedOn = b.DecidedAt!.Value,
+                ResponseTimeMinutes = (b.DecidedAt.Value - b.CreatedAt).TotalMinutes
+            })
+            .ToList();
+
+        var vm = new SessionRequestsPageViewModel
+        {
+            Tab = tab,
+            Sort = sort,
+            PendingCount = allBookings.Count(b => b.Status == "Pending"),
+            AcceptedThisMonthCount = decidedThisMonth.Count(b => !b.DeclinedByTutor),
+            DeclinedThisMonthCount = decidedThisMonth.Count(b => b.DeclinedByTutor),
+            AvgResponseTimeMinutes = avgResponseMinutes,
+            ResponseRatePercent = responseRate,
+            Requests = scoped.Select(BuildRow).ToList(),
+            RecentlyAccepted = recentlyAccepted
+        };
+
+        return View(vm);
+    }
+
     private async Task GenerateUpcomingSlotsAsync(int tutorProfileId, int daysAhead = 30)
     {
         var rules = await _context.TutorWeeklyAvailabilityRules

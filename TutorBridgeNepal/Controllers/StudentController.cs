@@ -406,6 +406,51 @@ public class StudentController : Controller
 
         return View(vm);
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BookSlot(int slotId, string subject, int tutorProfileId, string? note)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        var slot = await _context.TutorAvailabilitySlots
+            .FirstOrDefaultAsync(s => s.Id == slotId);
+
+        if (slot == null)
+        {
+            TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
+            return RedirectToAction("TutorProfile", new { id = tutorProfileId });
+        }
+
+        // Capacity check (supports group sessions where Capacity > 1) instead
+        // of a plain booked/not-booked flag.
+        var activeCount = await _context.Bookings
+            .CountAsync(b => b.TutorAvailabilitySlotId == slotId && b.Status != "Cancelled");
+
+        if (activeCount >= slot.Capacity)
+        {
+            TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
+            return RedirectToAction("TutorProfile", new { id = tutorProfileId });
+        }
+
+        _context.Bookings.Add(new Booking
+        {
+            StudentProfileId = studentProfile.Id,
+            TutorProfileId = slot.TutorProfileId,
+            TutorAvailabilitySlotId = slot.Id,
+            Subject = string.IsNullOrWhiteSpace(subject) ? "General" : subject,
+            Status = "Pending",
+            Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
+        });
+
+        slot.IsBooked = (activeCount + 1) >= slot.Capacity;
+        await _context.SaveChangesAsync();
+
+        TempData["BookingSuccess"] = "Session requested! Your tutor will confirm it shortly.";
+        return RedirectToAction("Sessions");
+    }
+
     public async Task<IActionResult> Sessions(string tab = "upcoming", string? subject = null, int? tutorProfileId = null, string sort = "newest")
     {
         var studentProfile = await GetCurrentStudentProfileAsync();
@@ -1375,7 +1420,7 @@ public class StudentController : Controller
         }
 
         _context.Reviews.RemoveRange(_context.Reviews.Where(r => r.StudentProfileId == studentProfile.Id));
-        _context.Messages.RemoveRange(_context.Messages.Where(m => m.StudentProfileId == studentProfile.Id)); 
+        _context.Messages.RemoveRange(_context.Messages.Where(m => m.StudentProfileId == studentProfile.Id));
         _context.SavedTutors.RemoveRange(_context.SavedTutors.Where(s => s.StudentProfileId == studentProfile.Id));
         _context.Bookings.RemoveRange(_context.Bookings.Where(b => b.StudentProfileId == studentProfile.Id));
         _context.StudentProfiles.Remove(studentProfile);
@@ -1389,7 +1434,7 @@ public class StudentController : Controller
         return RedirectToAction("Index", "Home");
     }
 
-public async Task<IActionResult> HelpSupport()
+    public async Task<IActionResult> HelpSupport()
     {
         var studentProfile = await GetCurrentStudentProfileAsync();
         if (studentProfile == null) return RedirectToAction("Index", "Home");

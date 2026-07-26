@@ -1,0 +1,231 @@
+﻿@model TutorBridgeNepal.ViewModels.SessionRequestsPageViewModel
+@{
+    ViewData["Title"] = "Session Requests";
+    Layout = null;
+    var now = DateTime.Now;
+
+    string AgoText(DateTime createdAt)
+    {
+        var minutes = (int)(now - createdAt).TotalMinutes;
+        if (minutes < 1) return "just now";
+        if (minutes < 60) return $"{minutes} minute{(minutes == 1 ? "" : "s")} ago";
+        if (minutes < 1440) return $"{minutes / 60} hour{(minutes / 60 == 1 ? "" : "s")} ago";
+        return $"{minutes / 1440} day{(minutes / 1440 == 1 ? "" : "s")} ago";
+    }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Session Requests - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_TutorTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_TutorSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>Session Requests</h1>
+                        <p>Review and respond to new booking requests from students</p>
+                    </div>
+                </div>
+
+                <div class="stat-cards">
+                    <div class="stat-card">
+                        <div class="label">Pending requests</div>
+                        <div class="value" style="color:var(--danger);">@Model.PendingCount</div>
+                        <div class="sub">@(Model.PendingCount > 0 ? "Needs reply" : "All caught up")</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Accepted (@now.ToString("MMM"))</div>
+                        <div class="value">@Model.AcceptedThisMonthCount</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Declined (@now.ToString("MMM"))</div>
+                        <div class="value">@Model.DeclinedThisMonthCount</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Avg response time</div>
+                        <div class="value">
+                            @if (Model.AvgResponseTimeMinutes.HasValue)
+                            {
+                                var mins = Model.AvgResponseTimeMinutes.Value;
+                                @(mins < 60 ? $"{Math.Round(mins)} min" : $"{Math.Round(mins / 60, 1)} hr")
+                            }
+                            else
+                            {
+                                @:—
+                            }
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Response rate</div>
+                        <div class="value">@(Model.ResponseRatePercent.HasValue ? $"{Model.ResponseRatePercent}%" : "—")</div>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.6rem;">
+                    <div class="tab-bar">
+                        <a asp-action="SessionRequests" asp-route-tab="pending" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "pending" ? "active" : "")">Pending (@Model.PendingCount)</a>
+                        <a asp-action="SessionRequests" asp-route-tab="accepted" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "accepted" ? "active" : "")">Accepted</a>
+                        <a asp-action="SessionRequests" asp-route-tab="declined" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "declined" ? "active" : "")">Declined</a>
+                        <a asp-action="SessionRequests" asp-route-tab="all" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "all" ? "active" : "")">All requests</a>
+                    </div>
+                    <form method="get" asp-action="SessionRequests">
+                        <input type="hidden" name="tab" value="@Model.Tab" />
+                        <select name="sort" class="sort-select" onchange="this.form.submit()">
+                            <option value="newest" selected="@(Model.Sort == "newest")">Newest first</option>
+                            <option value="oldest" selected="@(Model.Sort == "oldest")">Oldest first</option>
+                        </select>
+                    </form>
+                </div>
+
+                <div style="margin-top:1rem;">
+                    @if (!Model.Requests.Any())
+                    {
+                        <p class="empty-state">No requests in this view.</p>
+                    }
+                    else
+                    {
+                        @foreach (var r in Model.Requests)
+                        {
+                            var cardClass = r.Status == "Pending" ? "" : r.Status == "Cancelled" ? "declined" : "accepted";
+                            <div class="session-request-card @cardClass">
+                                <div class="sr-top-row">
+                                    <div class="sr-student">
+                                        <div class="avatar">@r.StudentInitials</div>
+                                        <div class="sr-student-info">
+                                            <div class="name">
+                                                @r.StudentName
+                                                @if (r.IsReturningStudent)
+                                                {
+                                                    <span class="returning-badge">Returning student</span>
+                                                }
+                                            </div>
+                                            <div class="meta">@(string.IsNullOrWhiteSpace(r.GradeLevel) ? "" : r.GradeLevel + " · ")@r.District</div>
+                                            <div class="history">
+                                                @if (r.IsReturningStudent)
+                                                {
+                                                    @:@r.PriorSessionsCount prior session@(r.PriorSessionsCount == 1 ? "" : "s")
+                                                    @if (r.LastSessionAt.HasValue)
+                                                    {
+                                                        @:· Last session: @r.LastSessionAt.Value.ToString("d MMM yyyy")
+                                                    }
+                                                    @if (r.LastRatingGiven.HasValue)
+                                                    {
+                                                        @:· Rating given: @(new string('★', r.LastRatingGiven.Value))@(new string('☆', 5 - r.LastRatingGiven.Value))
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    @:No previous sessions with you
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style="text-align:right;">
+                                        <div class="sr-ago">Requested @AgoText(r.CreatedAt)</div>
+                                        @if (r.Status == "Pending")
+                                        {
+                                            <div class="sr-actions">
+                                                <form asp-controller="Tutor" asp-action="AcceptBooking" method="post" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.BookingId" />
+                                                    <input type="hidden" name="returnTo" value="SessionRequests" />
+                                                    <button type="submit" class="mini-btn green" style="width:100%;">✓ Accept</button>
+                                                </form>
+                                                <form asp-controller="Tutor" asp-action="DeclineBooking" method="post" style="margin:0;" onsubmit="return confirm('Decline this request?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.BookingId" />
+                                                    <input type="hidden" name="returnTo" value="SessionRequests" />
+                                                    <button type="submit" class="mini-btn danger" style="width:100%;">✕ Decline</button>
+                                                </form>
+                                                <span class="disabled-btn" title="Proposing a new time isn't built yet" style="text-align:center;">Propose time</span>
+                                            </div>
+                                        }
+                                        else if (r.DeclinedByTutor)
+                                        {
+                                            <span class="sr-status-pill declined">Declined</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="sr-status-pill accepted">Accepted</span>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="sr-details">
+                                    <div class="sr-detail-col">
+                                        <label>Subject</label>
+                                        <div class="val">@r.Subject</div>
+                                    </div>
+                                    <div class="sr-detail-col">
+                                        <label>Date &amp; time</label>
+                                        <div class="val">@r.StartTime.ToString("ddd, d MMM yyyy")</div>
+                                        <div class="sub">@r.StartTime.ToString("h:mm tt") – @r.EndTime.ToString("h:mm tt")</div>
+                                    </div>
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(r.Note))
+                                {
+                                    <div class="sr-note">"@r.Note"</div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+
+                @if (Model.RecentlyAccepted.Any())
+                {
+                    <div class="section-subhead">
+                        <h2>Recently accepted</h2>
+                    </div>
+                    <div class="panel">
+                        <table class="dash-table">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Subject</th>
+                                    <th>Session date</th>
+                                    <th>Accepted on</th>
+                                    <th>Response time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var a in Model.RecentlyAccepted)
+                                {
+                                    <tr>
+                                        <td>@a.StudentName</td>
+                                        <td>@a.Subject</td>
+                                        <td>@a.SessionDate.ToString("d MMM, h:mm tt")</td>
+                                        <td>@a.AcceptedOn.ToString("d MMM yyyy")</td>
+                                        <td>@(a.ResponseTimeMinutes < 60 ? $"{Math.Round(a.ResponseTimeMinutes)} min" : $"{Math.Round(a.ResponseTimeMinutes / 60, 1)} hr")</td>
+                                        <td><span class="sr-status-pill accepted">Accepted</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
