@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TutorBridgeNepal.Data;
 
@@ -11,9 +12,11 @@ using TutorBridgeNepal.Data;
 namespace TutorBridgeNepal.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260728042550_AddTutorReplyToReview")]
+    partial class AddTutorReplyToReview
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -564,38 +567,6 @@ namespace TutorBridgeNepal.Migrations
                     b.ToTable("TutorAvailabilitySlots");
                 });
 
-            modelBuilder.Entity("TutorBridgeNepal.Models.TutorCredential", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("FileName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Icon")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("TutorProfileId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TutorProfileId");
-
-                    b.ToTable("TutorCredentials");
-                });
-
             modelBuilder.Entity("TutorBridgeNepal.Models.TutorProfile", b =>
                 {
                     b.Property<int>("Id")
@@ -604,62 +575,23 @@ namespace TutorBridgeNepal.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<bool>("AutoAcceptReturningStudents")
-                        .HasColumnType("bit");
-
                     b.Property<decimal>("AverageRating")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Bio")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("CancellationWindowHours")
-                        .HasColumnType("int");
-
-                    b.Property<string>("DisplayName")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<bool>("IsAvailableNow")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeactivated")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsListedInSearch")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsVerified")
                         .HasColumnType("bit");
 
-                    b.Property<string>("Languages")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("MaxSessionsPerDay")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MinimumBookingNoticeHours")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("NotifyNewMessages")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("NotifyNewSessionRequests")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("NotifyWeeklyEarningsSummary")
-                        .HasColumnType("bit");
-
                     b.Property<int>("ReviewCount")
                         .HasColumnType("int");
 
-                    b.Property<bool>("ShowAvailabilityBadge")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Subjects")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("TeachingMode")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TeachingStyle")
@@ -677,37 +609,6 @@ namespace TutorBridgeNepal.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("TutorProfiles");
-                });
-
-            modelBuilder.Entity("TutorBridgeNepal.Models.TutorSubjectRate", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("RatePerHour")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Subject")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("TutorProfileId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TutorProfileId");
-
-                    b.ToTable("TutorSubjectRates");
                 });
 
             modelBuilder.Entity("TutorBridgeNepal.Models.TutorTimeOff", b =>
@@ -969,17 +870,6 @@ namespace TutorBridgeNepal.Migrations
                     b.Navigation("TutorProfile");
                 });
 
-            modelBuilder.Entity("TutorBridgeNepal.Models.TutorCredential", b =>
-                {
-                    b.HasOne("TutorBridgeNepal.Models.TutorProfile", "TutorProfile")
-                        .WithMany()
-                        .HasForeignKey("TutorProfileId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TutorProfile");
-                });
-
             modelBuilder.Entity("TutorBridgeNepal.Models.TutorProfile", b =>
                 {
                     b.HasOne("TutorBridgeNepal.Models.ApplicationUser", "User")
@@ -989,17 +879,6 @@ namespace TutorBridgeNepal.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("TutorBridgeNepal.Models.TutorSubjectRate", b =>
-                {
-                    b.HasOne("TutorBridgeNepal.Models.TutorProfile", "TutorProfile")
-                        .WithMany()
-                        .HasForeignKey("TutorProfileId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TutorProfile");
                 });
 
             modelBuilder.Entity("TutorBridgeNepal.Models.TutorTimeOff", b =>

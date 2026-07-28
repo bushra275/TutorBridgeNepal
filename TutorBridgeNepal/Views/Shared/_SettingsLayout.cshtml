@@ -1,0 +1,68 @@
+﻿@{
+    var activeSection = ViewData["SettingsActiveSection"] as string ?? "account";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_TutorTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_TutorSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>Settings</h1>
+                        <p>Manage your account, availability and tutoring preferences</p>
+                    </div>
+                </div>
+
+                @if (TempData["SettingsSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                }
+                @if (TempData["SettingsError"] != null)
+                {
+                    <div class="status-banner error mb-3">@TempData["SettingsError"]</div>
+                }
+
+                <div class="settings-layout">
+                    <!-- Left nav - each item is its own page -->
+                    <div class="settings-nav">
+                        <a asp-controller="Tutor" asp-action="SettingsAccount" class="@(activeSection == "account" ? "active" : "")">Account &amp; security</a>
+                        <a asp-controller="Tutor" asp-action="SettingsAvailability" class="@(activeSection == "availability" ? "active" : "")">Availability preferences</a>
+                        <a asp-controller="Tutor" asp-action="SettingsBookingPolicy" class="@(activeSection == "bookingpolicy" ? "active" : "")">Booking &amp; cancellation policy</a>
+                        <a asp-controller="Tutor" asp-action="SettingsNotifications" class="@(activeSection == "notifications" ? "active" : "")">Notification preferences</a>
+                        <a asp-controller="Tutor" asp-action="SettingsPrivacy" class="@(activeSection == "privacy" ? "active" : "")">Privacy</a>
+                        <a asp-controller="Tutor" asp-action="SettingsDevices" class="@(activeSection == "devices" ? "active" : "")">Linked devices</a>
+                        <a asp-controller="Tutor" asp-action="SettingsCalendar" class="@(activeSection == "calendar" ? "active" : "")">Connected calendar</a>
+                        <a asp-controller="Tutor" asp-action="SettingsDeactivate" class="danger-link @(activeSection == "deactivate" ? "active" : "")">Deactivate tutor account</a>
+                    </div>
+
+                    <!-- Right content - each section's own page renders here -->
+                    <div class="settings-content">
+                        @RenderBody()
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

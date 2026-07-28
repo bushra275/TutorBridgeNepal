@@ -1,0 +1,38 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorSettingsPageViewModel
+@{
+    ViewData["Title"] = "Availability preferences";
+    ViewData["SettingsActiveSection"] = "availability";
+    Layout = "_SettingsLayout";
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <h2>Availability preferences</h2>
+    </div>
+
+    <div class="settings-toggle-row">
+        <div>
+            <div class="settings-toggle-title">Show "Available now" badge</div>
+            <div class="settings-toggle-sub">Let students know you can accept instant bookings</div>
+        </div>
+        <form asp-controller="Tutor" asp-action="UpdateAvailabilityPreference" method="post" class="toggle-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="key" value="ShowAvailabilityBadge" />
+            <input type="hidden" name="value" value="@(!Model.ShowAvailabilityBadge)" />
+            <button type="submit" class="toggle-switch @(Model.ShowAvailabilityBadge ? "on" : "")" aria-label="Toggle available now badge"><span class="toggle-knob"></span></button>
+        </form>
+    </div>
+
+    <div class="settings-toggle-row">
+        <div>
+            <div class="settings-toggle-title">Auto-accept returning students</div>
+            <div class="settings-toggle-sub">Skip manual approval for students you've taught before</div>
+        </div>
+        <form asp-controller="Tutor" asp-action="UpdateAvailabilityPreference" method="post" class="toggle-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="key" value="AutoAcceptReturningStudents" />
+            <input type="hidden" name="value" value="@(!Model.AutoAcceptReturningStudents)" />
+            <button type="submit" class="toggle-switch @(Model.AutoAcceptReturningStudents ? "on" : "")" aria-label="Toggle auto-accept returning students"><span class="toggle-knob"></span></button>
+        </form>
+    </div>
+</div>

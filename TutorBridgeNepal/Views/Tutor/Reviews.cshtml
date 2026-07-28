@@ -1,0 +1,186 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorReviewsPageViewModel
+@{
+    ViewData["Title"] = "Reviews";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reviews - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_TutorTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_TutorSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>Reviews</h1>
+                        <p>See what students are saying about your teaching</p>
+                    </div>
+                    <span class="disabled-btn" title="Export isn't built yet">Export reviews</span>
+                </div>
+
+                @if (TempData["SettingsSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                }
+
+                <div class="rv-overview-grid">
+                    <div class="rv-panel rv-rating-box">
+                        @if (Model.ReviewCount > 0)
+                        {
+                            <div class="big-num">@Model.AverageRating.ToString("0.0")</div>
+                            <div class="stars">@(new string('★', (int)Math.Round(Model.AverageRating)))@(new string('☆', 5 - (int)Math.Round(Model.AverageRating)))</div>
+                            <div class="based-on">Based on @Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s")</div>
+                            @foreach (var b in Model.StarDistribution)
+                            {
+                                <div class="star-bar-row">
+                                    <span>@b.Stars★</span>
+                                    <div class="star-bar-track"><div class="star-bar-fill" style="width:@(b.Percent)%;"></div></div>
+                                    <span>@b.Percent%</span>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="empty-state">No reviews yet.</p>
+                        }
+                    </div>
+
+                    <div class="rv-panel">
+                        <h3>What students say most</h3>
+                        @if (Model.CommonPhrases.Any())
+                        {
+                            <div class="phrase-tags">
+                                @foreach (var phrase in Model.CommonPhrases)
+                                {
+                                    <span class="phrase-tag @(phrase == "Runs long" ? "caution" : "")">@phrase</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="empty-state">Not enough review text yet to spot common themes.</p>
+                        }
+                    </div>
+
+                    <div class="rv-panel">
+                        <h3>Performance vs platform</h3>
+                        <div class="rv-perf-row"><span class="lbl">Your average rating</span><span class="val">@(Model.ReviewCount > 0 ? Model.AverageRating.ToString("0.0") + " ★" : "—")</span></div>
+                        <div class="rv-perf-row"><span class="lbl">Platform average</span><span class="val">@(Model.PlatformAverageRating > 0 ? Model.PlatformAverageRating.ToString("0.0") + " ★" : "—")</span></div>
+                        <div class="rv-perf-row"><span class="lbl">Response rate</span><span class="val">@(Model.ResponseRatePercent.HasValue ? Model.ResponseRatePercent + "%" : "—")</span></div>
+                        <div class="rv-perf-row"><span class="lbl">Repeat booking rate</span><span class="val">@(Model.RepeatBookingRatePercent.HasValue ? Model.RepeatBookingRatePercent + "%" : "—")</span></div>
+                        @if (Model.IsTopFivePercent)
+                        {
+                            <span class="top-tutor-badge">🏆 Top 5% tutor</span>
+                        }
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.6rem;">
+                    <div class="tab-bar">
+                        <a asp-action="Reviews" asp-route-tab="all" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "all" ? "active" : "")">All (@Model.ReviewCount)</a>
+                        <a asp-action="Reviews" asp-route-tab="5star" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "5star" ? "active" : "")">5 star (@Model.FiveStarCount)</a>
+                        <a asp-action="Reviews" asp-route-tab="4star" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "4star" ? "active" : "")">4 star (@Model.FourStarCount)</a>
+                        <a asp-action="Reviews" asp-route-tab="3below" asp-route-sort="@Model.Sort" class="tab-btn @(Model.Tab == "3below" ? "active" : "")">3 &amp; below (@Model.ThreeAndBelowCount)</a>
+                    </div>
+                    <form method="get" asp-action="Reviews">
+                        <input type="hidden" name="tab" value="@Model.Tab" />
+                        <select name="sort" class="sort-select" onchange="this.form.submit()">
+                            <option value="newest" selected="@(Model.Sort == "newest")">Newest first</option>
+                            <option value="oldest" selected="@(Model.Sort == "oldest")">Oldest first</option>
+                        </select>
+                    </form>
+                </div>
+
+                <div style="margin-top:1rem;">
+                    @if (!Model.Reviews.Any())
+                    {
+                        <p class="empty-state">No reviews in this view.</p>
+                    }
+                    else
+                    {
+                        @foreach (var r in Model.Reviews)
+                        {
+                            var daysAgo = (int)(DateTime.Now - r.CreatedAt).TotalDays;
+                            var agoText = daysAgo < 1 ? "today" : daysAgo == 1 ? "1 day ago" : daysAgo < 14 ? $"{daysAgo} days ago" : $"{daysAgo / 7} week{(daysAgo / 7 == 1 ? "" : "s")} ago";
+                            <div class="review-row">
+                                <div class="rv-row-top">
+                                    <div class="rv-row-name">
+                                        <div class="avatar">@r.StudentInitials</div>
+                                        <div>
+                                            <div class="name">@r.StudentName</div>
+                                            <div class="stars-line">
+                                                <span style="color:var(--orange);">@(new string('★', r.Rating))@(new string('☆', 5 - r.Rating))</span>
+                                                <span class="msc-badge" style="background:var(--mint); color:var(--green-dark);">@r.Subject session</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="rv-row-date">
+                                        <div>@agoText</div>
+                                        <div>Session: @r.SessionDate.ToString("d MMM yyyy")</div>
+                                    </div>
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(r.Comment))
+                                {
+                                    <p class="rv-comment">"@r.Comment"</p>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(r.TutorReply))
+                                {
+                                    <div class="reply-box">
+                                        <span class="reply-label">↳ Your reply</span>
+                                        @r.TutorReply
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div style="margin-top:.8rem;">
+                                        <button type="button" class="tb-btn-outline reply-toggle" data-target="reply-form-@r.ReviewId">Reply to review</button>
+                                    </div>
+                                    <form asp-controller="Tutor" asp-action="ReplyToReview" method="post" class="reply-form" id="reply-form-@r.ReviewId">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="reviewId" value="@r.ReviewId" />
+                                        <textarea name="reply" maxlength="500" placeholder="Write a reply..." required></textarea>
+                                        <div class="settings-actions" style="margin-top:.6rem;">
+                                            <button type="submit" class="tb-btn">Post reply</button>
+                                        </div>
+                                    </form>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            document.querySelectorAll('.reply-toggle').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var form = document.getElementById(btn.dataset.target);
+                    if (form) {
+                        form.classList.toggle('open');
+                        btn.style.display = 'none';
+                    }
+                });
+            });
+    </script>
+</body>
+</html>

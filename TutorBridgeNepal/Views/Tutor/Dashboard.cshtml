@@ -105,7 +105,7 @@
                                                 {
                                                     <span class="disabled-btn" title="Session hasn't started yet">Not started</span>
                                                 }
-                                                <span class="disabled-btn" title="Tutor-side messaging isn't built yet">Message student</span>
+                                                <a asp-controller="Tutor" asp-action="Messages" asp-route-studentProfileId="@s.StudentProfileId" class="mini-btn">Message student</a>
                                             </div>
                                         </div>
                                     </div>
@@ -211,7 +211,7 @@
                                             <div class="meta">@(string.IsNullOrWhiteSpace(s.GradeLevel) ? "" : s.GradeLevel + " · ")@s.SessionsCount session@(s.SessionsCount == 1 ? "" : "s")</div>
                                             <div class="next">Next: @(s.NextSessionAt.HasValue ? s.NextSessionAt.Value.ToString("d MMM, h:mm tt") : "Not scheduled")</div>
                                         </div>
-                                        <span class="disabled-btn" title="Tutor-side messaging isn't built yet">Message</span>
+                                        <a asp-controller="Tutor" asp-action="Messages" asp-route-studentProfileId="@s.StudentProfileId" class="mini-btn">Message</a>
                                     </div>
                                 }
                             }

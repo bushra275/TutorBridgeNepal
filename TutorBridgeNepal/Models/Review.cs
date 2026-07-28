@@ -17,4 +17,9 @@ public class Review
     public int Rating { get; set; } // 1-5
     public string? Comment { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+    // Tutor's reply to this review, if any:
+    public string? TutorReply { get; set; }
+    public DateTime? TutorRepliedAt { get; set; }
+
 }

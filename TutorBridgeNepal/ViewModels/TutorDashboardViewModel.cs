@@ -30,7 +30,8 @@ public class TutorDashboardViewModel
 public class TutorBookingRowViewModel
 {
 	public int BookingId { get; set; }
-	public string StudentName { get; set; } = string.Empty;
+    public int StudentProfileId { get; set; }
+    public string StudentName { get; set; } = string.Empty;
 	public string StudentInitials { get; set; } = string.Empty;
 	public string? StudentGradeLevel { get; set; }
 	public string Subject { get; set; } = string.Empty;

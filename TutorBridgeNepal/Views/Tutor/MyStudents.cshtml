@@ -158,7 +158,7 @@
                                     }
                                     else
                                     {
-                                        <span class="disabled-btn" title="Tutor-side messaging isn't built yet" style="text-align:center;">Message</span>
+                                        <a asp-controller="Tutor" asp-action="Messages" asp-route-studentProfileId="@s.StudentProfileId" class="mini-btn" style="text-align:center;">Message</a>
                                     }
                                     <span class="disabled-btn" title="Viewing full student profiles isn't built yet" style="text-align:center; @(s.HasPendingRequest ? "grid-column: span 2;" : "")">View profile</span>
                                 </div>

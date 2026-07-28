@@ -1,0 +1,24 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorSettingsPageViewModel
+@{
+    ViewData["Title"] = "Privacy";
+    ViewData["SettingsActiveSection"] = "privacy";
+    Layout = "_SettingsLayout";
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <h2>Privacy</h2>
+    </div>
+
+    <div class="settings-toggle-row">
+        <div>
+            <div class="settings-toggle-title">Show my profile in search results</div>
+            <div class="settings-toggle-sub">Turn this off to hide your profile from "Find a Tutor" while still keeping existing students and bookings</div>
+        </div>
+        <form asp-controller="Tutor" asp-action="UpdateSearchVisibility" method="post" class="toggle-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="isListedInSearch" value="@(!Model.IsListedInSearch)" />
+            <button type="submit" class="toggle-switch @(Model.IsListedInSearch ? "on" : "")" aria-label="Toggle search visibility"><span class="toggle-knob"></span></button>
+        </form>
+    </div>
+</div>

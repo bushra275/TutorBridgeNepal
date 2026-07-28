@@ -1,0 +1,236 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorMessagesPageViewModel
+@{
+    ViewData["Title"] = "Messages";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Messages - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_TutorTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_TutorSidebar")
+
+            <main class="dash-main">
+                <div class="messages-shell">
+                    <!-- Conversation list -->
+                    <aside class="conv-list">
+                        <div class="conv-list-header">
+                            <h2>
+                                Messages @if (Model.TotalUnread > 0)
+                                {
+                                    <span class="unread-count-badge">@Model.TotalUnread</span>
+                                }
+                            </h2>
+                            <input type="text" class="conv-search" id="convSearch" placeholder="Search conversations..." />
+                        </div>
+
+                        <div class="tab-bar" style="margin:0 1rem .8rem;">
+                            <a asp-action="Messages" asp-route-tab="all" class="tab-btn @(Model.Tab == "all" ? "active" : "")">All</a>
+                            <a asp-action="Messages" asp-route-tab="unread" class="tab-btn @(Model.Tab == "unread" ? "active" : "")">Unread</a>
+                            <a asp-action="Messages" asp-route-tab="students" class="tab-btn @(Model.Tab == "students" ? "active" : "")">Students</a>
+                        </div>
+
+                        <div class="conv-items" id="convItems">
+                            @if (!Model.Conversations.Any())
+                            {
+                                <p class="no-conversations">No conversations in this view.</p>
+                            }
+                            else
+                            {
+                                @foreach (var c in Model.Conversations)
+                                {
+                                    var isActive = c.StudentProfileId == Model.ActiveStudentProfileId;
+                                    <a asp-action="Messages" asp-route-studentProfileId="@c.StudentProfileId"
+                                       class="conv-item @(isActive ? "active" : "") @(c.UnreadCount > 0 ? "has-unread" : "")"
+                                       data-name="@c.StudentName.ToLower()">
+                                        <div class="avatar">@c.StudentInitials</div>
+                                        <div class="conv-item-body">
+                                            <div class="conv-item-top">
+                                                <strong>@c.StudentName</strong>
+                                                <span>@(c.LastMessageAt.HasValue ? c.LastMessageAt.Value.ToString("d MMM") : "")</span>
+                                            </div>
+                                            <div class="conv-preview">
+                                                @if (c.LastMessagePreview != null)
+                                                {
+                                                    @c.LastMessagePreview
+                                                }
+                                                else if (c.IsNew)
+                                                {
+                                                    @:New student · No sessions yet
+                                                }
+                                                else
+                                                {
+                                                    @:No messages yet — say hello!
+                                                }
+                                            </div>
+                                            <div class="conv-meta-row">
+                                                <span>@(c.Subjects.Any() ? c.Subjects[0] : "")</span>
+                                                @if (c.NextSessionAt.HasValue)
+                                                {
+                                                    <span>· Next: @c.NextSessionAt.Value.ToString("d MMM, h:mm tt")</span>
+                                                }
+                                                else if (c.LastSessionAt.HasValue)
+                                                {
+                                                    <span>· Last: @c.LastSessionAt.Value.ToString("d MMM")</span>
+                                                }
+                                                @if (c.UnreadCount > 0)
+                                                {
+                                                    <span class="unread-dot"></span>
+                                                }
+                                            </div>
+                                        </div>
+                                    </a>
+                                }
+                            }
+                        </div>
+                    </aside>
+
+                    <!-- Chat panel -->
+                    <section class="chat-panel">
+                        @if (Model.ActiveStudentProfileId == null)
+                        {
+                            <div class="chat-empty" style="margin:auto;">
+                                <p>Select a conversation to start chatting. You can only message students you have a booking relationship with.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="chat-header">
+                                <div class="avatar">@Model.ActiveStudentInitials</div>
+                                <div class="chat-header-info">
+                                    <h2>@Model.ActiveStudentName</h2>
+                                    <p class="tutor-meta mb-0">
+                                        @string.Join(", ", Model.ActiveStudentSubjects)@(string.IsNullOrWhiteSpace(Model.ActiveStudentGradeLevel) ? "" : " · " + Model.ActiveStudentGradeLevel)
+                                    </p>
+                                    @if (Model.ActiveStudentIsActive)
+                                    {
+                                        <span class="badge-active-student">Active student</span>
+                                    }
+                                    else if (Model.ActiveStudentIsNew)
+                                    {
+                                        <span class="badge-new-student">New student</span>
+                                    }
+                                </div>
+                                <span class="tb-btn-outline" style="opacity:.6; cursor:not-allowed;" title="Viewing full student profiles isn't built yet">View profile</span>
+                                <span class="tb-btn" style="opacity:.6; cursor:not-allowed; margin-left:.6rem;" title="Tutor-initiated scheduling isn't built yet - accept requests from Session Requests instead">Schedule</span>
+                            </div>
+
+                            <div class="chat-messages" id="chatMessages">
+                                @if (!Model.Messages.Any())
+                                {
+                                    <div class="chat-empty">
+                                        <p>No messages yet with @Model.ActiveStudentName.Split(' ')[0]. Send the first message below.</p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    DateTime? lastDate = null;
+                                    foreach (var m in Model.Messages)
+                                    {
+                                        if (lastDate == null || m.SentAt.Date != lastDate.Value.Date)
+                                        {
+                                            <div style="text-align:center; margin:.4rem 0;">
+                                                <span class="badge-soft">@(m.SentAt.Date == DateTime.Today ? "Today" : m.SentAt.ToString("d MMM yyyy"))</span>
+                                            </div>
+                                            lastDate = m.SentAt.Date;
+                                        }
+
+                                        var isOwn = m.SenderRole == "Tutor";
+                                        <div class="msg-row @(isOwn ? "tutor-own" : "student-other")">
+                                            <div>
+                                                <div class="msg-bubble">@m.Content</div>
+                                                <div class="msg-meta">
+                                                    @m.SentAt.ToString("h:mm tt")
+                                                    @if (isOwn)
+                                                    {
+                                                        @:· You @(m.IsRead ? "✓✓" : "✓")
+                                                    }
+                                                    else
+                                                    {
+                                                        @:· @Model.ActiveStudentName.Split(' ')[0]
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+
+                            <form class="chat-input-bar" asp-controller="Tutor" asp-action="SendMessage" method="post" style="position:relative;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="studentProfileId" value="@Model.ActiveStudentProfileId" />
+                                <button type="button" class="icon-btn-sm" disabled title="File attachments aren't supported yet">📎</button>
+                                <button type="button" class="icon-btn-sm" id="emojiBtn">🙂</button>
+                                <div class="emoji-picker" id="emojiPicker">
+                                    @foreach (var e in new[] { "😀", "😂", "🙂", "👍", "🙏", "❤️", "🎉", "👏", "😊", "🤔", "✅", "📚" })
+                                    {
+                                        <button type="button" data-emoji="@e">@e</button>
+                                    }
+                                </div>
+                                <input type="text" name="content" id="chatInput" class="chat-input" placeholder="Type a message..." autocomplete="off" required />
+                                <button type="submit" class="tb-btn">Send</button>
+                            </form>
+                        }
+                    </section>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            document.getElementById('convSearch')?.addEventListener('input', function () {
+                var term = this.value.toLowerCase();
+                document.querySelectorAll('#convItems .conv-item').forEach(function (item) {
+                    var name = item.getAttribute('data-name') || '';
+                    item.style.display = name.indexOf(term) !== -1 ? 'flex' : 'none';
+                });
+            });
+
+            var chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            var emojiBtn = document.getElementById('emojiBtn');
+            var emojiPicker = document.getElementById('emojiPicker');
+            var chatInput = document.getElementById('chatInput');
+
+            if (emojiBtn && emojiPicker && chatInput) {
+                emojiBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    emojiPicker.classList.toggle('open');
+                });
+
+                emojiPicker.querySelectorAll('button[data-emoji]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        chatInput.value += btn.dataset.emoji;
+                        chatInput.focus();
+                        emojiPicker.classList.remove('open');
+                    });
+                });
+
+                document.addEventListener('click', function (e) {
+                    if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+                        emojiPicker.classList.remove('open');
+                    }
+                });
+            }
+    </script>
+</body>
+</html>

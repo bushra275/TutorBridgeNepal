@@ -13,11 +13,13 @@ public class TutorController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
 
-    public TutorController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+    public TutorController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager)
     {
         _context = context;
         _userManager = userManager;
+        _signInManager = signInManager;
     }
 
     private static string GetInitials(string fullName)
@@ -27,6 +29,19 @@ public class TutorController : Controller
         if (parts.Length == 1) return parts[0][..Math.Min(2, parts[0].Length)].ToUpper();
         return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
     }
+    // Real (not invented) district -> province mapping, used only to show
+    // "Kathmandu, Bagmati Province" next to the district the tutor already
+    // selected. Covers the districts offered in the registration/settings
+    // dropdowns; falls back to just the district name if not listed.
+    private static readonly Dictionary<string, string> DistrictToProvince = new()
+    {
+        ["Kathmandu"] = "Bagmati Province",
+        ["Lalitpur"] = "Bagmati Province",
+        ["Bhaktapur"] = "Bagmati Province",
+        ["Chitwan"] = "Bagmati Province",
+        ["Pokhara"] = "Gandaki Province",
+        ["Biratnagar"] = "Koshi Province",
+    };
 
     private async Task<TutorProfile?> GetCurrentTutorProfileAsync()
     {
@@ -51,7 +66,7 @@ public class TutorController : Controller
         ViewData["ActiveNav"] = activeNav;
         ViewData["PendingRequestCount"] = pendingCount;
         ViewData["UnreadMessageCount"] = unreadMessageCount;
-        ViewData["IsAvailableNow"] = tutor.IsAvailableNow;
+        ViewData["ShowAvailabilityBadge"] = tutor.ShowAvailabilityBadge;
     }
 
     public async Task<IActionResult> Dashboard()
@@ -92,6 +107,7 @@ public class TutorController : Controller
         TutorBookingRowViewModel ToRow(Booking b) => new()
         {
             BookingId = b.Id,
+            StudentProfileId = b.StudentProfileId,
             StudentName = b.StudentProfile.User.FullName,
             StudentInitials = GetInitials(b.StudentProfile.User.FullName),
             StudentGradeLevel = b.StudentProfile.GradeLevel,
@@ -885,5 +901,720 @@ public class TutorController : Controller
         };
 
         return View(vm);
+    }
+
+    public async Task<IActionResult> Messages(int? studentProfileId, string tab = "all", string? search = null)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await SetTutorSidebarContextAsync("messages", tutor);
+
+        var now = DateTime.Now;
+
+        // Conversations = students this tutor has an actual booking relationship
+        // with (same rule as the Student side - you can only message someone
+        // you've booked with).
+        var allBookings = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.TutorProfileId == tutor.Id)
+            .ToListAsync();
+
+        var studentIds = allBookings.Select(b => b.StudentProfileId).Distinct().ToList();
+
+        var allMessages = await _context.Messages
+            .Where(m => m.TutorProfileId == tutor.Id && studentIds.Contains(m.StudentProfileId))
+            .OrderByDescending(m => m.SentAt)
+            .ToListAsync();
+
+        var conversations = studentIds.Select(sid =>
+        {
+            var studentBookings = allBookings.Where(b => b.StudentProfileId == sid).ToList();
+            var student = studentBookings.First().StudentProfile;
+            var threadMessages = allMessages.Where(m => m.StudentProfileId == sid).ToList();
+            var last = threadMessages.FirstOrDefault();
+
+            var nonCancelled = studentBookings.Where(b => b.Status != "Cancelled").ToList();
+            var completedCount = nonCancelled.Count(b => b.Status == "Completed");
+            var nextSession = nonCancelled
+                .Where(b => b.Status == "Confirmed" && b.TutorAvailabilitySlot.StartTime >= now)
+                .OrderBy(b => b.TutorAvailabilitySlot.StartTime)
+                .FirstOrDefault();
+            var lastSession = nonCancelled
+                .Where(b => b.Status == "Completed")
+                .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+                .FirstOrDefault();
+
+            return new TutorConversationListItemViewModel
+            {
+                StudentProfileId = sid,
+                StudentName = student.User.FullName,
+                StudentInitials = GetInitials(student.User.FullName),
+                LastMessagePreview = last?.Content,
+                LastMessageAt = last?.SentAt,
+                UnreadCount = threadMessages.Count(m => m.SenderRole == "Student" && !m.IsRead),
+                Subjects = nonCancelled.Select(b => b.Subject).Distinct().OrderBy(s => s).ToList(),
+                IsNew = completedCount == 0,
+                NextSessionAt = nextSession?.TutorAvailabilitySlot.StartTime,
+                LastSessionAt = lastSession?.TutorAvailabilitySlot.StartTime
+            };
+        })
+        .OrderByDescending(c => c.LastMessageAt ?? DateTime.MinValue)
+        .ToList();
+
+        var vm = new TutorMessagesPageViewModel { Tab = tab, Search = search };
+
+        var activeStudentId = studentProfileId ?? conversations.FirstOrDefault()?.StudentProfileId;
+
+        if (activeStudentId.HasValue)
+        {
+            var activeConvo = conversations.FirstOrDefault(c => c.StudentProfileId == activeStudentId.Value);
+            if (activeConvo != null)
+            {
+                var threadMessages = allMessages
+                    .Where(m => m.StudentProfileId == activeStudentId.Value)
+                    .OrderBy(m => m.SentAt)
+                    .ToList();
+
+                var unreadFromStudent = threadMessages.Where(m => m.SenderRole == "Student" && !m.IsRead).ToList();
+                if (unreadFromStudent.Any())
+                {
+                    var idsToMark = unreadFromStudent.Select(m => m.Id).ToList();
+                    var toUpdate = await _context.Messages.Where(m => idsToMark.Contains(m.Id)).ToListAsync();
+                    foreach (var m in toUpdate) m.IsRead = true;
+                    await _context.SaveChangesAsync();
+                }
+
+                // Zero the unread count on the shared list now that it's been read,
+                // before the tab/search filter below runs.
+                activeConvo.UnreadCount = 0;
+
+                vm.ActiveStudentProfileId = activeConvo.StudentProfileId;
+                vm.ActiveStudentName = activeConvo.StudentName;
+                vm.ActiveStudentInitials = activeConvo.StudentInitials;
+                vm.ActiveStudentIsNew = activeConvo.IsNew;
+                vm.ActiveStudentIsActive = activeConvo.NextSessionAt.HasValue;
+                vm.ActiveStudentSubjects = activeConvo.Subjects;
+
+                var studentProfile = allBookings.First(b => b.StudentProfileId == activeStudentId.Value).StudentProfile;
+                vm.ActiveStudentGradeLevel = studentProfile.GradeLevel;
+
+                vm.Messages = threadMessages.Select(m => new TutorMessageBubbleViewModel
+                {
+                    Id = m.Id,
+                    SenderRole = m.SenderRole,
+                    Content = m.Content,
+                    SentAt = m.SentAt,
+                    IsRead = m.IsRead
+                }).ToList();
+            }
+        }
+
+        IEnumerable<TutorConversationListItemViewModel> scopedConvos = tab switch
+        {
+            "unread" => conversations.Where(c => c.UnreadCount > 0),
+            _ => conversations // "all" and "students" show the same real set - there's no other conversation source
+        };
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            scopedConvos = scopedConvos.Where(c => c.StudentName.Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        vm.Conversations = scopedConvos.ToList();
+        vm.TotalUnread = conversations.Sum(c => c.UnreadCount);
+
+        return View(vm);
+    }
+
+    public async Task<IActionResult> Reviews(string tab = "all", string sort = "newest")
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await SetTutorSidebarContextAsync("reviews", tutor);
+
+        var reviews = await _context.Reviews
+            .Include(r => r.StudentProfile).ThenInclude(s => s.User)
+            .Include(r => r.Booking).ThenInclude(b => b.TutorAvailabilitySlot)
+            .Where(r => r.TutorProfileId == tutor.Id)
+            .ToListAsync();
+
+        var starDistribution = Enumerable.Range(1, 5)
+            .Select(star => new StarBucketViewModel
+            {
+                Stars = star,
+                Count = reviews.Count(r => r.Rating == star),
+                Percent = reviews.Any() ? (int)Math.Round(reviews.Count(r => r.Rating == star) * 100.0 / reviews.Count) : 0
+            })
+            .OrderByDescending(s => s.Stars)
+            .ToList();
+
+        IEnumerable<Review> scoped = tab switch
+        {
+            "5star" => reviews.Where(r => r.Rating == 5),
+            "4star" => reviews.Where(r => r.Rating == 4),
+            "3below" => reviews.Where(r => r.Rating <= 3),
+            _ => reviews
+        };
+
+        scoped = sort == "oldest" ? scoped.OrderBy(r => r.CreatedAt) : scoped.OrderByDescending(r => r.CreatedAt);
+
+        // "What students say most" - real keyword matching over actual comment
+        // text, not an invented/AI-generated summary. Only phrases that
+        // genuinely appear (case-insensitively) in real comments show up here.
+        var phraseGroups = new (string Label, string[] Matches)[]
+        {
+            ("Clear explanations", new[] { "clear" }),
+            ("Patient", new[] { "patient" }),
+            ("Well-prepared", new[] { "prepared" }),
+            ("Improved grades", new[] { "improved", "grade" }),
+            ("Punctual", new[] { "punctual", "on time" }),
+            ("Exam-focused", new[] { "exam", "see prep", "board exam" }),
+            ("Helpful", new[] { "helpful" }),
+            ("Friendly", new[] { "friendly" }),
+            ("Recommend", new[] { "recommend" }),
+            ("Runs long", new[] { "long", "runs over" }),
+        };
+
+        var allComments = reviews.Where(r => !string.IsNullOrWhiteSpace(r.Comment)).Select(r => r.Comment!.ToLowerInvariant()).ToList();
+        var commonPhrases = phraseGroups
+            .Select(p => new { p.Label, Count = allComments.Count(c => p.Matches.Any(m => c.Contains(m))) })
+            .Where(p => p.Count > 0)
+            .OrderByDescending(p => p.Count)
+            .Take(8)
+            .Select(p => p.Label)
+            .ToList();
+
+        // Platform average - real cross-tutor query, simple mean across every
+        // reviewed tutor (not weighted by review count).
+        var platformRatings = await _context.TutorProfiles
+            .Where(t => t.ReviewCount > 0)
+            .Select(t => t.AverageRating)
+            .ToListAsync();
+        var platformAverage = platformRatings.Any() ? Math.Round(platformRatings.Average(), 2) : 0m;
+
+        // Lifetime response rate (accept/decline vs total requests received)
+        var allBookings = await _context.Bookings.Where(b => b.TutorProfileId == tutor.Id).ToListAsync();
+        var decidedCount = allBookings.Count(b => b.DecidedAt.HasValue);
+        var responseRate = allBookings.Any() ? (int?)Math.Round(decidedCount * 100.0 / allBookings.Count) : null;
+
+        // Repeat booking rate - % of students who booked more than once
+        var studentBookingCounts = allBookings
+            .Where(b => b.Status != "Cancelled")
+            .GroupBy(b => b.StudentProfileId)
+            .Select(g => g.Count())
+            .ToList();
+        var repeatRate = studentBookingCounts.Any()
+            ? (int?)Math.Round(studentBookingCounts.Count(c => c >= 2) * 100.0 / studentBookingCounts.Count)
+            : null;
+
+        // Top 5% - real percentile rank among all reviewed tutors by average rating
+        var isTopFivePercent = false;
+        if (platformRatings.Count >= 2 && tutor.ReviewCount > 0)
+        {
+            var rank = platformRatings.Count(r => r > tutor.AverageRating) + 1;
+            var percentile = rank * 100.0 / platformRatings.Count;
+            isTopFivePercent = percentile <= 5;
+        }
+
+        var vm = new TutorReviewsPageViewModel
+        {
+            Tab = tab,
+            Sort = sort,
+            AverageRating = tutor.AverageRating,
+            ReviewCount = tutor.ReviewCount,
+            StarDistribution = starDistribution,
+            FiveStarCount = reviews.Count(r => r.Rating == 5),
+            FourStarCount = reviews.Count(r => r.Rating == 4),
+            ThreeAndBelowCount = reviews.Count(r => r.Rating <= 3),
+            CommonPhrases = commonPhrases,
+            PlatformAverageRating = platformAverage,
+            ResponseRatePercent = responseRate,
+            RepeatBookingRatePercent = repeatRate,
+            IsTopFivePercent = isTopFivePercent,
+            Reviews = scoped.Select(r => new TutorReviewRowViewModel2
+            {
+                ReviewId = r.Id,
+                StudentName = r.StudentProfile.User.FullName,
+                StudentInitials = GetInitials(r.StudentProfile.User.FullName),
+                Rating = r.Rating,
+                Comment = r.Comment,
+                Subject = r.Booking.Subject,
+                SessionDate = r.Booking.TutorAvailabilitySlot.StartTime,
+                CreatedAt = r.CreatedAt,
+                TutorReply = r.TutorReply,
+                TutorRepliedAt = r.TutorRepliedAt
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReplyToReview(int reviewId, string reply)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        if (string.IsNullOrWhiteSpace(reply))
+        {
+            return RedirectToAction("Reviews");
+        }
+
+        var review = await _context.Reviews
+            .FirstOrDefaultAsync(r => r.Id == reviewId && r.TutorProfileId == tutor.Id);
+
+        if (review != null)
+        {
+            review.TutorReply = reply.Trim();
+            review.TutorRepliedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+        }
+
+        return RedirectToAction("Reviews");
+    }
+
+    public async Task<IActionResult> Profile()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await SetTutorSidebarContextAsync("myprofile", tutor);
+
+        var sessionsCompleted = await _context.Bookings
+            .CountAsync(b => b.TutorProfileId == tutor.Id && b.Status == "Completed");
+
+        var subjectRates = await _context.TutorSubjectRates
+            .Where(s => s.TutorProfileId == tutor.Id)
+            .OrderBy(s => s.SortOrder)
+            .ToListAsync();
+
+        var credentials = await _context.TutorCredentials
+            .Where(c => c.TutorProfileId == tutor.Id)
+            .OrderBy(c => c.SortOrder)
+            .ToListAsync();
+
+        // Top tutor badge - genuine percentile rank among reviewed tutors,
+        // same computation as the "Top 5%" badge on the Reviews page.
+        var platformRatings = await _context.TutorProfiles
+            .Where(t => t.ReviewCount > 0)
+            .Select(t => t.AverageRating)
+            .ToListAsync();
+        var isTopTutor = false;
+        if (platformRatings.Count >= 2 && tutor.ReviewCount > 0)
+        {
+            var rank = platformRatings.Count(r => r > tutor.AverageRating) + 1;
+            var percentile = rank * 100.0 / platformRatings.Count;
+            isTopTutor = percentile <= 5;
+        }
+
+        var languages = (tutor.Languages ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        var teachingStyleTags = (tutor.TeachingStyle ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+        var (completionPercent, completionHint) = CalculateProfileCompletion(tutor, subjectRates.Count, credentials.Count, languages.Count, teachingStyleTags.Count);
+
+        var vm = new TutorProfilePageViewModel
+        {
+            FullName = tutor.User.FullName,
+            DisplayName = tutor.DisplayName,
+            Initials = GetInitials(tutor.User.FullName),
+            IsVerified = tutor.IsVerified,
+            IsTopTutor = isTopTutor,
+            TopTutorYear = DateTime.Now.Year,
+            SubjectTags = tutor.Subjects.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
+            District = tutor.User.District,
+            Province = tutor.User.District != null && DistrictToProvince.TryGetValue(tutor.User.District, out var prov) ? prov : null,
+            YearsOfExperience = tutor.YearsOfExperience,
+            SessionsCompleted = sessionsCompleted,
+            AverageRating = tutor.AverageRating,
+            ReviewCount = tutor.ReviewCount,
+            Bio = tutor.Bio,
+            TeachingMode = tutor.TeachingMode,
+            Languages = languages,
+            TeachingStyleTags = teachingStyleTags,
+            SubjectRates = subjectRates.Select(s => new TutorSubjectRateRowViewModel
+            {
+                Id = s.Id,
+                Subject = s.Subject,
+                Description = s.Description,
+                RatePerHour = s.RatePerHour
+            }).ToList(),
+            Credentials = credentials.Select(c => new TutorCredentialRowViewModel
+            {
+                Id = c.Id,
+                Title = c.Title,
+                FileName = c.FileName,
+                Icon = c.Icon
+            }).ToList(),
+            ProfileCompletionPercent = completionPercent,
+            ProfileCompletionHint = completionHint
+        };
+
+        return View(vm);
+    }
+
+    // Weighted checklist behind the "Profile completion" bar. "Video intro"
+    // has no upload feature yet, so it never counts as complete - that's why
+    // the bar can never reach 100% honestly until that feature exists.
+    private static (int Percent, string? Hint) CalculateProfileCompletion(TutorProfile tutor, int subjectRateCount, int credentialCount, int languageCount, int teachingStyleCount)
+    {
+        var checklist = new (bool Done, string Label)[]
+        {
+            (!string.IsNullOrWhiteSpace(tutor.DisplayName), "Add a display name"),
+            (!string.IsNullOrWhiteSpace(tutor.Bio) && tutor.Bio.Trim().Length >= 20, "Write a bio"),
+            (!string.IsNullOrWhiteSpace(tutor.User.District), "Add your district"),
+            (tutor.YearsOfExperience > 0, "Add your years of experience"),
+            (!string.IsNullOrWhiteSpace(tutor.TeachingMode), "Set your teaching mode"),
+            (languageCount > 0, "Add a language you teach in"),
+            (teachingStyleCount > 0, "Add a teaching style tag"),
+            (subjectRateCount > 0, "Add a subject and rate"),
+            (credentialCount > 0, "Add a credential or document"),
+            (false, "Add a video intro"), // never true - no upload feature yet
+        };
+
+        var doneCount = checklist.Count(c => c.Done);
+        var percent = (int)Math.Round(doneCount * 100.0 / checklist.Length);
+        var firstMissing = checklist.FirstOrDefault(c => !c.Done).Label;
+
+        return (percent, percent >= 100 ? null : $"{firstMissing} to reach 100%");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateProfile(string fullName, string? displayName, string? district, int yearsOfExperience, string? teachingMode, string? languages, string? teachingStyle, string? bio)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            TempData["SettingsError"] = "Full name is required.";
+            return RedirectToAction("Profile");
+        }
+
+        tutor.User.FullName = fullName.Trim();
+        tutor.User.District = string.IsNullOrWhiteSpace(district) ? null : district;
+        tutor.DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+        tutor.YearsOfExperience = yearsOfExperience;
+        tutor.TeachingMode = string.IsNullOrWhiteSpace(teachingMode) ? null : teachingMode;
+        tutor.Languages = languages;
+        tutor.TeachingStyle = teachingStyle;
+        tutor.Bio = string.IsNullOrWhiteSpace(bio) ? null : bio.Trim();
+
+        await _context.SaveChangesAsync();
+
+        TempData["SettingsSuccess"] = "Profile updated.";
+        return RedirectToAction("Profile");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddSubjectRate(string subject, string? description, decimal ratePerHour)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        if (string.IsNullOrWhiteSpace(subject) || ratePerHour <= 0)
+        {
+            TempData["SettingsError"] = "Subject and a valid rate are required.";
+            return RedirectToAction("Profile");
+        }
+
+        var nextSortOrder = await _context.TutorSubjectRates
+            .Where(s => s.TutorProfileId == tutor.Id)
+            .Select(s => (int?)s.SortOrder)
+            .MaxAsync() ?? -1;
+
+        _context.TutorSubjectRates.Add(new TutorSubjectRate
+        {
+            TutorProfileId = tutor.Id,
+            Subject = subject.Trim(),
+            Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            RatePerHour = ratePerHour,
+            SortOrder = nextSortOrder + 1
+        });
+
+        await _context.SaveChangesAsync();
+        TempData["SettingsSuccess"] = "Subject added.";
+        return RedirectToAction("Profile");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateSubjectRate(int id, string subject, string? description, decimal ratePerHour)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var row = await _context.TutorSubjectRates
+            .FirstOrDefaultAsync(s => s.Id == id && s.TutorProfileId == tutor.Id);
+
+        if (row != null && !string.IsNullOrWhiteSpace(subject) && ratePerHour > 0)
+        {
+            row.Subject = subject.Trim();
+            row.Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+            row.RatePerHour = ratePerHour;
+            await _context.SaveChangesAsync();
+        }
+
+        return RedirectToAction("Profile");
+    }
+
+    private async Task<TutorSettingsPageViewModel> BuildSettingsViewModelAsync(TutorProfile tutor)
+    {
+        return new TutorSettingsPageViewModel
+        {
+            Initials = GetInitials(tutor.User.FullName),
+            Email = tutor.User.Email ?? "",
+            PhoneNumber = tutor.User.PhoneNumber,
+            TwoFactorEnabled = tutor.User.TwoFactorEnabled,
+            ShowAvailabilityBadge = tutor.ShowAvailabilityBadge,
+            AutoAcceptReturningStudents = tutor.AutoAcceptReturningStudents,
+            MinimumBookingNoticeHours = tutor.MinimumBookingNoticeHours,
+            CancellationWindowHours = tutor.CancellationWindowHours,
+            MaxSessionsPerDay = tutor.MaxSessionsPerDay,
+            NotifyNewSessionRequests = tutor.NotifyNewSessionRequests,
+            NotifyNewMessages = tutor.NotifyNewMessages,
+            NotifyWeeklyEarningsSummary = tutor.NotifyWeeklyEarningsSummary,
+            IsListedInSearch = tutor.IsListedInSearch
+        };
+    }
+
+    public async Task<IActionResult> SettingsAccount()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+        await SetTutorSidebarContextAsync("settings", tutor);
+        return View(await BuildSettingsViewModelAsync(tutor));
+    }
+
+    public async Task<IActionResult> SettingsAvailability()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+        await SetTutorSidebarContextAsync("settings", tutor);
+        return View(await BuildSettingsViewModelAsync(tutor));
+    }
+
+    public async Task<IActionResult> SettingsBookingPolicy()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+        await SetTutorSidebarContextAsync("settings", tutor);
+        return View(await BuildSettingsViewModelAsync(tutor));
+    }
+
+    public async Task<IActionResult> SettingsNotifications()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+        await SetTutorSidebarContextAsync("settings", tutor);
+        return View(await BuildSettingsViewModelAsync(tutor));
+    }
+
+    public async Task<IActionResult> SettingsPrivacy()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+        await SetTutorSidebarContextAsync("settings", tutor);
+        return View(await BuildSettingsViewModelAsync(tutor));
+    }
+
+    public async Task<IActionResult> SettingsDevices()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+        await SetTutorSidebarContextAsync("settings", tutor);
+        return View(await BuildSettingsViewModelAsync(tutor));
+    }
+
+    public async Task<IActionResult> SettingsCalendar()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+        await SetTutorSidebarContextAsync("settings", tutor);
+        return View(await BuildSettingsViewModelAsync(tutor));
+    }
+
+    public async Task<IActionResult> SettingsDeactivate()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+        await SetTutorSidebarContextAsync("settings", tutor);
+        return View(await BuildSettingsViewModelAsync(tutor));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateAccount(string? email, string? phoneNumber)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var user = tutor.User;
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            TempData["SettingsError"] = "Email is required.";
+            return RedirectToAction("SettingsAccount");
+        }
+
+        user.PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+
+        if (!string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            var setEmailResult = await _userManager.SetEmailAsync(user, email.Trim());
+            if (!setEmailResult.Succeeded)
+            {
+                TempData["SettingsError"] = "Could not update email: " + string.Join(" ", setEmailResult.Errors.Select(e => e.Description));
+                return RedirectToAction("SettingsAccount");
+            }
+            await _userManager.SetUserNameAsync(user, email.Trim());
+        }
+
+        var updateResult = await _userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            TempData["SettingsError"] = "Could not save account changes.";
+            return RedirectToAction("SettingsAccount");
+        }
+
+        await _signInManager.RefreshSignInAsync(user);
+        TempData["SettingsSuccess"] = "Account details updated.";
+        return RedirectToAction("SettingsAccount");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(string currentPassword, string newPassword, string confirmNewPassword)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword != confirmNewPassword)
+        {
+            TempData["SettingsError"] = "New password and confirmation do not match.";
+            return RedirectToAction("SettingsAccount");
+        }
+
+        var result = await _userManager.ChangePasswordAsync(tutor.User, currentPassword, newPassword);
+        if (!result.Succeeded)
+        {
+            TempData["SettingsError"] = string.Join(" ", result.Errors.Select(e => e.Description));
+            return RedirectToAction("SettingsAccount");
+        }
+
+        await _signInManager.RefreshSignInAsync(tutor.User);
+        TempData["SettingsSuccess"] = "Password changed.";
+        return RedirectToAction("SettingsAccount");
+    }
+
+    // Invalidates every existing login cookie for this account (this device
+    // included) by rotating the Identity security stamp - a real ASP.NET Core
+    // Identity mechanism, not a fabricated device list. There is no per-device
+    // tracking table, so we can't show/target individual devices.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SignOutAllDevices()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await _userManager.UpdateSecurityStampAsync(tutor.User);
+        await _signInManager.SignOutAsync();
+
+        TempData["SettingsSuccessGlobal"] = "You've been signed out on all devices. Please log in again.";
+        return RedirectToAction("TutorLogin", "Account");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateAvailabilityPreference(string key, bool value)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        switch (key)
+        {
+            case "ShowAvailabilityBadge": tutor.ShowAvailabilityBadge = value; break;
+            case "AutoAcceptReturningStudents": tutor.AutoAcceptReturningStudents = value; break;
+        }
+
+        await _context.SaveChangesAsync();
+        return RedirectToAction("SettingsAvailability");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateBookingPolicy(int minimumBookingNoticeHours, int cancellationWindowHours, int maxSessionsPerDay)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        tutor.MinimumBookingNoticeHours = Math.Max(0, minimumBookingNoticeHours);
+        tutor.CancellationWindowHours = Math.Max(0, cancellationWindowHours);
+        tutor.MaxSessionsPerDay = Math.Max(0, maxSessionsPerDay);
+
+        await _context.SaveChangesAsync();
+        TempData["SettingsSuccess"] = "Booking policy updated.";
+        return RedirectToAction("SettingsBookingPolicy");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateNotificationPreference(string key, bool value)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        switch (key)
+        {
+            case "NewSessionRequests": tutor.NotifyNewSessionRequests = value; break;
+            case "NewMessages": tutor.NotifyNewMessages = value; break;
+            case "WeeklyEarningsSummary": tutor.NotifyWeeklyEarningsSummary = value; break;
+        }
+
+        await _context.SaveChangesAsync();
+        return RedirectToAction("SettingsNotifications");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateSearchVisibility(bool isListedInSearch)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        tutor.IsListedInSearch = isListedInSearch;
+        await _context.SaveChangesAsync();
+        return RedirectToAction("SettingsPrivacy");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeactivateAccount(string confirmText)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        if (!string.Equals(confirmText?.Trim(), "DEACTIVATE", StringComparison.Ordinal))
+        {
+            TempData["SettingsError"] = "Type DEACTIVATE exactly to confirm.";
+            return RedirectToAction("SettingsDeactivate");
+        }
+
+        tutor.IsDeactivated = true;
+        tutor.IsListedInSearch = false;
+        await _context.SaveChangesAsync();
+
+        await _signInManager.SignOutAsync();
+        TempData["SettingsSuccessGlobal"] = "Your tutor account has been deactivated. Contact support to reactivate it.";
+        return RedirectToAction("TutorLogin", "Account");
     }
 }

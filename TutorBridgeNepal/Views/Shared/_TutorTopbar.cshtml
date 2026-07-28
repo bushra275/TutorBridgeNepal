@@ -2,7 +2,7 @@
     var initials = ViewData["SidebarInitials"] as string ?? "?";
     var name = ViewData["SidebarName"] as string ?? "";
     var isAvailable = ViewData["IsAvailableNow"] as bool? ?? false;
-    var pendingCount = ViewData["PendingRequestCount"] as int? ?? 0;
+    var showAvailabilityBadge = ViewData["ShowAvailabilityBadge"] as bool? ?? true; var pendingCount = ViewData["PendingRequestCount"] as int? ?? 0;
     var unreadCount = ViewData["UnreadMessageCount"] as int? ?? 0;
     var alertCount = pendingCount + unreadCount;
 }
@@ -13,13 +13,16 @@
         <input type="text" placeholder="Search students, sessions..." disabled title="Search isn't built yet" />
     </div>
 
-    <form asp-controller="Tutor" asp-action="ToggleAvailability" method="post" style="margin:0;">
-        @Html.AntiForgeryToken()
-        <button type="submit" class="badge-soft availability-pill" style="border:none; cursor:pointer;" title="Click to toggle">
-            <span class="avail-dot" style="background:@(isAvailable ? "var(--green-2)" : "var(--muted)");"></span>
-            @(isAvailable ? "Available now" : "Not available")
-        </button>
-    </form>
+    @if (showAvailabilityBadge)
+    {
+        <form asp-controller="Tutor" asp-action="ToggleAvailability" method="post" style="margin:0;">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="badge-soft availability-pill" style="border:none; cursor:pointer;" title="Click to toggle">
+                <span class="avail-dot" style="background:@(isAvailable ? "var(--green-2)" : "var(--muted)");"></span>
+                @(isAvailable ? "Available now" : "Not available")
+            </button>
+        </form>
+    }
 
     <div class="dash-topbar-right">
         <a asp-controller="Tutor" asp-action="Dashboard" asp-fragment="pending-requests" class="icon-btn" title="Pending requests + unread messages" style="position:relative;">

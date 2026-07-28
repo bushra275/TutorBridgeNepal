@@ -1,0 +1,343 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorProfilePageViewModel
+@{
+    ViewData["Title"] = "My Profile";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Profile - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_TutorTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_TutorSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>My Profile</h1>
+                        <p>This is how students see you on TutorBridge Nepal</p>
+                    </div>
+                    <div style="display:flex; gap:.6rem;">
+                        <span class="disabled-btn" title="Preview isn't built yet">Preview as student</span>
+                        <button type="submit" form="profileForm" class="tb-btn" style="min-height:38px; padding:0 1.2rem;">Save changes</button>
+                    </div>
+                </div>
+
+                @if (TempData["SettingsSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                }
+                @if (TempData["SettingsError"] != null)
+                {
+                    <div class="status-banner error mb-3">@TempData["SettingsError"]</div>
+                }
+
+                <!-- Identity card -->
+                <div class="panel mp-identity-panel">
+                    <div class="mp-identity-left">
+                        <div class="avatar-circle-lg mp-avatar-xl">@Model.Initials</div>
+                        <button type="button" class="tb-btn-outline" disabled title="Photo upload isn't built yet">Change photo</button>
+                    </div>
+
+                    <div class="mp-identity-mid">
+                        <h2>@Model.FullName</h2>
+                        <div class="mp-badges">
+                            @if (Model.IsVerified)
+                            {
+                                <span class="msc-badge" style="background:var(--mint); color:var(--green-dark);">✓ Verified</span>
+                            }
+                            @if (Model.IsTopTutor)
+                            {
+                                <span class="top-tutor-badge">Top Tutor @Model.TopTutorYear</span>
+                            }
+                        </div>
+                        <p class="mp-subline">
+                            @string.Join(" · ", new[] { string.Join(" · ", Model.SubjectTags), Model.District != null ? (Model.Province != null ? $"{Model.District}, {Model.Province}" : Model.District) : null }.Where(x => !string.IsNullOrWhiteSpace(x)))
+                        </p>
+                        <p class="mp-subline muted">
+                            @(Model.YearsOfExperience) year@(Model.YearsOfExperience == 1 ? "" : "s") experience · @Model.SessionsCompleted sessions completed
+                        </p>
+                        @if (Model.ReviewCount > 0)
+                        {
+                            <p class="mp-subline">
+                                <span style="color:var(--orange);">@(new string('★', (int)Math.Round(Model.AverageRating)))@(new string('☆', 5 - (int)Math.Round(Model.AverageRating)))</span>
+                                @Model.AverageRating.ToString("0.0") <span class="muted">(@Model.ReviewCount reviews)</span>
+                            </p>
+                        }
+                    </div>
+
+                    <div class="mp-identity-right">
+                        <div class="mp-completion-label">Profile completion</div>
+                        <div class="star-bar-track mp-completion-track">
+                            <div class="star-bar-fill" style="width:@(Model.ProfileCompletionPercent)%;"></div>
+                        </div>
+                        <div class="mp-completion-pct">@Model.ProfileCompletionPercent%</div>
+                        @if (!string.IsNullOrEmpty(Model.ProfileCompletionHint))
+                        {
+                            <div class="mp-completion-hint">@Model.ProfileCompletionHint</div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Basic information -->
+                <form id="profileForm" asp-controller="Tutor" asp-action="UpdateProfile" method="post" class="panel" style="margin-top:1rem;">
+                    @Html.AntiForgeryToken()
+                    <div class="panel-head"><h2>Basic information</h2></div>
+
+                    <div class="settings-form-grid">
+                        <div class="field">
+                            <label>Full name</label>
+                            <input type="text" name="fullName" class="tb-input" value="@Model.FullName" required maxlength="150" />
+                        </div>
+                        <div class="field">
+                            <label>Display name (optional)</label>
+                            <input type="text" name="displayName" class="tb-input" value="@Model.DisplayName" placeholder="e.g. Ram Sir" maxlength="60" />
+                        </div>
+                        <div class="field">
+                            <label>District</label>
+                            <select name="district" class="tb-select">
+                                <option value="">Select district</option>
+                                @foreach (var d in new[] { "Kathmandu", "Lalitpur", "Bhaktapur", "Pokhara", "Chitwan", "Biratnagar" })
+                                {
+                                    <option selected="@(Model.District == d)">@d</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Years of experience</label>
+                            <input type="number" name="yearsOfExperience" class="tb-input" value="@Model.YearsOfExperience" min="0" max="60" />
+                        </div>
+                        <div class="field">
+                            <label>Teaching mode</label>
+                            <select name="teachingMode" class="tb-select">
+                                <option value="">Select teaching mode</option>
+                                @foreach (var m in new[] { "Online only", "In-person only", "Online & In-person" })
+                                {
+                                    <option selected="@(Model.TeachingMode == m)">@m</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Languages spoken</label>
+                            <div class="tag-input-box">
+                                <div id="languageTagList" style="display:contents;"></div>
+                                <input type="text" id="languageTagInput" placeholder="+ Add" maxlength="30" />
+                            </div>
+                            <input type="hidden" name="languages" id="languagesHidden" value="@string.Join(",", Model.Languages)" />
+                        </div>
+                        <div class="field full">
+                            <label>Bio / About me</label>
+                            <textarea name="bio" class="tb-input" style="min-height:100px; resize:vertical;" maxlength="500">@Model.Bio</textarea>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Subjects & rates -->
+                <div class="panel" style="margin-top:1rem;">
+                    <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center;">
+                        <h2>Subjects &amp; rates</h2>
+                        <button type="button" class="tb-btn-outline" style="min-height:36px; padding:0 1rem; font-size:.82rem;" id="addSubjectToggle">+ Add</button>
+                    </div>
+
+                    <form asp-controller="Tutor" asp-action="AddSubjectRate" method="post" class="mp-add-subject-form" id="addSubjectForm">
+                        @Html.AntiForgeryToken()
+                        <input type="text" name="subject" placeholder="Subject (e.g. Chemistry)" maxlength="60" required />
+                        <input type="text" name="description" placeholder="Description (e.g. Grade 9-12)" maxlength="120" />
+                        <input type="number" name="ratePerHour" placeholder="Rate / hr" min="1" step="1" required />
+                        <button type="submit" class="tb-btn" style="min-height:38px; padding:0 1rem; font-size:.82rem;">Add</button>
+                    </form>
+
+                    @if (!Model.SubjectRates.Any())
+                    {
+                        <p class="empty-state">No subjects added yet.</p>
+                    }
+                    else
+                    {
+                        @foreach (var s in Model.SubjectRates)
+                        {
+                            <div class="mp-subject-row">
+                                <div class="mp-subject-info">
+                                    <div class="mp-subject-name">@s.Subject</div>
+                                    @if (!string.IsNullOrWhiteSpace(s.Description))
+                                    {
+                                        <div class="mp-subject-desc">@s.Description</div>
+                                    }
+                                </div>
+
+                                <form asp-controller="Tutor" asp-action="UpdateSubjectRate" method="post" class="mp-rate-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@s.Id" />
+                                    <input type="hidden" name="subject" value="@s.Subject" />
+                                    <input type="hidden" name="description" value="@s.Description" />
+                                    <div class="mp-rate-box">
+                                        <span>Rs</span>
+                                        <input type="number" name="ratePerHour" value="@s.RatePerHour" min="1" step="1" onchange="this.form.submit()" />
+                                        <span>/hr</span>
+                                    </div>
+                                </form>
+
+                                <button type="button" class="mp-edit-link subject-edit-toggle" data-target="edit-subject-@s.Id">Edit</button>
+                            </div>
+
+                            <form asp-controller="Tutor" asp-action="UpdateSubjectRate" method="post" class="mp-subject-edit-form" id="edit-subject-@s.Id">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@s.Id" />
+                                <input type="text" name="subject" value="@s.Subject" maxlength="60" required />
+                                <input type="text" name="description" value="@s.Description" placeholder="Description" maxlength="120" />
+                                <input type="hidden" name="ratePerHour" value="@s.RatePerHour" />
+                                <button type="submit" class="tb-btn" style="min-height:34px; padding:0 .9rem; font-size:.8rem;">Save</button>
+                            </form>
+                        }
+                    }
+                </div>
+
+                <!-- Teaching style -->
+                <form id="teachingStyleForm" asp-controller="Tutor" asp-action="UpdateProfile" method="post" class="panel" style="margin-top:1rem;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="fullName" value="@Model.FullName" />
+                    <input type="hidden" name="displayName" value="@Model.DisplayName" />
+                    <input type="hidden" name="district" value="@Model.District" />
+                    <input type="hidden" name="yearsOfExperience" value="@Model.YearsOfExperience" />
+                    <input type="hidden" name="teachingMode" value="@Model.TeachingMode" />
+                    <input type="hidden" name="languages" value="@string.Join(",", Model.Languages)" />
+                    <input type="hidden" name="bio" value="@Model.Bio" />
+
+                    <div class="panel-head"><h2>Teaching style</h2></div>
+
+                    <div class="tag-input-box">
+                        <div id="styleTagList" style="display:contents;"></div>
+                        <input type="text" id="styleTagInput" placeholder="+ Add tag" maxlength="30" />
+                    </div>
+                    <input type="hidden" name="teachingStyle" id="teachingStyleHidden" value="@string.Join(",", Model.TeachingStyleTags)" />
+                </form>
+
+                <!-- Credentials & documents -->
+                <div class="panel" style="margin-top:1rem;">
+                    <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center;">
+                        <h2>Credentials &amp; documents</h2>
+                    </div>
+
+                    <div class="mp-credentials-row">
+                        @if (!Model.Credentials.Any())
+                        {
+                            <p class="empty-state">No credentials added yet.</p>
+                        }
+                        else
+                        {
+                            @foreach (var c in Model.Credentials)
+                            {
+                                <span class="mp-credential-chip">@c.Icon @c.Title</span>
+                            }
+                        }
+                        <span class="mp-credential-chip disabled" title="Document upload isn't built yet">+ Add document</span>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            // Reusable comma-separated tag chip editor (same pattern as Student Settings' subject tags).
+            // onChange (optional) fires after every add/remove - used to auto-submit the
+            // Teaching style form, since that panel has no visible Save button of its own.
+            function initTagEditor(hiddenId, listId, inputId, chipClass, onChange) {
+                var hidden = document.getElementById(hiddenId);
+                var list = document.getElementById(listId);
+                var input = document.getElementById(inputId);
+                if (!hidden || !list || !input) return;
+
+                function currentTags() {
+                    return (hidden.value || '').split(',').map(function(t) { return t.trim(); }).filter(function(t) { return t.length > 0; });
+                }
+
+                function render() {
+                    var tags = currentTags();
+                    list.innerHTML = '';
+                    tags.forEach(function(tag) {
+                        var chip = document.createElement('span');
+                        chip.className = chipClass;
+                        chip.textContent = tag + ' ';
+                        var remove = document.createElement('button');
+                        remove.type = 'button';
+                        remove.className = 'tag-remove-btn';
+                        remove.textContent = '×';
+                        remove.addEventListener('click', function() {
+                            hidden.value = currentTags().filter(function(t) { return t !== tag; }).join(',');
+                            render();
+                            if (onChange) onChange();
+                        });
+                        chip.appendChild(remove);
+                        list.appendChild(chip);
+                    });
+                }
+
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        var val = input.value.trim();
+                        if (val.length === 0) return;
+                        var tags = currentTags();
+                        if (tags.indexOf(val) === -1) {
+                            tags.push(val);
+                            hidden.value = tags.join(',');
+                            render();
+                            if (onChange) onChange();
+                        }
+                        input.value = '';
+                    }
+                });
+
+                render();
+            }
+
+            initTagEditor('languagesHidden', 'languageTagList', 'languageTagInput', 'subject-chip');
+            initTagEditor('teachingStyleHidden', 'styleTagList', 'styleTagInput', 'subject-chip', function() {
+                // The Teaching style form auto-submits on every tag change, but it
+                // carries its own copy of the Basic information fields (fullName,
+                // bio, etc.) so it doesn't wipe that section if it hasn't been
+                // saved yet. Sync the live values in first so nothing unsaved is lost.
+                var profileForm = document.getElementById('profileForm');
+                var styleForm = document.getElementById('teachingStyleForm');
+                ['fullName', 'displayName', 'district', 'yearsOfExperience', 'teachingMode', 'bio'].forEach(function(name) {
+                    var src = profileForm.elements[name];
+                    var dest = styleForm.elements[name];
+                    if (src && dest) dest.value = src.value;
+                });
+                styleForm.elements['languages'].value = document.getElementById('languagesHidden').value;
+                styleForm.requestSubmit();
+            });
+
+            // Toggle inline "edit subject" panels
+            document.querySelectorAll('.subject-edit-toggle').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var form = document.getElementById(btn.dataset.target);
+                    if (form) form.classList.toggle('open');
+                });
+            });
+
+            // Toggle the "add subject" form
+            var addToggle = document.getElementById('addSubjectToggle');
+            var addForm = document.getElementById('addSubjectForm');
+            if (addToggle && addForm) {
+                addToggle.addEventListener('click', function() {
+                    addForm.classList.toggle('open');
+                });
+            }
+    </script>
+</body>
+</html>

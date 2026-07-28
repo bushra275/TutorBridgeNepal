@@ -1,0 +1,19 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorSettingsPageViewModel
+@{
+    ViewData["Title"] = "Connected calendar";
+    ViewData["SettingsActiveSection"] = "calendar";
+    Layout = "_SettingsLayout";
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <h2>Connected calendar</h2>
+    </div>
+    <div class="settings-toggle-row">
+        <div>
+            <div class="settings-toggle-title">Google Calendar</div>
+            <div class="settings-toggle-sub">Sync your TutorBridge sessions to an external calendar</div>
+        </div>
+        <button type="button" class="tb-btn-outline" disabled title="Calendar integration isn't built yet">Connect</button>
+    </div>
+</div>

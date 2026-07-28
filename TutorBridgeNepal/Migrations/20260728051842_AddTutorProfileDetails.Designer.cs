@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TutorBridgeNepal.Data;
 
@@ -11,9 +12,11 @@ using TutorBridgeNepal.Data;
 namespace TutorBridgeNepal.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260728051842_AddTutorProfileDetails")]
+    partial class AddTutorProfileDetails
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -604,28 +607,16 @@ namespace TutorBridgeNepal.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<bool>("AutoAcceptReturningStudents")
-                        .HasColumnType("bit");
-
                     b.Property<decimal>("AverageRating")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Bio")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("CancellationWindowHours")
-                        .HasColumnType("int");
-
                     b.Property<string>("DisplayName")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsAvailableNow")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeactivated")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsListedInSearch")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsVerified")
@@ -634,26 +625,8 @@ namespace TutorBridgeNepal.Migrations
                     b.Property<string>("Languages")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("MaxSessionsPerDay")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MinimumBookingNoticeHours")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("NotifyNewMessages")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("NotifyNewSessionRequests")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("NotifyWeeklyEarningsSummary")
-                        .HasColumnType("bit");
-
                     b.Property<int>("ReviewCount")
                         .HasColumnType("int");
-
-                    b.Property<bool>("ShowAvailabilityBadge")
-                        .HasColumnType("bit");
 
                     b.Property<string>("Subjects")
                         .IsRequired()

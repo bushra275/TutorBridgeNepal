@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using TutorBridgeNepal.Data;
 using TutorBridgeNepal.Models;
 using TutorBridgeNepal.ViewModels;
+using Microsoft.EntityFrameworkCore;
 
 namespace TutorBridgeNepal.Controllers;
 
@@ -53,6 +54,16 @@ public class AccountController : Controller
         {
             ModelState.AddModelError("", "Invalid login details for this role.");
             return View(model);
+        }
+
+        if (model.Role == "Tutor")
+        {
+            var tutorProfile = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.UserId == user.Id);
+            if (tutorProfile != null && tutorProfile.IsDeactivated)
+            {
+                ModelState.AddModelError("", "This tutor account has been deactivated. Contact support to reactivate it.");
+                return View(model);
+            }
         }
 
         var result = await _signInManager.PasswordSignInAsync(

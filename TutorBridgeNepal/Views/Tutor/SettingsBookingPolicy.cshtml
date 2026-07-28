@@ -1,0 +1,49 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorSettingsPageViewModel
+@{
+    ViewData["Title"] = "Booking & cancellation policy";
+    ViewData["SettingsActiveSection"] = "bookingpolicy";
+    Layout = "_SettingsLayout";
+}
+
+<div class="panel">
+    <div class="panel-head">
+        <h2>Booking &amp; cancellation policy</h2>
+    </div>
+
+    <form asp-controller="Tutor" asp-action="UpdateBookingPolicy" method="post" class="settings-form-grid cols-3">
+        @Html.AntiForgeryToken()
+        <div class="field">
+            <label>Minimum booking notice</label>
+            <select name="minimumBookingNoticeHours" class="tb-select">
+                @foreach (var opt in new[] { (0, "No minimum"), (2, "2 hours"), (6, "6 hours"), (12, "12 hours"), (24, "24 hours") })
+                {
+                    <option value="@opt.Item1" selected="@(Model.MinimumBookingNoticeHours == opt.Item1)">@opt.Item2</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label>Cancellation window</label>
+            <select name="cancellationWindowHours" class="tb-select">
+                @foreach (var opt in new[] { (0, "No window"), (2, "2 hours before session"), (4, "4 hours before session"), (12, "12 hours before session"), (24, "24 hours before session") })
+                {
+                    <option value="@opt.Item1" selected="@(Model.CancellationWindowHours == opt.Item1)">@opt.Item2</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label>Max sessions per day</label>
+            <select name="maxSessionsPerDay" class="tb-select">
+                @foreach (var opt in new[] { (0, "No limit"), (2, "2 sessions"), (4, "4 sessions"), (6, "6 sessions"), (8, "8 sessions") })
+                {
+                    <option value="@opt.Item1" selected="@(Model.MaxSessionsPerDay == opt.Item1)">@opt.Item2</option>
+                }
+            </select>
+        </div>
+        <div class="field full">
+            <p class="tutor-meta" style="margin:0;">Late cancellations within this window are subject to platform review.</p>
+        </div>
+        <div class="field full settings-actions">
+            <button type="submit" class="tb-btn">Save changes</button>
+        </div>
+    </form>
+</div>

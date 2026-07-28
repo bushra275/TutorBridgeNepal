@@ -277,8 +277,7 @@ public class StudentController : Controller
     {
         await SetSidebarContextAsync("findtutors");
 
-        var baseQuery = _context.TutorProfiles.Include(t => t.User).Where(t => t.IsVerified);
-
+        var baseQuery = _context.TutorProfiles.Include(t => t.User).Where(t => t.IsVerified && t.IsListedInSearch);
         var allVerified = await baseQuery.ToListAsync();
         var subjectOptions = allVerified
             .SelectMany(t => t.Subjects.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -415,9 +414,10 @@ public class StudentController : Controller
         if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
 
         var slot = await _context.TutorAvailabilitySlots
-            .FirstOrDefaultAsync(s => s.Id == slotId);
+                   .Include(s => s.TutorProfile)
+                   .FirstOrDefaultAsync(s => s.Id == slotId);
 
-        if (slot == null)
+        if (slot == null || slot.TutorProfile.IsDeactivated)
         {
             TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
             return RedirectToAction("TutorProfile", new { id = tutorProfileId });
@@ -434,20 +434,61 @@ public class StudentController : Controller
             return RedirectToAction("TutorProfile", new { id = tutorProfileId });
         }
 
-        _context.Bookings.Add(new Booking
+        var tutor = slot.TutorProfile;
+
+        // Minimum booking notice - the tutor's own policy from Settings.
+        if (tutor.MinimumBookingNoticeHours > 0 && slot.StartTime < DateTime.Now.AddHours(tutor.MinimumBookingNoticeHours))
+        {
+            TempData["BookingError"] = $"This tutor requires at least {tutor.MinimumBookingNoticeHours} hours' notice before a session. Please choose a later slot.";
+            return RedirectToAction("TutorProfile", new { id = tutorProfileId });
+        }
+
+        // Max sessions per day - counts this tutor's other non-cancelled
+        // bookings that fall on the same calendar day as the requested slot.
+        if (tutor.MaxSessionsPerDay > 0)
+        {
+            var sameDaySessionCount = await _context.Bookings
+                .Include(b => b.TutorAvailabilitySlot)
+                .CountAsync(b => b.TutorProfileId == tutor.Id
+                    && b.Status != "Cancelled"
+                    && b.TutorAvailabilitySlot.StartTime.Date == slot.StartTime.Date);
+
+            if (sameDaySessionCount >= tutor.MaxSessionsPerDay)
+            {
+                TempData["BookingError"] = "This tutor has reached their maximum sessions for that day. Please choose another date.";
+                return RedirectToAction("TutorProfile", new { id = tutorProfileId });
+            }
+        }
+
+        // Auto-accept returning students - if this student has a prior
+        // non-cancelled booking with this tutor and the tutor has opted in,
+        // skip the manual approval step.
+        var isReturningStudent = tutor.AutoAcceptReturningStudents && await _context.Bookings
+            .AnyAsync(b => b.StudentProfileId == studentProfile.Id && b.TutorProfileId == tutor.Id && b.Status != "Cancelled");
+
+        var booking = new Booking
         {
             StudentProfileId = studentProfile.Id,
             TutorProfileId = slot.TutorProfileId,
             TutorAvailabilitySlotId = slot.Id,
             Subject = string.IsNullOrWhiteSpace(subject) ? "General" : subject,
-            Status = "Pending",
+            Status = isReturningStudent ? "Confirmed" : "Pending",
             Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
-        });
+        };
+
+        if (isReturningStudent)
+        {
+            booking.DecidedAt = DateTime.Now;
+        }
+
+        _context.Bookings.Add(booking);
 
         slot.IsBooked = (activeCount + 1) >= slot.Capacity;
         await _context.SaveChangesAsync();
 
-        TempData["BookingSuccess"] = "Session requested! Your tutor will confirm it shortly.";
+        TempData["BookingSuccess"] = isReturningStudent
+            ? "Session booked and automatically confirmed!"
+            : "Session requested! Your tutor will confirm it shortly.";
         return RedirectToAction("Sessions");
     }
 

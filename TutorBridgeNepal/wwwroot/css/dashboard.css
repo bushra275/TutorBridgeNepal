@@ -2759,3 +2759,373 @@ button.topbar-avatar {
     font-weight: 700;
     background: #fff;
 }
+
+/* ===== Tutor Messages page ===== */
+/* Own-message alignment for the tutor's perspective (mirrors .from-student /
+   .from-tutor on the Student page, which are the opposite way round). */
+.msg-row.tutor-own {
+    justify-content: flex-end;
+}
+
+    .msg-row.tutor-own .msg-bubble {
+        background: var(--green, #127a5b);
+        color: #fff;
+    }
+
+    .msg-row.tutor-own .msg-meta {
+        color: var(--muted, #8c8d87);
+        text-align: right;
+    }
+
+.msg-row.student-other .msg-bubble {
+    background: #fff;
+    border: 1px solid var(--line, #deded7);
+    border-left: 3px solid var(--green-2, #169a70);
+}
+
+.badge-active-student {
+    background: var(--mint, #dff7ef);
+    color: var(--green-dark, #174d38);
+    font-size: .7rem;
+    font-weight: 700;
+    padding: .15rem .6rem;
+    border-radius: 999px;
+    display: inline-block;
+}
+
+.badge-new-student {
+    background: #f1eaff;
+    color: #6b3fd6;
+    font-size: .7rem;
+    font-weight: 700;
+    padding: .15rem .6rem;
+    border-radius: 999px;
+    display: inline-block;
+}
+
+.emoji-picker {
+    display: none;
+    position: absolute;
+    bottom: 60px;
+    background: #fff;
+    border: 1px solid var(--line, #deded7);
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(20,30,25,.15);
+    padding: .6rem;
+    grid-template-columns: repeat(6, 1fr);
+    gap: .2rem;
+    z-index: 50;
+}
+
+    .emoji-picker.open {
+        display: grid;
+    }
+
+    .emoji-picker button {
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        padding: .3rem;
+        border-radius: 6px;
+    }
+
+        .emoji-picker button:hover {
+            background: var(--soft, #f1f3f0);
+        }
+
+.icon-btn-sm {
+    width: 38px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line, #deded7);
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+    .icon-btn-sm:disabled {
+        opacity: .5;
+        cursor: not-allowed;
+    }
+
+/* ============ Reviews page ============ */
+
+.rv-overview-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1.4fr 1.1fr;
+    gap: 1rem;
+    margin-bottom: 1.4rem;
+}
+
+@media (max-width: 1100px) {
+    .rv-overview-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.rv-panel {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.2rem 1.3rem;
+}
+
+    .rv-panel h3 {
+        font-size: .92rem;
+        font-weight: 800;
+        margin: 0 0 .9rem;
+        color: var(--ink);
+    }
+
+/* Rating summary box */
+.rv-rating-box {
+    text-align: center;
+}
+
+    .rv-rating-box .big-num {
+        font-size: 2.6rem;
+        font-weight: 900;
+        color: var(--green-dark);
+        line-height: 1;
+    }
+
+    .rv-rating-box .stars {
+        color: var(--orange);
+        font-size: 1.1rem;
+        margin-top: .3rem;
+        letter-spacing: .1rem;
+    }
+
+    .rv-rating-box .based-on {
+        color: var(--muted);
+        font-size: .78rem;
+        margin: .3rem 0 1rem;
+    }
+
+.star-bar-row {
+    display: grid;
+    grid-template-columns: 28px 1fr 34px;
+    align-items: center;
+    gap: .5rem;
+    font-size: .74rem;
+    color: var(--muted);
+    margin-bottom: .4rem;
+    text-align: left;
+}
+
+.star-bar-track {
+    height: 7px;
+    background: var(--soft);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.star-bar-fill {
+    height: 100%;
+    background: var(--green-2);
+    border-radius: 999px;
+}
+
+/* What students say most */
+.phrase-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.phrase-tag {
+    font-size: .78rem;
+    font-weight: 700;
+    padding: .4rem .8rem;
+    border-radius: 999px;
+    background: var(--mint);
+    color: var(--green-dark);
+    white-space: nowrap;
+}
+
+    .phrase-tag.caution {
+        background: #fff1d5;
+        color: #a96808;
+    }
+
+/* Performance vs platform */
+.rv-perf-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .5rem 0;
+    border-bottom: 1px dashed var(--line);
+    font-size: .84rem;
+}
+
+    .rv-perf-row:last-of-type {
+        border-bottom: none;
+    }
+
+    .rv-perf-row .lbl {
+        color: var(--muted);
+    }
+
+    .rv-perf-row .val {
+        font-weight: 800;
+        color: var(--ink);
+    }
+
+.top-tutor-badge {
+    display: inline-block;
+    margin-top: .8rem;
+    font-size: .76rem;
+    font-weight: 800;
+    padding: .35rem .7rem;
+    border-radius: 999px;
+    background: #fff1d5;
+    color: #a96808;
+}
+
+/* Sort dropdown next to tab bar */
+.sort-select {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: .5rem .8rem;
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--ink);
+    background: #fff;
+    height: fit-content;
+}
+
+/* Individual review row */
+.review-row {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.1rem 1.3rem;
+    margin-bottom: .9rem;
+}
+
+.rv-row-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.rv-row-name {
+    display: flex;
+    gap: .7rem;
+    align-items: center;
+}
+
+    .rv-row-name .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--mint-2);
+        color: var(--green-dark);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: .82rem;
+        flex-shrink: 0;
+    }
+
+    .rv-row-name .name {
+        font-weight: 700;
+        font-size: .9rem;
+        color: var(--ink);
+    }
+
+    .rv-row-name .stars-line {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        margin-top: .2rem;
+        font-size: .82rem;
+    }
+
+.rv-row-date {
+    text-align: right;
+    font-size: .76rem;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.rv-comment {
+    margin: .8rem 0 0;
+    font-size: .86rem;
+    color: var(--ink);
+    line-height: 1.55;
+    font-style: italic;
+}
+
+/* Reply */
+.reply-box {
+    margin-top: .8rem;
+    background: var(--soft);
+    border-radius: 8px;
+    padding: .7rem .9rem;
+    font-size: .82rem;
+    color: var(--ink);
+    line-height: 1.5;
+}
+
+.reply-label {
+    display: block;
+    font-weight: 800;
+    color: var(--green-dark);
+    font-size: .74rem;
+    margin-bottom: .25rem;
+}
+
+.reply-toggle {
+    min-height: 34px !important;
+    padding: 0 .9rem !important;
+    font-size: .78rem !important;
+}
+
+.reply-form {
+    display: none;
+    margin-top: .8rem;
+}
+
+    .reply-form.open {
+        display: block;
+    }
+
+    .reply-form textarea {
+        width: 100%;
+        min-height: 80px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: .6rem .8rem;
+        font-size: .84rem;
+        font-family: inherit;
+        resize: vertical;
+    }
+
+        .reply-form textarea:focus {
+            outline: none;
+            border-color: var(--green-2);
+        }
+
+    .reply-form .tb-btn {
+        min-height: 36px;
+        padding: 0 1.1rem;
+        font-size: .82rem;
+    }
+
+@media (max-width: 700px) {
+    .rv-row-top {
+        flex-direction: column;
+    }
+
+    .rv-row-date {
+        text-align: left;
+    }
+}

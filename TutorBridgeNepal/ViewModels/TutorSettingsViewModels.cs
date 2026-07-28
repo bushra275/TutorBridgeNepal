@@ -1,0 +1,22 @@
+﻿namespace TutorBridgeNepal.ViewModels;
+
+public class TutorSettingsPageViewModel
+{
+    public string Initials { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string? PhoneNumber { get; set; }
+    public bool TwoFactorEnabled { get; set; }
+
+    public bool ShowAvailabilityBadge { get; set; }
+    public bool AutoAcceptReturningStudents { get; set; }
+
+    public int MinimumBookingNoticeHours { get; set; }
+    public int CancellationWindowHours { get; set; }
+    public int MaxSessionsPerDay { get; set; }
+
+    public bool NotifyNewSessionRequests { get; set; }
+    public bool NotifyNewMessages { get; set; }
+    public bool NotifyWeeklyEarningsSummary { get; set; }
+
+    public bool IsListedInSearch { get; set; }
+}
