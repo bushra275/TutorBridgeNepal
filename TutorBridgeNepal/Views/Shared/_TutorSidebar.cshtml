@@ -43,7 +43,7 @@
 
     <ul class="dash-nav-secondary">
         <li><a asp-controller="Tutor" asp-action="SettingsAccount" class="@(activeNav == "settings" ? "active" : "")"><span class="nav-icon">⚙️</span> Settings</a></li>
-        <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">❓</span> Help &amp; Support</span></li>
+        <li><a asp-controller="Tutor" asp-action="HelpSupport" class="@(activeNav == "help" ? "active" : "")"><span class="nav-icon">❓</span> Help &amp; Support</a></li>
         <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
     </ul>
 </aside>

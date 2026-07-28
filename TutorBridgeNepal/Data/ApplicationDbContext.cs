@@ -111,6 +111,19 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<SupportTicket>()
                     .HasIndex(t => t.StudentProfileId);
 
+        // Restrict (not Cascade) here to avoid the multiple-cascade-path
+        // conflict SQL Server raises when TutorProfile already cascades into
+        // Bookings/Messages/etc. that could reach this table too. Same
+        // reasoning as the Review FKs below.
+        builder.Entity<SupportTicket>()
+            .HasOne(t => t.TutorProfile)
+            .WithMany()
+            .HasForeignKey(t => t.TutorProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SupportTicket>()
+                    .HasIndex(t => t.TutorProfileId);
+
         // Restrict (not Cascade) on all three FKs, consistent with Booking/Message/
         // SavedTutor - avoids multiple-cascade-path conflicts and requires the
         // explicit manual cleanup already used elsewhere (see DeleteAccount).

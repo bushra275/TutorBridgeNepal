@@ -1617,4 +1617,62 @@ public class TutorController : Controller
         TempData["SettingsSuccessGlobal"] = "Your tutor account has been deactivated. Contact support to reactivate it.";
         return RedirectToAction("TutorLogin", "Account");
     }
+    public async Task<IActionResult> HelpSupport()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await SetTutorSidebarContextAsync("help", tutor);
+
+        var tickets = await _context.SupportTickets
+            .Where(t => t.TutorProfileId == tutor.Id)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+
+        var vm = new HelpSupportPageViewModel
+        {
+            MyTickets = tickets.Select(t => new SupportTicketRowViewModel
+            {
+                Id = t.Id,
+                Category = t.Category,
+                Subject = t.Subject,
+                Message = t.Message,
+                Status = t.Status,
+                CreatedAt = t.CreatedAt
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SubmitSupportTicket(string category, string subject, string message)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("TutorLogin", "Account");
+
+        if (string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(message))
+        {
+            TempData["SettingsError"] = "Please fill in both a subject and a message.";
+            return RedirectToAction("HelpSupport");
+        }
+
+        var validCategories = new[] { "Booking", "Schedule", "Payments", "Account", "Other" };
+
+        _context.SupportTickets.Add(new SupportTicket
+        {
+            TutorProfileId = tutor.Id,
+            Category = validCategories.Contains(category) ? category : "Other",
+            Subject = subject.Trim(),
+            Message = message.Trim(),
+            Status = "Open",
+            CreatedAt = DateTime.Now
+        });
+
+        await _context.SaveChangesAsync();
+
+        TempData["SettingsSuccess"] = "Your request has been submitted. We'll get back to you by email.";
+        return RedirectToAction("HelpSupport");
+    }
 }

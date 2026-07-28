@@ -1,0 +1,182 @@
+﻿@model TutorBridgeNepal.ViewModels.HelpSupportPageViewModel
+@{
+    ViewData["Title"] = "Help & Support";
+    Layout = null;
+
+    var faqs = new (string Category, string Question, string Answer)[]
+    {
+        ("Session requests", "How do session requests work?",
+            "When a student books an open slot from your schedule, it lands in Session Requests as Pending. Accept it to confirm the session, or decline it to free the slot back up."),
+        ("Session requests", "Can I mark a session as completed or missed?",
+            "Yes. Once a confirmed session's time has passed, open it from Session Requests or your Dashboard and mark it Completed or Missed."),
+        ("Schedule & availability", "How do I set my weekly availability?",
+            "Go to Settings > Availability to set your recurring weekly hours, or mark specific days off. You can also add one-off time off for holidays or breaks."),
+        ("Schedule & availability", "Can more than one student book the same slot?",
+            "Only if you've raised that slot's capacity above 1 for group sessions. By default each slot holds a single student."),
+        ("Messaging & reviews", "Can I message my students?",
+            "You can read messages from students you have a booking with under Messages. Replying from the tutor side is still being built, so you can't send messages back yet - this is a known limitation, not a bug."),
+        ("Messaging & reviews", "Can I respond to a review a student left me?",
+            "Yes. Open Reviews and use the Reply option under any review to post a public response."),
+        ("Account & settings", "How do I update my profile, subjects, or rates?",
+            "Go to My Profile to edit your bio, teaching details, and add or update subjects with their hourly rates."),
+        ("Account & settings", "How do I change my email or password?",
+            "Go to Settings > Account. Your email and password can both be updated there."),
+        ("Account & settings", "How do I stop appearing in student search?",
+            "Go to Settings > Privacy and turn off search visibility, or deactivate your account entirely from Settings > Deactivate. Deactivating signs you out and blocks login until support reactivates it, but keeps your bookings, reviews and messages."),
+        ("Account & settings", "Does TutorBridge Nepal take a cut of my sessions?",
+            "No. There's no payment or payout system on the platform yet - booking and messaging are free to use for tutors and students alike."),
+    };
+    var faqCategories = faqs.Select(f => f.Category).Distinct().ToList();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Help & Support - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_TutorTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_TutorSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>Help &amp; Support</h1>
+                        <p>Answers to common tutoring questions, and a way to reach us directly</p>
+                    </div>
+                </div>
+
+                @if (TempData["SettingsSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                }
+                @if (TempData["SettingsError"] != null)
+                {
+                    <div class="status-banner error mb-3">@TempData["SettingsError"]</div>
+                }
+
+                <div class="help-layout">
+                    <!-- Left: FAQ -->
+                    <div>
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Frequently asked questions</h2>
+                            </div>
+
+                            <div class="faq-list">
+                                @foreach (var category in faqCategories)
+                                {
+                                    <div class="faq-category-label">@category</div>
+                                    @foreach (var faq in faqs.Where(f => f.Category == category))
+                                    {
+                                        <div class="faq-item">
+                                            <button type="button" class="faq-question">
+                                                <span>@faq.Question</span>
+                                                <span class="faq-chevron">⌄</span>
+                                            </button>
+                                            <div class="faq-answer">
+                                                <p>@faq.Answer</p>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Contact + tickets -->
+                    <div>
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Still need help?</h2>
+                            </div>
+                            <p class="tutor-meta mb-3" style="margin-top:-.6rem;">Email us directly, or submit a request below and we'll follow up by email. There's no live chat or ticket inbox yet, so replies happen manually.</p>
+                            <a href="mailto:support@tutorbridgenepal.com" class="tb-btn-outline" style="display:inline-flex;">✉️ support@tutorbridgenepal.com</a>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Submit a request</h2>
+                            </div>
+
+                            <form asp-controller="Tutor" asp-action="SubmitSupportTicket" method="post" class="settings-form-grid">
+                                @Html.AntiForgeryToken()
+                                <div class="field">
+                                    <label>Category</label>
+                                    <select name="category" class="tb-select">
+                                        <option>Booking</option>
+                                        <option>Schedule</option>
+                                        <option>Payments</option>
+                                        <option>Account</option>
+                                        <option selected>Other</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label>Subject</label>
+                                    <input type="text" name="subject" class="tb-input" required maxlength="150" />
+                                </div>
+                                <div class="field full">
+                                    <label>Message</label>
+                                    <textarea name="message" class="tb-input" style="min-height:110px; padding:.9rem 1.25rem;" required maxlength="2000"></textarea>
+                                </div>
+                                <div class="field full settings-actions">
+                                    <button type="submit" class="tb-btn">Submit request</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h2>Your requests</h2>
+                            </div>
+
+                            @if (!Model.MyTickets.Any())
+                            {
+                                <p class="empty-state">You haven't submitted any requests yet.</p>
+                            }
+                            else
+                            {
+                                @foreach (var ticket in Model.MyTickets)
+                                {
+                                    <div class="ticket-row">
+                                        <div class="ticket-row-head">
+                                            <span class="ticket-subject">@ticket.Subject</span>
+                                            <span class="ticket-status-pill @(ticket.Status == "Resolved" ? "resolved" : "open")">@ticket.Status</span>
+                                        </div>
+                                        <div class="ticket-meta">@ticket.Category · @ticket.CreatedAt.ToString("d MMM yyyy, h:mm tt")</div>
+                                        <p class="ticket-message">@ticket.Message</p>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            document.querySelectorAll('.faq-question').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var item = btn.closest('.faq-item');
+                    var wasOpen = item.classList.contains('open');
+                    document.querySelectorAll('.faq-item.open').forEach(function(i) { i.classList.remove('open'); });
+                    if (!wasOpen) item.classList.add('open');
+                });
+            });
+    </script>
+</body>
+</html>
