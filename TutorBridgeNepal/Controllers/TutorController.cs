@@ -67,6 +67,96 @@ public class TutorController : Controller
         ViewData["PendingRequestCount"] = pendingCount;
         ViewData["UnreadMessageCount"] = unreadMessageCount;
         ViewData["ShowAvailabilityBadge"] = tutor.ShowAvailabilityBadge;
+
+        var now = DateTime.Now;
+        var notifications = new List<NotificationItemViewModel>();
+
+        // Pending session requests - most actionable, shown first
+        var pendingRequests = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Where(b => b.TutorProfileId == tutor.Id && b.Status == "Pending")
+            .OrderByDescending(b => b.CreatedAt)
+            .Take(5)
+            .ToListAsync();
+
+        notifications.AddRange(pendingRequests.Select(b => new NotificationItemViewModel
+        {
+            Type = "Session",
+            Icon = "📩",
+            Title = $"New request from {b.StudentProfile.User.FullName}",
+            Subtitle = $"{b.Subject} · requested {b.CreatedAt:d MMM, h:mm tt}",
+            Timestamp = b.CreatedAt,
+            LinkController = "Tutor",
+            LinkAction = "SessionRequests"
+        }));
+
+        // Confirmed sessions starting within the next 24 hours
+        var soonSessions = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.TutorProfileId == tutor.Id
+                && b.Status == "Confirmed"
+                && b.TutorAvailabilitySlot.StartTime >= now
+                && b.TutorAvailabilitySlot.StartTime <= now.AddHours(24))
+            .OrderBy(b => b.TutorAvailabilitySlot.StartTime)
+            .Take(5)
+            .ToListAsync();
+
+        notifications.AddRange(soonSessions.Select(b => new NotificationItemViewModel
+        {
+            Type = "Session",
+            Icon = "📅",
+            Title = $"{b.Subject} with {b.StudentProfile.User.FullName}",
+            Subtitle = $"Starts {b.TutorAvailabilitySlot.StartTime:ddd, d MMM h:mm tt}",
+            Timestamp = b.TutorAvailabilitySlot.StartTime,
+            LinkController = "Tutor",
+            LinkAction = "Schedule"
+        }));
+
+        // Unread messages, one entry per student with the most recent unread one
+        var unreadMessages = await _context.Messages
+            .Include(m => m.StudentProfile).ThenInclude(s => s.User)
+            .Where(m => m.TutorProfileId == tutor.Id && m.SenderRole == "Student" && !m.IsRead)
+            .OrderByDescending(m => m.SentAt)
+            .ToListAsync();
+
+        notifications.AddRange(unreadMessages
+            .GroupBy(m => m.StudentProfileId)
+            .Select(g => g.First())
+            .Take(5)
+            .Select(m => new NotificationItemViewModel
+            {
+                Type = "Message",
+                Icon = "💬",
+                Title = $"New message from {m.StudentProfile.User.FullName}",
+                Subtitle = m.Content.Length > 60 ? m.Content.Substring(0, 60) + "…" : m.Content,
+                Timestamp = m.SentAt,
+                LinkController = "Tutor",
+                LinkAction = "Messages",
+                RouteId = m.StudentProfileId
+            }));
+
+        // Reviews left in the last 7 days
+        var recentReviews = await _context.Reviews
+            .Include(r => r.StudentProfile).ThenInclude(s => s.User)
+            .Where(r => r.TutorProfileId == tutor.Id && r.CreatedAt >= now.AddDays(-7))
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(5)
+            .ToListAsync();
+
+        notifications.AddRange(recentReviews.Select(r => new NotificationItemViewModel
+        {
+            Type = "Review",
+            Icon = "⭐",
+            Title = $"{r.StudentProfile.User.FullName} left a {r.Rating}-star review",
+            Subtitle = string.IsNullOrWhiteSpace(r.Comment) ? "No comment left" : (r.Comment.Length > 60 ? r.Comment.Substring(0, 60) + "…" : r.Comment),
+            Timestamp = r.CreatedAt,
+            LinkController = "Tutor",
+            LinkAction = "Reviews"
+        }));
+
+        ViewData["Notifications"] = notifications.OrderByDescending(n => n.Timestamp).Take(8).ToList();
+        ViewData["NotificationCount"] = notifications.Count;
     }
 
     public async Task<IActionResult> Dashboard()
