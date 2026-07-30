@@ -30,7 +30,7 @@
                         <h1>My Students</h1>
                         <p>All students you've taught, past and present</p>
                     </div>
-                    <span class="disabled-btn" title="Export isn't built yet">Export list</span>
+                    <a asp-controller="Tutor" asp-action="ExportStudentsCsv" class="tb-btn-outline">Export list</a>
                 </div>
 
                 <div class="stat-cards">
@@ -160,7 +160,7 @@
                                     {
                                         <a asp-controller="Tutor" asp-action="Messages" asp-route-studentProfileId="@s.StudentProfileId" class="mini-btn" style="text-align:center;">Message</a>
                                     }
-                                    <span class="disabled-btn" title="Viewing full student profiles isn't built yet" style="text-align:center; @(s.HasPendingRequest ? "grid-column: span 2;" : "")">View profile</span>
+                                    <a asp-controller="Tutor" asp-action="StudentDetail" asp-route-id="@s.StudentProfileId" class="tb-btn-outline" style="text-align:center; @(s.HasPendingRequest ? "grid-column: span 2;" : "")">View profile</a>
                                 </div>
                             </div>
                         }

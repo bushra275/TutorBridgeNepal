@@ -1,0 +1,88 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorStudentDetailViewModel
+@{
+    ViewData["Title"] = Model.FullName;
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@Model.FullName - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_TutorTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_TutorSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>@Model.FullName</h1>
+                        <p>Student profile</p>
+                    </div>
+                    <a asp-controller="Tutor" asp-action="MyStudents" class="tb-btn-outline">Back to My Students</a>
+                </div>
+
+                @if (TempData["SettingsError"] != null)
+                {
+                    <div class="status-banner error mb-3">@TempData["SettingsError"]</div>
+                }
+
+                <div class="profile-head-card" style="display:flex; gap:1.2rem; align-items:center; flex-wrap:wrap;">
+                    <div class="profile-head-avatar">@Model.Initials</div>
+                    <div style="flex:1; min-width:220px;">
+                        <h1 style="margin:0; font-size:1.3rem;">@Model.FullName</h1>
+                        <p class="tutor-meta mb-1" style="margin-top:.4rem;">
+                            @string.Join(" · ", new[] { Model.GradeLevel, Model.SchoolName, Model.District }.Where(x => !string.IsNullOrWhiteSpace(x)))
+                        </p>
+                        @if (!string.IsNullOrWhiteSpace(Model.CurriculumBoard))
+                        {
+                            <p class="tutor-meta mb-1">Curriculum: @Model.CurriculumBoard</p>
+                        }
+                        <div class="session-count-text">@Model.TotalSessions session@(Model.TotalSessions == 1 ? "" : "s") together · @Model.CompletedSessions completed</div>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.LearningGoal))
+                {
+                    <div class="panel" style="margin-top:1rem;">
+                        <div class="panel-head"><h2>Learning goal</h2></div>
+                        <p class="tutor-meta" style="white-space:pre-wrap;">@Model.LearningGoal</p>
+                    </div>
+                }
+
+                <div class="panel" style="margin-top:1rem;">
+                    <div class="panel-head"><h2>Session history</h2></div>
+                    @if (!Model.RecentSessions.Any())
+                    {
+                        <p class="empty-state">No sessions yet.</p>
+                    }
+                    else
+                    {
+                        @foreach (var s in Model.RecentSessions)
+                        {
+                            <div class="mp-subject-row">
+                                <div class="mp-subject-info">
+                                    <div class="mp-subject-name">@s.Subject</div>
+                                    <div class="mp-subject-desc">@s.Date.ToString("d MMM yyyy")</div>
+                                </div>
+                                <span class="msc-badge @(s.Status == "Completed" ? "" : s.Status == "Cancelled" ? "pending" : "new")">@s.Status</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

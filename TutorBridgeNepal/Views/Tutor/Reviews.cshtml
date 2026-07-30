@@ -30,7 +30,7 @@
                         <h1>Reviews</h1>
                         <p>See what students are saying about your teaching</p>
                     </div>
-                    <span class="disabled-btn" title="Export isn't built yet">Export reviews</span>
+                    <a asp-controller="Tutor" asp-action="ExportReviewsCsv" class="tb-btn-outline">Export reviews</a>
                 </div>
 
                 @if (TempData["SettingsSuccess"] != null)

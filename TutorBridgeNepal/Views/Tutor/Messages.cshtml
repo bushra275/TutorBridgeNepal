@@ -125,8 +125,7 @@
                                         <span class="badge-new-student">New student</span>
                                     }
                                 </div>
-                                <span class="tb-btn-outline" style="opacity:.6; cursor:not-allowed;" title="Viewing full student profiles isn't built yet">View profile</span>
-                                <span class="tb-btn" style="opacity:.6; cursor:not-allowed; margin-left:.6rem;" title="Tutor-initiated scheduling isn't built yet - accept requests from Session Requests instead">Schedule</span>
+                                <a asp-controller="Tutor" asp-action="StudentDetail" asp-route-id="@Model.ActiveStudentProfileId" class="tb-btn-outline">View profile</a>                                <span class="tb-btn" style="opacity:.6; cursor:not-allowed; margin-left:.6rem;" title="Tutor-initiated scheduling isn't built yet - accept requests from Session Requests instead">Schedule</span>
                             </div>
 
                             <div class="chat-messages" id="chatMessages">

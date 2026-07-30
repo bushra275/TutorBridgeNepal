@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using TutorBridgeNepal.Data;
 using TutorBridgeNepal.Models;
 using TutorBridgeNepal.ViewModels;
+using TutorBridgeNepal.Helpers;
+using Microsoft.AspNetCore.Hosting;
 
 namespace TutorBridgeNepal.Controllers;
 
@@ -14,12 +16,14 @@ public class StudentController : Controller
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
+    private readonly IWebHostEnvironment _webHostEnvironment;
 
-    public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager)
+    public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment)
     {
         _context = context;
         _userManager = userManager;
         _signInManager = signInManager;
+        _webHostEnvironment = webHostEnvironment;
     }
 
     private static string GetInitials(string fullName)
@@ -1271,6 +1275,7 @@ public class StudentController : Controller
         var vm = new SettingsPageViewModel
         {
             Initials = GetInitials(user.FullName),
+            PhotoUrl = user.PhotoUrl,
             Profile = new SettingsProfileFormModel
             {
                 FullName = user.FullName,
@@ -1532,5 +1537,42 @@ public class StudentController : Controller
 
         TempData["SettingsSuccess"] = "Your request has been submitted. We'll get back to you by email.";
         return RedirectToAction("HelpSupport");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadPhoto(IFormFile? photo)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return RedirectToAction("Index", "Home");
+
+        var (url, error) = await FileUploadHelper.SavePhotoAsync(photo, _webHostEnvironment.WebRootPath);
+        if (error != null)
+        {
+            TempData["SettingsError"] = error;
+            return RedirectToAction("Settings");
+        }
+
+        FileUploadHelper.TryDelete(user.PhotoUrl, _webHostEnvironment.WebRootPath);
+        user.PhotoUrl = url;
+        await _context.SaveChangesAsync();
+
+        TempData["SettingsSuccess"] = "Profile photo updated.";
+        return RedirectToAction("Settings");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemovePhoto()
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return RedirectToAction("Index", "Home");
+
+        FileUploadHelper.TryDelete(user.PhotoUrl, _webHostEnvironment.WebRootPath);
+        user.PhotoUrl = null;
+        await _context.SaveChangesAsync();
+
+        TempData["SettingsSuccess"] = "Profile photo removed.";
+        return RedirectToAction("Settings");
     }
 }

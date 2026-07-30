@@ -1,0 +1,136 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorPreviewProfileViewModel
+@{
+    ViewData["Title"] = "Preview as student";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preview as student - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_TutorTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_TutorSidebar")
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>Preview as student</h1>
+                        <p>This is a read-only preview of what students see on your public profile - you can't book yourself, so the booking calendar is left out.</p>
+                    </div>
+                    <a asp-controller="Tutor" asp-action="Profile" class="tb-btn-outline">Back to edit profile</a>
+                </div>
+
+                <div class="profile-head-card" style="display:flex; gap:1.2rem; align-items:center; flex-wrap:wrap;">
+                    @if (!string.IsNullOrEmpty(Model.PhotoUrl))
+                    {
+                        <img src="@Model.PhotoUrl" alt="Profile photo" class="profile-head-avatar" style="object-fit:cover;" />
+                    }
+                    else
+                    {
+                        <div class="profile-head-avatar">@Model.Initials</div>
+                    }
+                    <div style="flex:1; min-width:220px;">
+                        <h1 style="margin:0; font-size:1.3rem;">@(Model.DisplayName ?? Model.FullName)</h1>
+                        <div class="badge-row" style="margin-top:.35rem;">
+                            @if (Model.IsVerified)
+                            {
+                                <span class="verified-inline">✓ Verified</span>
+                            }
+                        </div>
+                        <p class="tutor-meta mb-1" style="margin-top:.4rem;">@(Model.TeachingMode ?? "")@(string.IsNullOrWhiteSpace(Model.District) ? "" : " · " + Model.District)</p>
+                        <p class="tutor-meta mb-1">@Model.YearsOfExperience yrs experience</p>
+                        <div class="stars">
+                            @if (Model.AverageRating > 0)
+                            {
+                                @:★★★★★ <span class="tutor-meta">@Model.AverageRating.ToString("0.0")</span>
+                            }
+                            else
+                            {
+                                <span class="tutor-meta">New tutor</span>
+                            }
+                        </div>
+                        <div class="session-count-text">@Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s")</div>
+                    </div>
+                    <div class="action-row">
+                        <span class="disabled-btn" title="You can't book your own profile">Book a session</span>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Bio))
+                {
+                    <div class="panel" style="margin-top:1rem;">
+                        <div class="panel-head"><h2>About</h2></div>
+                        <p class="tutor-meta" style="white-space:pre-wrap;">@Model.Bio</p>
+                    </div>
+                }
+
+                <div class="panel" style="margin-top:1rem;">
+                    <div class="panel-head"><h2>Subjects &amp; rates</h2></div>
+                    @if (!Model.SubjectRates.Any())
+                    {
+                        <p class="empty-state">No subjects added yet.</p>
+                    }
+                    else
+                    {
+                        @foreach (var s in Model.SubjectRates)
+                        {
+                            <div class="mp-subject-row">
+                                <div class="mp-subject-info">
+                                    <div class="mp-subject-name">@s.Subject</div>
+                                    @if (!string.IsNullOrWhiteSpace(s.Description))
+                                    {
+                                        <div class="mp-subject-desc">@s.Description</div>
+                                    }
+                                </div>
+                                <div class="mp-rate-box"><span>Rs</span> @s.RatePerHour <span>/hr</span></div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="panel" style="margin-top:1rem;">
+                    <div class="panel-head"><h2>Recent reviews</h2></div>
+                    @if (!Model.RecentReviews.Any())
+                    {
+                        <p class="empty-state">No reviews yet.</p>
+                    }
+                    else
+                    {
+                        @foreach (var r in Model.RecentReviews)
+                        {
+                            <div class="review-row">
+                                <div class="rv-row-top">
+                                    <div class="rv-row-name">
+                                        <div class="avatar">@r.StudentInitials</div>
+                                        <div>
+                                            <div class="name">@r.StudentName</div>
+                                            <span style="color:var(--orange);">@(new string('★', r.Rating))@(new string('☆', 5 - r.Rating))</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(r.Comment))
+                                {
+                                    <p class="rv-comment">"@r.Comment"</p>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

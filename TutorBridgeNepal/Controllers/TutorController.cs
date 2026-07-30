@@ -1349,6 +1349,99 @@ public class TutorController : Controller
         return View(vm);
     }
 
+    public async Task<IActionResult> PreviewProfile()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await SetTutorSidebarContextAsync("myprofile", tutor);
+
+        var subjectRates = await _context.TutorSubjectRates
+            .Where(s => s.TutorProfileId == tutor.Id)
+            .OrderBy(s => s.SortOrder)
+            .ToListAsync();
+
+        var recentReviews = await _context.Reviews
+            .Include(r => r.StudentProfile).ThenInclude(s => s.User)
+            .Where(r => r.TutorProfileId == tutor.Id)
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(10)
+            .ToListAsync();
+
+        var vm = new TutorPreviewProfileViewModel
+        {
+            PhotoUrl = tutor.User.PhotoUrl,
+            Initials = GetInitials(tutor.User.FullName),
+            FullName = tutor.User.FullName,
+            DisplayName = tutor.DisplayName,
+            IsVerified = tutor.IsVerified,
+            TeachingMode = tutor.TeachingMode,
+            District = tutor.User.District,
+            YearsOfExperience = tutor.YearsOfExperience,
+            AverageRating = tutor.AverageRating,
+            ReviewCount = tutor.ReviewCount,
+            Bio = tutor.Bio,
+            SubjectRates = subjectRates.Select(s => new TutorSubjectRateRowViewModel
+            {
+                Id = s.Id,
+                Subject = s.Subject,
+                Description = s.Description,
+                RatePerHour = s.RatePerHour
+            }).ToList(),
+            RecentReviews = recentReviews.Select(r => new PreviewReviewRowViewModel
+            {
+                StudentInitials = GetInitials(r.StudentProfile.User.FullName),
+                StudentName = r.StudentProfile.User.FullName,
+                Rating = r.Rating,
+                Comment = r.Comment
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    public async Task<IActionResult> StudentDetail(int id)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await SetTutorSidebarContextAsync("mystudents", tutor);
+
+        var studentProfile = await _context.StudentProfiles
+            .Include(s => s.User)
+            .FirstOrDefaultAsync(s => s.Id == id);
+
+        if (studentProfile == null) return NotFound();
+
+        var bookings = await _context.Bookings
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.StudentProfileId == id && b.TutorProfileId == tutor.Id)
+            .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+            .ToListAsync();
+
+        var vm = new TutorStudentDetailViewModel
+        {
+            StudentProfileId = studentProfile.Id,
+            FullName = studentProfile.User.FullName,
+            Initials = GetInitials(studentProfile.User.FullName),
+            GradeLevel = studentProfile.GradeLevel,
+            SchoolName = studentProfile.SchoolName,
+            District = studentProfile.User.District,
+            CurriculumBoard = studentProfile.CurriculumBoard,
+            LearningGoal = studentProfile.LearningGoal,
+            TotalSessions = bookings.Count,
+            CompletedSessions = bookings.Count(b => b.Status == "Completed"),
+            RecentSessions = bookings.Take(10).Select(b => new StudentSessionHistoryRow
+            {
+                Subject = b.Subject,
+                Date = b.TutorAvailabilitySlot.StartTime,
+                Status = b.Status
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
     // Weighted checklist behind the "Profile completion" bar. "Video intro"
     // has no upload feature yet, so it never counts as complete - that's why
     // the bar can never reach 100% honestly until that feature exists.

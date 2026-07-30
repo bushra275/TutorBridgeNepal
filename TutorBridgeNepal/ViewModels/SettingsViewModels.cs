@@ -3,6 +3,7 @@
 public class SettingsPageViewModel
 {
     public string Initials { get; set; } = string.Empty;
+    public string? PhotoUrl { get; set; }
     public SettingsProfileFormModel Profile { get; set; } = new();
     public SettingsAcademicFormModel Academic { get; set; } = new();
     public SettingsNotificationsModel Notifications { get; set; } = new();
