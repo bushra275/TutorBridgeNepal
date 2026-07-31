@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preview as student - TutorBridge Nepal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -78,14 +78,14 @@
                 }
 
                 <div class="panel" style="margin-top:1rem;">
-                    <div class="panel-head"><h2>Subjects &amp; rates</h2></div>
-                    @if (!Model.SubjectRates.Any())
+                    <div class="panel-head"><h2>Subjects</h2></div>
+                    @if (!Model.Subjects.Any())
                     {
                         <p class="empty-state">No subjects added yet.</p>
                     }
                     else
                     {
-                        @foreach (var s in Model.SubjectRates)
+                        @foreach (var s in Model.Subjects)
                         {
                             <div class="mp-subject-row">
                                 <div class="mp-subject-info">
@@ -95,7 +95,7 @@
                                         <div class="mp-subject-desc">@s.Description</div>
                                     }
                                 </div>
-                                <div class="mp-rate-box"><span>Rs</span> @s.RatePerHour <span>/hr</span></div>
+                                
                             </div>
                         }
                     }

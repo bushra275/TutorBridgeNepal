@@ -23,7 +23,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<TutorWeeklyAvailabilityRule> TutorWeeklyAvailabilityRules => Set<TutorWeeklyAvailabilityRule>();
     public DbSet<TutorTimeOff> TutorTimeOffs => Set<TutorTimeOff>();
-    public DbSet<TutorSubjectRate> TutorSubjectRates => Set<TutorSubjectRate>();
+    public DbSet<TutorSubject> TutorSubjects => Set<TutorSubject>();
     public DbSet<TutorCredential> TutorCredentials => Set<TutorCredential>();
     protected override void OnModelCreating(ModelBuilder builder)
     {

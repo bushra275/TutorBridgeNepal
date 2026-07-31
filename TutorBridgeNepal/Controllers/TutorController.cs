@@ -67,96 +67,6 @@ public class TutorController : Controller
         ViewData["PendingRequestCount"] = pendingCount;
         ViewData["UnreadMessageCount"] = unreadMessageCount;
         ViewData["ShowAvailabilityBadge"] = tutor.ShowAvailabilityBadge;
-
-        var now = DateTime.Now;
-        var notifications = new List<NotificationItemViewModel>();
-
-        // Pending session requests - most actionable, shown first
-        var pendingRequests = await _context.Bookings
-            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
-            .Where(b => b.TutorProfileId == tutor.Id && b.Status == "Pending")
-            .OrderByDescending(b => b.CreatedAt)
-            .Take(5)
-            .ToListAsync();
-
-        notifications.AddRange(pendingRequests.Select(b => new NotificationItemViewModel
-        {
-            Type = "Session",
-            Icon = "📩",
-            Title = $"New request from {b.StudentProfile.User.FullName}",
-            Subtitle = $"{b.Subject} · requested {b.CreatedAt:d MMM, h:mm tt}",
-            Timestamp = b.CreatedAt,
-            LinkController = "Tutor",
-            LinkAction = "SessionRequests"
-        }));
-
-        // Confirmed sessions starting within the next 24 hours
-        var soonSessions = await _context.Bookings
-            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
-            .Include(b => b.TutorAvailabilitySlot)
-            .Where(b => b.TutorProfileId == tutor.Id
-                && b.Status == "Confirmed"
-                && b.TutorAvailabilitySlot.StartTime >= now
-                && b.TutorAvailabilitySlot.StartTime <= now.AddHours(24))
-            .OrderBy(b => b.TutorAvailabilitySlot.StartTime)
-            .Take(5)
-            .ToListAsync();
-
-        notifications.AddRange(soonSessions.Select(b => new NotificationItemViewModel
-        {
-            Type = "Session",
-            Icon = "📅",
-            Title = $"{b.Subject} with {b.StudentProfile.User.FullName}",
-            Subtitle = $"Starts {b.TutorAvailabilitySlot.StartTime:ddd, d MMM h:mm tt}",
-            Timestamp = b.TutorAvailabilitySlot.StartTime,
-            LinkController = "Tutor",
-            LinkAction = "Schedule"
-        }));
-
-        // Unread messages, one entry per student with the most recent unread one
-        var unreadMessages = await _context.Messages
-            .Include(m => m.StudentProfile).ThenInclude(s => s.User)
-            .Where(m => m.TutorProfileId == tutor.Id && m.SenderRole == "Student" && !m.IsRead)
-            .OrderByDescending(m => m.SentAt)
-            .ToListAsync();
-
-        notifications.AddRange(unreadMessages
-            .GroupBy(m => m.StudentProfileId)
-            .Select(g => g.First())
-            .Take(5)
-            .Select(m => new NotificationItemViewModel
-            {
-                Type = "Message",
-                Icon = "💬",
-                Title = $"New message from {m.StudentProfile.User.FullName}",
-                Subtitle = m.Content.Length > 60 ? m.Content.Substring(0, 60) + "…" : m.Content,
-                Timestamp = m.SentAt,
-                LinkController = "Tutor",
-                LinkAction = "Messages",
-                RouteId = m.StudentProfileId
-            }));
-
-        // Reviews left in the last 7 days
-        var recentReviews = await _context.Reviews
-            .Include(r => r.StudentProfile).ThenInclude(s => s.User)
-            .Where(r => r.TutorProfileId == tutor.Id && r.CreatedAt >= now.AddDays(-7))
-            .OrderByDescending(r => r.CreatedAt)
-            .Take(5)
-            .ToListAsync();
-
-        notifications.AddRange(recentReviews.Select(r => new NotificationItemViewModel
-        {
-            Type = "Review",
-            Icon = "⭐",
-            Title = $"{r.StudentProfile.User.FullName} left a {r.Rating}-star review",
-            Subtitle = string.IsNullOrWhiteSpace(r.Comment) ? "No comment left" : (r.Comment.Length > 60 ? r.Comment.Substring(0, 60) + "…" : r.Comment),
-            Timestamp = r.CreatedAt,
-            LinkController = "Tutor",
-            LinkAction = "Reviews"
-        }));
-
-        ViewData["Notifications"] = notifications.OrderByDescending(n => n.Timestamp).Take(8).ToList();
-        ViewData["NotificationCount"] = notifications.Count;
     }
 
     public async Task<IActionResult> Dashboard()
@@ -1278,7 +1188,7 @@ public class TutorController : Controller
         var sessionsCompleted = await _context.Bookings
             .CountAsync(b => b.TutorProfileId == tutor.Id && b.Status == "Completed");
 
-        var subjectRates = await _context.TutorSubjectRates
+        var subjects = await _context.TutorSubjects
             .Where(s => s.TutorProfileId == tutor.Id)
             .OrderBy(s => s.SortOrder)
             .ToListAsync();
@@ -1307,7 +1217,7 @@ public class TutorController : Controller
         var teachingStyleTags = (tutor.TeachingStyle ?? string.Empty)
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
-        var (completionPercent, completionHint) = CalculateProfileCompletion(tutor, subjectRates.Count, credentials.Count, languages.Count, teachingStyleTags.Count);
+        var (completionPercent, completionHint) = CalculateProfileCompletion(tutor, subjects.Count, credentials.Count, languages.Count, teachingStyleTags.Count);
 
         var vm = new TutorProfilePageViewModel
         {
@@ -1328,12 +1238,11 @@ public class TutorController : Controller
             TeachingMode = tutor.TeachingMode,
             Languages = languages,
             TeachingStyleTags = teachingStyleTags,
-            SubjectRates = subjectRates.Select(s => new TutorSubjectRateRowViewModel
+            Subjects = subjects.Select(s => new TutorSubjectRowViewModel
             {
                 Id = s.Id,
                 Subject = s.Subject,
-                Description = s.Description,
-                RatePerHour = s.RatePerHour
+                Description = s.Description
             }).ToList(),
             Credentials = credentials.Select(c => new TutorCredentialRowViewModel
             {
@@ -1349,119 +1258,27 @@ public class TutorController : Controller
         return View(vm);
     }
 
-    public async Task<IActionResult> PreviewProfile()
-    {
-        var tutor = await GetCurrentTutorProfileAsync();
-        if (tutor == null) return RedirectToAction("Index", "Home");
-
-        await SetTutorSidebarContextAsync("myprofile", tutor);
-
-        var subjectRates = await _context.TutorSubjectRates
-            .Where(s => s.TutorProfileId == tutor.Id)
-            .OrderBy(s => s.SortOrder)
-            .ToListAsync();
-
-        var recentReviews = await _context.Reviews
-            .Include(r => r.StudentProfile).ThenInclude(s => s.User)
-            .Where(r => r.TutorProfileId == tutor.Id)
-            .OrderByDescending(r => r.CreatedAt)
-            .Take(10)
-            .ToListAsync();
-
-        var vm = new TutorPreviewProfileViewModel
-        {
-            PhotoUrl = tutor.User.PhotoUrl,
-            Initials = GetInitials(tutor.User.FullName),
-            FullName = tutor.User.FullName,
-            DisplayName = tutor.DisplayName,
-            IsVerified = tutor.IsVerified,
-            TeachingMode = tutor.TeachingMode,
-            District = tutor.User.District,
-            YearsOfExperience = tutor.YearsOfExperience,
-            AverageRating = tutor.AverageRating,
-            ReviewCount = tutor.ReviewCount,
-            Bio = tutor.Bio,
-            SubjectRates = subjectRates.Select(s => new TutorSubjectRateRowViewModel
-            {
-                Id = s.Id,
-                Subject = s.Subject,
-                Description = s.Description,
-                RatePerHour = s.RatePerHour
-            }).ToList(),
-            RecentReviews = recentReviews.Select(r => new PreviewReviewRowViewModel
-            {
-                StudentInitials = GetInitials(r.StudentProfile.User.FullName),
-                StudentName = r.StudentProfile.User.FullName,
-                Rating = r.Rating,
-                Comment = r.Comment
-            }).ToList()
-        };
-
-        return View(vm);
-    }
-
-    public async Task<IActionResult> StudentDetail(int id)
-    {
-        var tutor = await GetCurrentTutorProfileAsync();
-        if (tutor == null) return RedirectToAction("Index", "Home");
-
-        await SetTutorSidebarContextAsync("mystudents", tutor);
-
-        var studentProfile = await _context.StudentProfiles
-            .Include(s => s.User)
-            .FirstOrDefaultAsync(s => s.Id == id);
-
-        if (studentProfile == null) return NotFound();
-
-        var bookings = await _context.Bookings
-            .Include(b => b.TutorAvailabilitySlot)
-            .Where(b => b.StudentProfileId == id && b.TutorProfileId == tutor.Id)
-            .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
-            .ToListAsync();
-
-        var vm = new TutorStudentDetailViewModel
-        {
-            StudentProfileId = studentProfile.Id,
-            FullName = studentProfile.User.FullName,
-            Initials = GetInitials(studentProfile.User.FullName),
-            GradeLevel = studentProfile.GradeLevel,
-            SchoolName = studentProfile.SchoolName,
-            District = studentProfile.User.District,
-            CurriculumBoard = studentProfile.CurriculumBoard,
-            LearningGoal = studentProfile.LearningGoal,
-            TotalSessions = bookings.Count,
-            CompletedSessions = bookings.Count(b => b.Status == "Completed"),
-            RecentSessions = bookings.Take(10).Select(b => new StudentSessionHistoryRow
-            {
-                Subject = b.Subject,
-                Date = b.TutorAvailabilitySlot.StartTime,
-                Status = b.Status
-            }).ToList()
-        };
-
-        return View(vm);
-    }
-
     // Weighted checklist behind the "Profile completion" bar. "Video intro"
     // has no upload feature yet, so it never counts as complete - that's why
     // the bar can never reach 100% honestly until that feature exists.
-    private static (int Percent, string? Hint) CalculateProfileCompletion(TutorProfile tutor, int subjectRateCount, int credentialCount, int languageCount, int teachingStyleCount)
+    private static (int Percent, string? Hint) CalculateProfileCompletion(TutorProfile tutor, int subjectCount, int credentialCount, int languageCount, int teachingStyleCount)
     {
         var checklist = new (bool Done, string Label)[]
         {
-            (!string.IsNullOrWhiteSpace(tutor.DisplayName), "Add a display name"),
-            (!string.IsNullOrWhiteSpace(tutor.Bio) && tutor.Bio.Trim().Length >= 20, "Write a bio"),
-            (!string.IsNullOrWhiteSpace(tutor.User.District), "Add your district"),
-            (tutor.YearsOfExperience > 0, "Add your years of experience"),
-            (!string.IsNullOrWhiteSpace(tutor.TeachingMode), "Set your teaching mode"),
-            (languageCount > 0, "Add a language you teach in"),
-            (teachingStyleCount > 0, "Add a teaching style tag"),
-            (subjectRateCount > 0, "Add a subject and rate"),
-            (credentialCount > 0, "Add a credential or document"),
-            (false, "Add a video intro"), // never true - no upload feature yet
+        (!string.IsNullOrWhiteSpace(tutor.DisplayName), "Add a display name"),
+        (!string.IsNullOrWhiteSpace(tutor.Bio) && tutor.Bio.Trim().Length >= 20, "Write a bio"),
+        (!string.IsNullOrWhiteSpace(tutor.User.District), "Add your district"),
+        (tutor.YearsOfExperience > 0, "Add your years of experience"),
+        (!string.IsNullOrWhiteSpace(tutor.TeachingMode), "Set your teaching mode"),
+        (languageCount > 0, "Add a language you teach in"),
+        (teachingStyleCount > 0, "Add a teaching style tag"),
+        (subjectCount > 0, "Add a subject"),
+        (credentialCount > 0, "Add a credential or document"),
+        (false, "Add a video intro"), // never true - no upload feature yet
         };
 
         var doneCount = checklist.Count(c => c.Done);
+        // ... (leave the rest of this method exactly as it already is below this point)
         var percent = (int)Math.Round(doneCount * 100.0 / checklist.Length);
         var firstMissing = checklist.FirstOrDefault(c => !c.Done).Label;
 
@@ -1498,28 +1315,27 @@ public class TutorController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddSubjectRate(string subject, string? description, decimal ratePerHour)
+    public async Task<IActionResult> AddSubject(string subject, string? description)
     {
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
 
-        if (string.IsNullOrWhiteSpace(subject) || ratePerHour <= 0)
+        if (string.IsNullOrWhiteSpace(subject))
         {
-            TempData["SettingsError"] = "Subject and a valid rate are required.";
+            TempData["SettingsError"] = "Subject is required.";
             return RedirectToAction("Profile");
         }
 
-        var nextSortOrder = await _context.TutorSubjectRates
+        var nextSortOrder = await _context.TutorSubjects
             .Where(s => s.TutorProfileId == tutor.Id)
             .Select(s => (int?)s.SortOrder)
             .MaxAsync() ?? -1;
 
-        _context.TutorSubjectRates.Add(new TutorSubjectRate
+        _context.TutorSubjects.Add(new TutorSubject
         {
             TutorProfileId = tutor.Id,
             Subject = subject.Trim(),
             Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-            RatePerHour = ratePerHour,
             SortOrder = nextSortOrder + 1
         });
 
@@ -1530,19 +1346,18 @@ public class TutorController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateSubjectRate(int id, string subject, string? description, decimal ratePerHour)
+    public async Task<IActionResult> UpdateSubject(int id, string subject, string? description)
     {
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
 
-        var row = await _context.TutorSubjectRates
+        var row = await _context.TutorSubjects
             .FirstOrDefaultAsync(s => s.Id == id && s.TutorProfileId == tutor.Id);
 
-        if (row != null && !string.IsNullOrWhiteSpace(subject) && ratePerHour > 0)
+        if (row != null && !string.IsNullOrWhiteSpace(subject))
         {
             row.Subject = subject.Trim();
             row.Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
-            row.RatePerHour = ratePerHour;
             await _context.SaveChangesAsync();
         }
 

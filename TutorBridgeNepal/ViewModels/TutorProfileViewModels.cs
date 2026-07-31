@@ -23,21 +23,19 @@ public class TutorProfilePageViewModel
     public List<string> Languages { get; set; } = new();
     public List<string> TeachingStyleTags { get; set; } = new();
 
-    public List<TutorSubjectRateRowViewModel> SubjectRates { get; set; } = new();
+    public List<TutorSubjectRowViewModel> Subjects { get; set; } = new();
     public List<TutorCredentialRowViewModel> Credentials { get; set; } = new();
 
     public int ProfileCompletionPercent { get; set; }
     public string? ProfileCompletionHint { get; set; }
 }
 
-public class TutorSubjectRateRowViewModel
+public class TutorSubjectRowViewModel
 {
     public int Id { get; set; }
     public string Subject { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public decimal RatePerHour { get; set; }
 }
-
 public class TutorCredentialRowViewModel
 {
     public int Id { get; set; }

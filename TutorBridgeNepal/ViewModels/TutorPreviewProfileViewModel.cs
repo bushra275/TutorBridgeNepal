@@ -14,7 +14,7 @@ public class TutorPreviewProfileViewModel
     public int ReviewCount { get; set; }
     public string? Bio { get; set; }
 
-    public List<TutorSubjectRateRowViewModel> SubjectRates { get; set; } = new();
+    public List<TutorSubjectRowViewModel> Subjects { get; set; } = new();
     public List<PreviewReviewRowViewModel> RecentReviews { get; set; } = new();
 }
 

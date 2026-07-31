@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Profile - TutorBridge Nepal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -145,28 +145,27 @@
                     </div>
                 </form>
 
-                <!-- Subjects & rates -->
+                <!-- Subjects -->
                 <div class="panel" style="margin-top:1rem;">
                     <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center;">
-                        <h2>Subjects &amp; rates</h2>
+                        <h2>Subjects</h2>
                         <button type="button" class="tb-btn-outline" style="min-height:36px; padding:0 1rem; font-size:.82rem;" id="addSubjectToggle">+ Add</button>
                     </div>
 
-                    <form asp-controller="Tutor" asp-action="AddSubjectRate" method="post" class="mp-add-subject-form" id="addSubjectForm">
+                    <form asp-controller="Tutor" asp-action="AddSubject" method="post" class="mp-add-subject-form" id="addSubjectForm">
                         @Html.AntiForgeryToken()
                         <input type="text" name="subject" placeholder="Subject (e.g. Chemistry)" maxlength="60" required />
                         <input type="text" name="description" placeholder="Description (e.g. Grade 9-12)" maxlength="120" />
-                        <input type="number" name="ratePerHour" placeholder="Rate / hr" min="1" step="1" required />
                         <button type="submit" class="tb-btn" style="min-height:38px; padding:0 1rem; font-size:.82rem;">Add</button>
                     </form>
 
-                    @if (!Model.SubjectRates.Any())
+                    @if (!Model.Subjects.Any())
                     {
                         <p class="empty-state">No subjects added yet.</p>
                     }
                     else
                     {
-                        @foreach (var s in Model.SubjectRates)
+                        @foreach (var s in Model.Subjects)
                         {
                             <div class="mp-subject-row">
                                 <div class="mp-subject-info">
@@ -177,27 +176,14 @@
                                     }
                                 </div>
 
-                                <form asp-controller="Tutor" asp-action="UpdateSubjectRate" method="post" class="mp-rate-form">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@s.Id" />
-                                    <input type="hidden" name="subject" value="@s.Subject" />
-                                    <input type="hidden" name="description" value="@s.Description" />
-                                    <div class="mp-rate-box">
-                                        <span>Rs</span>
-                                        <input type="number" name="ratePerHour" value="@s.RatePerHour" min="1" step="1" onchange="this.form.submit()" />
-                                        <span>/hr</span>
-                                    </div>
-                                </form>
-
                                 <button type="button" class="mp-edit-link subject-edit-toggle" data-target="edit-subject-@s.Id">Edit</button>
                             </div>
 
-                            <form asp-controller="Tutor" asp-action="UpdateSubjectRate" method="post" class="mp-subject-edit-form" id="edit-subject-@s.Id">
+                            <form asp-controller="Tutor" asp-action="UpdateSubject" method="post" class="mp-subject-edit-form" id="edit-subject-@s.Id">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="id" value="@s.Id" />
                                 <input type="text" name="subject" value="@s.Subject" maxlength="60" required />
                                 <input type="text" name="description" value="@s.Description" placeholder="Description" maxlength="120" />
-                                <input type="hidden" name="ratePerHour" value="@s.RatePerHour" />
                                 <button type="submit" class="tb-btn" style="min-height:34px; padding:0 .9rem; font-size:.8rem;">Save</button>
                             </form>
                         }
