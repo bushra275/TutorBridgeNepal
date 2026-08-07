@@ -20,6 +20,11 @@ public class TutorProfile
     public string? Languages { get; set; }
 
     public bool IsVerified { get; set; }
+
+    // Set when an admin rejects a pending application (as opposed to just not
+    // having reviewed it yet) so rejected tutors drop out of the verification
+    // queue instead of reappearing as still-pending.
+    public bool VerificationRejected { get; set; }
     public decimal AverageRating { get; set; }
     public int ReviewCount { get; set; }
     public bool IsAvailableNow { get; set; }

@@ -178,12 +178,12 @@ public class TutorController : Controller
             TodaySchedule = todaySchedule.Select(ToRow).ToList(),
             PendingRequests = pending.Select(ToRow).ToList(),
             RecentSessions = bookings
-                .Where(b => b.Status == "Completed" || b.Status == "Cancelled")
-                .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
-                .Take(5)
-                .Select(ToRow)
-                .ToList(),
-            MyStudents = myStudents,
+            .Where(b => b.Status != "Pending" && b.TutorAvailabilitySlot.StartTime < now)
+            .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+            .Take(5)
+            .Select(ToRow)
+            .ToList(),
+                    MyStudents = myStudents,
             RecentReviews = recentReviews
         };
 
@@ -1027,6 +1027,47 @@ public class TutorController : Controller
         vm.TotalUnread = conversations.Sum(c => c.UnreadCount);
 
         return View(vm);
+    }
+
+    // ---------------------------------------------------------------------
+    // ADDED: this action was missing. Views/Tutor/Messages.cshtml (line 172)
+    // already posts here with `studentProfileId` (hidden input) and `content`
+    // (text input) - without this action the tutor-side Send button had
+    // nothing to call. Mirrors StudentController.SendMessage, but checks the
+    // booking relationship from the tutor's side instead of the student's.
+    // ---------------------------------------------------------------------
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendMessage(int studentProfileId, string content)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return RedirectToAction("Messages", new { studentProfileId });
+        }
+
+        // Only allow messaging a student the tutor actually has a booking
+        // relationship with (same rule as the Student side's SendMessage).
+        var hasRelationship = await _context.Bookings
+            .AnyAsync(b => b.TutorProfileId == tutor.Id && b.StudentProfileId == studentProfileId);
+
+        if (!hasRelationship) return RedirectToAction("Messages");
+
+        _context.Messages.Add(new Message
+        {
+            StudentProfileId = studentProfileId,
+            TutorProfileId = tutor.Id,
+            SenderRole = "Tutor",
+            Content = content.Trim(),
+            SentAt = DateTime.Now,
+            IsRead = false
+        });
+
+        await _context.SaveChangesAsync();
+
+        return RedirectToAction("Messages", new { studentProfileId });
     }
 
     public async Task<IActionResult> Reviews(string tab = "all", string sort = "newest")

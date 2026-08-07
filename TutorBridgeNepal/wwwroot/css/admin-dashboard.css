@@ -58,6 +58,11 @@
         color: #a96808;
     }
 
+    .kpi-badge.neutral {
+        background: var(--soft);
+        color: var(--muted);
+    }
+
 /* Chart */
 .chart-panel .panel-head .btn-period {
     margin-left: auto;
@@ -69,6 +74,28 @@
     font-size: .78rem;
     font-weight: 700;
     color: var(--ink);
+}
+
+.chart-with-axis {
+    display: flex;
+    gap: .6rem;
+}
+
+.chart-axis-y {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 190px;
+    padding-bottom: 1px;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 600;
+    text-align: right;
+}
+
+.chart-plot {
+    flex: 1;
+    min-width: 0;
 }
 
 .bar-chart {
@@ -92,6 +119,7 @@
     width: 60%;
     border-radius: 4px 4px 0 0;
     background: var(--mint-2);
+    min-height: 2px;
 }
 
     .bar.peak {
@@ -112,13 +140,14 @@
         font-weight: 600;
     }
 
-.chart-axis {
+.chart-empty {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    justify-content: center;
+    height: 190px;
     color: var(--muted);
-    font-size: .7rem;
+    font-size: .85rem;
     font-weight: 600;
-    margin-bottom: .3rem;
 }
 
 /* Verification queue */
@@ -165,6 +194,14 @@
     margin-top: .9rem;
 }
 
+.empty-row {
+    color: var(--muted);
+    font-size: .85rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 1rem 0;
+}
+
 /* Registrations table pills */
 .pill-active {
     background: var(--mint);
@@ -178,6 +215,14 @@
 
 .status-text.ongoing {
     color: #a96808;
+}
+
+.status-text.missed {
+    color: var(--danger, #c0392b);
+}
+
+.status-text.pending {
+    color: var(--muted, #888);
 }
 
 /* Complaints */

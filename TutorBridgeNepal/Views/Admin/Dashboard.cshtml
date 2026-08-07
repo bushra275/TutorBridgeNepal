@@ -1,6 +1,37 @@
-﻿@{
+﻿@model TutorBridgeNepal.ViewModels.AdminDashboardViewModel
+@{
     ViewData["Title"] = "Admin Dashboard";
     Layout = null;
+
+    string TrendBadgeClass(int? trend) => trend switch
+    {
+        null => "neutral",
+        >= 0 => "up",
+        _ => "urgent"
+    };
+
+    string TrendBadgeText(int? trend) => trend switch
+    {
+        null => "New",
+        >= 0 => $"+{trend}%",
+        _ => $"{trend}%"
+    };
+
+    string SessionStatusClass(string status) => status switch
+    {
+        "Completed" => "completed",
+        "Cancelled" => "cancelled",
+        "Missed" => "missed",
+        "Confirmed" => "ongoing",
+        _ => "pending"
+    };
+
+    string AvatarClass(int index) => (index % 3) switch
+    {
+        1 => "purple",
+        2 => "yellow",
+        _ => ""
+    };
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -28,36 +59,55 @@
             <div class="dash-topbar-right">
                 <a href="#" class="icon-btn" title="Notifications">
                     🔔
-                    <span class="dot"></span>
+                    @if (Model.OpenComplaintsCount > 0 || Model.PendingVerificationsCount > 0)
+                    {
+                        <span class="dot"></span>
+                    }
                 </a>
-                <div class="topbar-avatar">KS</div>
+                <div class="topbar-avatar">@Model.AdminInitials</div>
             </div>
         </header>
 
         <div class="dash-body">
             <aside class="dash-sidebar">
                 <div class="dash-user">
-                    <div class="avatar">KS</div>
+                    <div class="avatar">@Model.AdminInitials</div>
                     <div>
-                        <div class="name">Karan Shrestha</div>
+                        <div class="name">@Model.AdminName</div>
                         <div class="meta">Platform Administrator</div>
                         <span class="role-chip" style="background:#fff1d5;color:#a96808;">Super Admin</span>
                     </div>
                 </div>
 
                 <ul class="dash-nav">
-                    <li><a href="#" class="active"><span class="nav-icon">📊</span> Dashboard</a></li>
-                    <li><a href="#"><span class="nav-icon">👥</span> User Management</a></li>
-                    <li><a href="#"><span class="nav-icon">✅</span> Tutor Verification <span class="badge-count">5</span></a></li>
-                    <li><a href="#"><span class="nav-icon">🗒️</span> Session Logs</a></li>
-                    <li><a href="#"><span class="nav-icon">📈</span> Reports</a></li>
-                    <li><a href="#"><span class="nav-icon">⚠️</span> Complaints <span class="badge-count">2</span></a></li>
-                    <li><a href="#"><span class="nav-icon">🔔</span> Notifications</a></li>
-                    <li><a href="#"><span class="nav-icon">⚙️</span> Settings</a></li>
+                    <li><a asp-controller="Admin" asp-action="Dashboard" class="active"><span class="nav-icon">📊</span> Dashboard</a></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">👥</span> User Management</span></li>
+                    <li>
+                        <span class="disabled-nav-link" title="Coming soon">
+                            <span class="nav-icon">✅</span> Tutor Verification
+                            @if (Model.PendingVerificationsCount > 0)
+                            {
+                                <span class="badge-count">@Model.PendingVerificationsCount</span>
+                            }
+                        </span>
+                    </li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🗒️</span> Session Logs</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">📈</span> Reports</span></li>
+                    <li>
+                        <span class="disabled-nav-link" title="Coming soon">
+                            <span class="nav-icon">⚠️</span> Complaints
+                            @if (Model.OpenComplaintsCount > 0)
+                            {
+                                <span class="badge-count">@Model.OpenComplaintsCount</span>
+                            }
+                        </span>
+                    </li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🔔</span> Notifications</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚙️</span> Settings</span></li>
                 </ul>
 
                 <ul class="dash-nav-secondary">
-                    <li><a href="#"><span class="nav-icon">❓</span> Help center</a></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">❓</span> Help center</span></li>
                     <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
                 </ul>
             </aside>
@@ -66,9 +116,9 @@
                 <div class="dash-greeting" style="display:flex;align-items:flex-start;justify-content:space-between;">
                     <div>
                         <h1>Admin Dashboard</h1>
-                        <p>Tuesday, 10 June 2025 · TutorBridge Nepal platform overview</p>
+                        <p>@Model.TodayLabel · TutorBridge Nepal platform overview</p>
                     </div>
-                    <a href="#" class="tb-btn-outline">Export report</a>
+                    <span class="disabled-btn" title="Coming soon">Export report</span>
                 </div>
 
                 <!-- KPI row -->
@@ -76,37 +126,51 @@
                     <div class="kpi-card">
                         <div class="kpi-top">
                             <span class="label">Total users</span>
-                            <span class="kpi-badge up">+12%</span>
+                            <span class="kpi-badge @TrendBadgeClass(Model.TotalUsersTrendPercent)">@TrendBadgeText(Model.TotalUsersTrendPercent)</span>
                         </div>
-                        <div class="kpi-value">1,284</div>
+                        <div class="kpi-value">@Model.TotalUsers.ToString("N0")</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-top">
                             <span class="label">Active tutors</span>
-                            <span class="kpi-badge up">+8%</span>
+                            <span class="kpi-badge @TrendBadgeClass(Model.ActiveTutorsTrendPercent)">@TrendBadgeText(Model.ActiveTutorsTrendPercent)</span>
                         </div>
-                        <div class="kpi-value">312</div>
+                        <div class="kpi-value">@Model.ActiveTutors.ToString("N0")</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-top">
                             <span class="label">Sessions this month</span>
-                            <span class="kpi-badge up">+21%</span>
+                            <span class="kpi-badge @TrendBadgeClass(Model.SessionsTrendPercent)">@TrendBadgeText(Model.SessionsTrendPercent)</span>
                         </div>
-                        <div class="kpi-value">847</div>
+                        <div class="kpi-value">@Model.SessionsThisMonth.ToString("N0")</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-top">
                             <span class="label">Pending verifications</span>
-                            <span class="kpi-badge urgent">Urgent</span>
+                            @if (Model.PendingVerificationsCount > 0)
+                            {
+                                <span class="kpi-badge urgent">Urgent</span>
+                            }
+                            else
+                            {
+                                <span class="kpi-badge up">Clear</span>
+                            }
                         </div>
-                        <div class="kpi-value">5</div>
+                        <div class="kpi-value">@Model.PendingVerificationsCount</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-top">
                             <span class="label">Open complaints</span>
-                            <span class="kpi-badge review">Review</span>
+                            @if (Model.OpenComplaintsCount > 0)
+                            {
+                                <span class="kpi-badge review">Review</span>
+                            }
+                            else
+                            {
+                                <span class="kpi-badge up">Clear</span>
+                            }
                         </div>
-                        <div class="kpi-value">2</div>
+                        <div class="kpi-value">@Model.OpenComplaintsCount</div>
                     </div>
                 </div>
 
@@ -115,69 +179,101 @@
                     <div>
                         <div class="panel chart-panel">
                             <div class="panel-head">
-                                <h2>Session activity — June 2025</h2>
-                                <button class="btn-period">This month</button>
+                                <h2>Session activity — @Model.ChartMonthLabel</h2>
+                                <button class="btn-period" type="button">This month</button>
                             </div>
-                            <div class="chart-axis"><span>40</span></div>
-                            <div class="bar-chart">
-                                <div class="bar-col"><div class="bar" style="height:25%"></div></div>
-                                <div class="bar-col"><div class="bar" style="height:37%"></div></div>
-                                <div class="bar-col"><div class="bar" style="height:50%"></div></div>
-                                <div class="bar-col"><div class="bar" style="height:42%"></div></div>
-                                <div class="bar-col"><div class="bar" style="height:55%"></div></div>
-                                <div class="bar-col"><div class="bar peak" style="height:87%"></div></div>
-                                <div class="bar-col"><div class="bar" style="height:72%"></div></div>
-                                <div class="bar-col"><div class="bar" style="height:52%"></div></div>
-                                <div class="bar-col"><div class="bar" style="height:47%"></div></div>
-                                <div class="bar-col"><div class="bar" style="height:30%"></div></div>
-                            </div>
-                            <div class="bar-labels">
-                                <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
-                                <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
-                            </div>
+                            @if (Model.ChartValues.Sum() == 0)
+                            {
+                                <div class="chart-empty">No sessions recorded yet this month.</div>
+                            }
+                            else
+                            {
+                                <div class="chart-with-axis">
+                                    <div class="chart-axis-y">
+                                        <span>@Model.ChartMax</span>
+                                        <span>@((int)Math.Round(Model.ChartMax * 0.75))</span>
+                                        <span>@((int)Math.Round(Model.ChartMax * 0.5))</span>
+                                        <span>@((int)Math.Round(Model.ChartMax * 0.25))</span>
+                                        <span>0</span>
+                                    </div>
+                                    <div class="chart-plot">
+                                        <div class="bar-chart">
+                                            @foreach (var value in Model.ChartValues)
+                                            {
+                                                var heightPct = Math.Max(2, (int)Math.Round(100.0 * value / Model.ChartMax));
+                                                var isPeak = value == Model.ChartMax && value > 0;
+                                                <div class="bar-col"><div class="bar @(isPeak ? "peak" : "")" style="height:@(heightPct)%"></div></div>
+                                            }
+                                        </div>
+                                        <div class="bar-labels">
+                                            @foreach (var label in Model.ChartLabels)
+                                            {
+                                                <span>@label</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
 
                         <div class="panel">
                             <div class="panel-head"><h2>Recent sessions</h2></div>
-                            <table class="dash-table">
-                                <thead>
-                                    <tr>
-                                        <th>Student</th><th>Tutor</th><th>Subject</th><th>Date</th><th>Amount</th><th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td>Aayusha Shrestha</td><td>Ram Prasad S.</td><td>Mathematics</td><td>10 Jun</td><td>Rs 500</td><td><span class="status-text completed">Completed</span></td></tr>
-                                    <tr><td>Priya Tamang</td><td>Sita Bajracharya</td><td>Science</td><td>10 Jun</td><td>Rs 450</td><td><span class="status-text ongoing">Ongoing</span></td></tr>
-                                    <tr><td>Rohan Bista</td><td>Arjun Karmacharya</td><td>English</td><td>9 Jun</td><td>Rs 400</td><td><span class="status-text completed">Completed</span></td></tr>
-                                    <tr><td>Anisha Maharjan</td><td>Ram Prasad S.</td><td>Mathematics</td><td>9 Jun</td><td>Rs 500</td><td><span class="status-text completed">Completed</span></td></tr>
-                                    <tr><td>Sanjay Gurung</td><td>Nirajan Pradhan</td><td>Chemistry</td><td>8 Jun</td><td>Rs 480</td><td><span class="status-text cancelled">Cancelled</span></td></tr>
-                                    <tr><td>Deepa Karki</td><td>Sita Bajracharya</td><td>Biology</td><td>8 Jun</td><td>Rs 450</td><td><span class="status-text completed">Completed</span></td></tr>
-                                </tbody>
-                            </table>
+                            @if (Model.RecentSessions.Any())
+                            {
+                                <table class="dash-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Student</th>
+                                            <th>Tutor</th>
+                                            <th>Subject</th>
+                                            <th>Date</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var s in Model.RecentSessions)
+                                        {
+                                            <tr>
+                                                <td>@s.StudentName</td>
+                                                <td>@s.TutorName</td>
+                                                <td>@s.Subject</td>
+                                                <td>@s.Date.ToString("d MMM")</td>
+                                                <td><span class="status-text @SessionStatusClass(s.Status)">@s.Status</span></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                            else
+                            {
+                                <p class="empty-row">No sessions recorded yet.</p>
+                            }
                             <a href="#" class="view-all-link">View all sessions →</a>
                         </div>
 
                         <div class="panel">
                             <div class="panel-head">
                                 <h2>Open complaints</h2>
-                                <span class="tag-count" style="background:var(--danger-bg);color:var(--danger);">2</span>
+                                <span class="tag-count" style="background:var(--danger-bg);color:var(--danger);">@Model.OpenComplaintsCount</span>
                             </div>
-                            <div class="complaint-card">
-                                <div class="complaint-info">
-                                    <div class="title">Session not conducted</div>
-                                    <div class="meta">Reported by Rohan Bista · 9 Jun 2025</div>
-                                    <div class="meta">Against: Arjun Karmacharya (English)</div>
-                                </div>
-                                <a href="#" class="mini-btn">Investigate</a>
-                            </div>
-                            <div class="complaint-card warning">
-                                <div class="complaint-info">
-                                    <div class="title">Late cancellation</div>
-                                    <div class="meta">Reported by Priya Tamang · 8 Jun 2025</div>
-                                    <div class="meta">Against: Sita Bajracharya (Science)</div>
-                                </div>
-                                <a href="#" class="mini-btn">Review</a>
-                            </div>
+                            @if (Model.OpenComplaints.Any())
+                            {
+                                @for (var i = 0; i < Model.OpenComplaints.Count; i++)
+                                {
+                                    var c = Model.OpenComplaints[i];
+                                    <div class="complaint-card @(i % 2 == 1 ? "warning" : "")">
+                                        <div class="complaint-info">
+                                            <div class="title">@c.Subject</div>
+                                            <div class="meta">Reported by @c.ReporterName (@c.ReporterRole) · @c.CreatedAt.ToString("d MMM yyyy")</div>
+                                        </div>
+                                        <a asp-controller="Admin" asp-action="Dashboard" class="mini-btn">Review</a>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <p class="empty-row">No open complaints right now.</p>
+                            }
                         </div>
                     </div>
 
@@ -186,79 +282,95 @@
                         <div class="panel">
                             <div class="panel-head">
                                 <h2>Tutor verification queue</h2>
-                                <span class="tag-count">5</span>
+                                <span class="tag-count">@Model.PendingVerificationsCount</span>
                             </div>
-                            <div class="queue-row">
-                                <div class="avatar">NP</div>
-                                <div class="queue-info">
-                                    <div class="name">Nirajan Pradhan</div>
-                                    <div class="meta">Chemistry · Pokhara</div>
-                                </div>
-                                <div class="queue-actions">
-                                    <a href="#" class="mini-btn green">Approve</a>
-                                    <a href="#" class="mini-btn danger">Reject</a>
-                                </div>
-                            </div>
-                            <div class="queue-row">
-                                <div class="avatar purple">SR</div>
-                                <div class="queue-info">
-                                    <div class="name">Sunita Rai</div>
-                                    <div class="meta">English · Lalitpur</div>
-                                </div>
-                                <div class="queue-actions">
-                                    <a href="#" class="mini-btn green">Approve</a>
-                                    <a href="#" class="mini-btn danger">Reject</a>
-                                </div>
-                            </div>
-                            <div class="queue-row">
-                                <div class="avatar yellow">BT</div>
-                                <div class="queue-info">
-                                    <div class="name">Bikram Tamang</div>
-                                    <div class="meta">Physics · Bhaktapur</div>
-                                </div>
-                                <div class="queue-actions">
-                                    <a href="#" class="mini-btn green">Approve</a>
-                                    <a href="#" class="mini-btn danger">Reject</a>
-                                </div>
-                            </div>
-                            <a href="#" class="view-all-link">View all 5 pending →</a>
+                            @if (Model.PendingVerifications.Any())
+                            {
+                                @for (var i = 0; i < Model.PendingVerifications.Count; i++)
+                                {
+                                    var v = Model.PendingVerifications[i];
+                                    <div class="queue-row">
+                                        <div class="avatar @AvatarClass(i)">@v.Initials</div>
+                                        <div class="queue-info">
+                                            <div class="name">@v.Name</div>
+                                            <div class="meta">@(v.FirstSubject ?? "General") · @(v.District ?? "Nepal")</div>
+                                        </div>
+                                        <div class="queue-actions">
+                                            <form asp-controller="Admin" asp-action="ApproveTutor" method="post" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="tutorProfileId" value="@v.TutorProfileId" />
+                                                <button type="submit" class="mini-btn green">Approve</button>
+                                            </form>
+                                            <form asp-controller="Admin" asp-action="RejectTutor" method="post" style="margin:0;" onsubmit="return confirm('Reject this tutor application?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="tutorProfileId" value="@v.TutorProfileId" />
+                                                <button type="submit" class="mini-btn danger">Reject</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                }
+                                <a href="#" class="view-all-link">View all @Model.PendingVerificationsCount pending →</a>
+                            }
+                            else
+                            {
+                                <p class="empty-row">No tutors waiting on verification.</p>
+                            }
                         </div>
 
                         <div class="panel">
                             <div class="panel-head"><h2>Recent registrations</h2></div>
-                            <table class="dash-table">
-                                <thead>
-                                    <tr><th>Name</th><th>Role</th><th>District</th><th>Status</th></tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td>Bijay Thapa</td><td>Student</td><td>Kathmandu</td><td><span class="pill pill-active">Active</span></td></tr>
-                                    <tr><td>Sunita Rai</td><td>Tutor</td><td>Lalitpur</td><td><span class="pill pill-pending2">Pending</span></td></tr>
-                                    <tr><td>Rina Magar</td><td>Student</td><td>Pokhara</td><td><span class="pill pill-active">Active</span></td></tr>
-                                    <tr><td>Bikram Tamang</td><td>Tutor</td><td>Bhaktapur</td><td><span class="pill pill-pending2">Pending</span></td></tr>
-                                    <tr><td>Manisha Koirala</td><td>Student</td><td>Chitwan</td><td><span class="pill pill-active">Active</span></td></tr>
-                                    <tr><td>Nirajan Pradhan</td><td>Tutor</td><td>Pokhara</td><td><span class="pill pill-pending2">Pending</span></td></tr>
-                                </tbody>
-                            </table>
+                            @if (Model.RecentRegistrations.Any())
+                            {
+                                <table class="dash-table">
+                                    <thead>
+                                        <tr><th>Name</th><th>Role</th><th>District</th><th>Status</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var u in Model.RecentRegistrations)
+                                        {
+                                            <tr>
+                                                <td>@u.Name</td>
+                                                <td>@u.Role</td>
+                                                <td>@(u.District ?? "—")</td>
+                                                <td>
+                                                    @if (u.StatusLabel == "Active")
+                                                    {
+                                                        <span class="pill pill-active">Active</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="pill pill-pending2">Pending</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                            else
+                            {
+                                <p class="empty-row">No registrations yet.</p>
+                            }
                             <a href="#" class="view-all-link">View all users →</a>
                         </div>
 
                         <div class="panel">
                             <div class="panel-head"><h2>Platform health</h2></div>
                             <div class="progress-row">
-                                <div class="progress-label"><span>Tutor approval rate</span><span>86%</span></div>
-                                <div class="progress-track"><div class="progress-fill" style="width:86%"></div></div>
+                                <div class="progress-label"><span>Tutor approval rate</span><span>@Model.TutorApprovalRatePercent%</span></div>
+                                <div class="progress-track"><div class="progress-fill" style="width:@(Model.TutorApprovalRatePercent)%"></div></div>
                             </div>
                             <div class="progress-row">
-                                <div class="progress-label"><span>Session completion rate</span><span>92%</span></div>
-                                <div class="progress-track"><div class="progress-fill" style="width:92%"></div></div>
+                                <div class="progress-label"><span>Session completion rate</span><span>@Model.SessionCompletionRatePercent%</span></div>
+                                <div class="progress-track"><div class="progress-fill" style="width:@(Model.SessionCompletionRatePercent)%"></div></div>
                             </div>
                             <div class="progress-row">
-                                <div class="progress-label"><span>Student satisfaction</span><span>95%</span></div>
-                                <div class="progress-track"><div class="progress-fill" style="width:95%"></div></div>
+                                <div class="progress-label"><span>Student satisfaction</span><span>@Model.StudentSatisfactionPercent%</span></div>
+                                <div class="progress-track"><div class="progress-fill" style="width:@(Model.StudentSatisfactionPercent)%"></div></div>
                             </div>
                             <div class="progress-row">
-                                <div class="progress-label"><span>Complaint resolution rate</span><span>80%</span></div>
-                                <div class="progress-track"><div class="progress-fill orange" style="width:80%"></div></div>
+                                <div class="progress-label"><span>Complaint resolution rate</span><span>@Model.ComplaintResolutionRatePercent%</span></div>
+                                <div class="progress-track"><div class="progress-fill orange" style="width:@(Model.ComplaintResolutionRatePercent)%"></div></div>
                             </div>
                         </div>
                     </div>
@@ -267,32 +379,24 @@
                 <div class="panel">
                     <div class="panel-head">
                         <h2>Recent activity log</h2>
-                        <a href="#" class="mini-btn panel-action">View all</a>
+                        <span class="mini-btn panel-action" style="opacity:.6;cursor:not-allowed;" title="Coming soon">View all</span>
                     </div>
-                    <div class="activity-item">
-                        <div class="activity-dot green"></div>
-                        <div class="activity-time">10:32 AM</div>
-                        <div class="activity-text"><strong>New student registration</strong> — Bijay Thapa, Kathmandu</div>
-                        <span class="activity-tag student">Student</span>
-                    </div>
-                    <div class="activity-item">
-                        <div class="activity-dot green"></div>
-                        <div class="activity-time">09:48 AM</div>
-                        <div class="activity-text"><strong>Session completed</strong> — Ram Prasad × Aayusha Shrestha (Maths)</div>
-                        <span class="activity-tag session">Session</span>
-                    </div>
-                    <div class="activity-item">
-                        <div class="activity-dot orange"></div>
-                        <div class="activity-time">09:15 AM</div>
-                        <div class="activity-text"><strong>Tutor verification submitted</strong> — Nirajan Pradhan, Chemistry</div>
-                        <span class="activity-tag verify">Verify</span>
-                    </div>
-                    <div class="activity-item">
-                        <div class="activity-dot red"></div>
-                        <div class="activity-time">08:50 AM</div>
-                        <div class="activity-text"><strong>Complaint filed</strong> — Rohan Bista against Arjun Karmacharya</div>
-                        <span class="activity-tag review">Review</span>
-                    </div>
+                    @if (Model.RecentActivity.Any())
+                    {
+                        @foreach (var a in Model.RecentActivity)
+                        {
+                            <div class="activity-item">
+                                <div class="activity-dot @a.DotClass"></div>
+                                <div class="activity-time">@a.Timestamp.ToString("h:mm tt")</div>
+                                <div class="activity-text"><strong>@a.BoldLead</strong> — @a.RestText</div>
+                                <span class="activity-tag @a.TagClass">@a.Tag</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="empty-row">No recent activity yet.</p>
+                    }
                 </div>
             </main>
         </div>
