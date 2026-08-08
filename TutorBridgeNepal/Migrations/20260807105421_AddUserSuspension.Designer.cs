@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TutorBridgeNepal.Data;
 
@@ -11,9 +12,11 @@ using TutorBridgeNepal.Data;
 namespace TutorBridgeNepal.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260807105421_AddUserSuspension")]
+    partial class AddUserSuspension
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -583,13 +586,7 @@ namespace TutorBridgeNepal.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("DocumentType")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("FileName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FilePath")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Icon")
@@ -605,9 +602,6 @@ namespace TutorBridgeNepal.Migrations
 
                     b.Property<int>("TutorProfileId")
                         .HasColumnType("int");
-
-                    b.Property<DateTime>("UploadedAt")
-                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
@@ -637,12 +631,6 @@ namespace TutorBridgeNepal.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("DisplayName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Education")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ExperienceSummary")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsAvailableNow")
@@ -694,9 +682,6 @@ namespace TutorBridgeNepal.Migrations
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime?>("VerificationDecidedAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<bool>("VerificationRejected")
                         .HasColumnType("bit");

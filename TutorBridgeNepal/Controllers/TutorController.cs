@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 using TutorBridgeNepal.Data;
+using TutorBridgeNepal.Helpers;
 using TutorBridgeNepal.Models;
 using TutorBridgeNepal.ViewModels;
 
@@ -14,12 +16,45 @@ public class TutorController : Controller
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
+    private readonly IWebHostEnvironment _webHostEnvironment;
 
-    public TutorController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager)
+    public TutorController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment)
     {
         _context = context;
         _userManager = userManager;
         _signInManager = signInManager;
+        _webHostEnvironment = webHostEnvironment;
+    }
+
+    // The only actions an unverified (pending or rejected) tutor may reach.
+    // Everything else in this controller - dashboard, bookings, messages,
+    // settings, the full profile editor - is off limits until an admin sets
+    // IsVerified = true. This is the actual access gate; the login/register
+    // flow just routes people toward VerificationPending, it doesn't enforce
+    // anything by itself.
+    private static readonly string[] AllowedWhileUnverified =
+    {
+        "VerificationPending",
+        "UploadVerificationDocument",
+        "RemoveVerificationDocument",
+        "DownloadOwnVerificationDocument"
+    };
+
+    public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+    {
+        var actionName = context.ActionDescriptor.RouteValues?["action"];
+
+        if (actionName == null || !AllowedWhileUnverified.Contains(actionName))
+        {
+            var tutor = await GetCurrentTutorProfileAsync();
+            if (tutor != null && !tutor.IsVerified)
+            {
+                context.Result = RedirectToAction("VerificationPending");
+                return;
+            }
+        }
+
+        await next();
     }
 
     private static string GetInitials(string fullName)
@@ -29,10 +64,7 @@ public class TutorController : Controller
         if (parts.Length == 1) return parts[0][..Math.Min(2, parts[0].Length)].ToUpper();
         return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
     }
-    // Real (not invented) district -> province mapping, used only to show
-    // "Kathmandu, Bagmati Province" next to the district the tutor already
-    // selected. Covers the districts offered in the registration/settings
-    // dropdowns; falls back to just the district name if not listed.
+
     private static readonly Dictionary<string, string> DistrictToProvince = new()
     {
         ["Kathmandu"] = "Bagmati Province",
@@ -41,6 +73,15 @@ public class TutorController : Controller
         ["Chitwan"] = "Bagmati Province",
         ["Pokhara"] = "Gandaki Province",
         ["Biratnagar"] = "Koshi Province",
+    };
+
+    // The four documents the verification checklist always looks for.
+    private static readonly (string Type, string Label, string Icon)[] RequiredVerificationDocuments =
+    {
+        ("Citizenship",        "Citizenship.pdf",         "🪪"),
+        ("CVResume",           "CV_Resume.pdf",           "📄"),
+        ("DegreeCertificate",  "Degree_Certificate.pdf",  "🎓"),
+        ("PoliceReport",       "Police_Report.pdf",       "🛡️"),
     };
 
     private async Task<TutorProfile?> GetCurrentTutorProfileAsync()
@@ -68,6 +109,53 @@ public class TutorController : Controller
         ViewData["UnreadMessageCount"] = unreadMessageCount;
         ViewData["ShowAvailabilityBadge"] = tutor.ShowAvailabilityBadge;
     }
+
+    // ── 1b: VerificationPending ───────────────────────────────────────────
+
+    // Landing page for a tutor whose application hasn't been approved yet.
+    // Reachable regardless of verification state (see AllowedWhileUnverified
+    // above); every other action in this controller redirects here instead
+    // of running until IsVerified becomes true.
+    public async Task<IActionResult> VerificationPending()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        if (tutor.IsVerified)
+        {
+            return RedirectToAction("Dashboard");
+        }
+
+        var credentials = await _context.TutorCredentials
+            .Where(c => c.TutorProfileId == tutor.Id)
+            .ToListAsync();
+
+        var vm = new TutorVerificationPendingViewModel
+        {
+            FullName = tutor.User.FullName,
+            Initials = GetInitials(tutor.User.FullName),
+            IsRejected = tutor.VerificationRejected,
+            SubmittedAt = tutor.User.CreatedAt,
+            RequiredDocuments = RequiredVerificationDocuments.Select(rd =>
+            {
+                var match = credentials.FirstOrDefault(c => c.DocumentType == rd.Type);
+                return new TutorDocumentSlotViewModel
+                {
+                    DocumentType = rd.Type,
+                    Label = rd.Label,
+                    Icon = rd.Icon,
+                    IsUploaded = match != null,
+                    CredentialId = match?.Id,
+                    OriginalFileName = match?.FileName,
+                    UploadedAt = match?.UploadedAt
+                };
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    // ── Dashboard ─────────────────────────────────────────────────────────
 
     public async Task<IActionResult> Dashboard()
     {
@@ -178,12 +266,12 @@ public class TutorController : Controller
             TodaySchedule = todaySchedule.Select(ToRow).ToList(),
             PendingRequests = pending.Select(ToRow).ToList(),
             RecentSessions = bookings
-            .Where(b => b.Status != "Pending" && b.TutorAvailabilitySlot.StartTime < now)
-            .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
-            .Take(5)
-            .Select(ToRow)
-            .ToList(),
-                    MyStudents = myStudents,
+                .Where(b => b.Status != "Pending" && b.TutorAvailabilitySlot.StartTime < now)
+                .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+                .Take(5)
+                .Select(ToRow)
+                .ToList(),
+            MyStudents = myStudents,
             RecentReviews = recentReviews
         };
 
@@ -254,8 +342,6 @@ public class TutorController : Controller
             .Include(b => b.TutorAvailabilitySlot)
             .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id && b.Status == "Confirmed");
 
-        // Can only mark a session complete once it has actually started - stops
-        // a tutor from marking a future session done before it happens.
         if (booking != null && booking.TutorAvailabilitySlot.StartTime <= DateTime.Now)
         {
             booking.Status = "Completed";
@@ -399,7 +485,7 @@ public class TutorController : Controller
             .Where(r => r.TutorProfileId == tutorProfileId)
             .ToListAsync();
 
-        if (!rules.Any()) return; // tutor hasn't set up weekly availability yet
+        if (!rules.Any()) return;
 
         var now = DateTime.Now;
         var horizon = DateTime.Today.AddDays(daysAhead);
@@ -470,9 +556,9 @@ public class TutorController : Controller
         if (view == "month")
         {
             var monthStart = new DateTime(anchor.Year, anchor.Month, 1);
-            int leadingDays = (int)monthStart.DayOfWeek; // Sunday = 0, matches mockup's Sun-first grid
+            int leadingDays = (int)monthStart.DayOfWeek;
             rangeStart = monthStart.AddDays(-leadingDays);
-            rangeEndExclusive = rangeStart.AddDays(42); // fixed 6-row grid
+            rangeEndExclusive = rangeStart.AddDays(42);
             rangeLabel = monthStart.ToString("MMMM yyyy");
         }
         else
@@ -688,9 +774,6 @@ public class TutorController : Controller
             CreatedAt = DateTime.Now
         });
 
-        // Only remove slots with NO booking history at all (even a cancelled
-        // booking still references its slot via a Restrict FK, so it can't be
-        // deleted - only genuinely untouched slots are safe to remove here).
         var removableSlotIds = await _context.TutorAvailabilitySlots
             .Where(s => s.TutorProfileId == tutor.Id && s.StartTime < endAt && s.EndTime > startAt)
             .Where(s => !_context.Bookings.Any(b => b.TutorAvailabilitySlotId == s.Id))
@@ -844,7 +927,6 @@ public class TutorController : Controller
         }
 
         var allCards = studentGroups.Select(BuildCard).ToList();
-
         var activeCards = allCards.Where(c => c.StatusLabel == "Active").ToList();
         var pastCards = allCards.Where(c => c.StatusLabel == "Past").ToList();
 
@@ -862,14 +944,10 @@ public class TutorController : Controller
         }
 
         if (!string.IsNullOrWhiteSpace(grade))
-        {
             scoped = scoped.Where(c => c.GradeLevel == grade);
-        }
 
         if (!string.IsNullOrWhiteSpace(subject))
-        {
             scoped = scoped.Where(c => c.Subjects.Contains(subject));
-        }
 
         scoped = sort switch
         {
@@ -912,9 +990,6 @@ public class TutorController : Controller
 
         var now = DateTime.Now;
 
-        // Conversations = students this tutor has an actual booking relationship
-        // with (same rule as the Student side - you can only message someone
-        // you've booked with).
         var allBookings = await _context.Bookings
             .Include(b => b.StudentProfile).ThenInclude(s => s.User)
             .Include(b => b.TutorAvailabilitySlot)
@@ -986,8 +1061,6 @@ public class TutorController : Controller
                     await _context.SaveChangesAsync();
                 }
 
-                // Zero the unread count on the shared list now that it's been read,
-                // before the tab/search filter below runs.
                 activeConvo.UnreadCount = 0;
 
                 vm.ActiveStudentProfileId = activeConvo.StudentProfileId;
@@ -1014,7 +1087,7 @@ public class TutorController : Controller
         IEnumerable<TutorConversationListItemViewModel> scopedConvos = tab switch
         {
             "unread" => conversations.Where(c => c.UnreadCount > 0),
-            _ => conversations // "all" and "students" show the same real set - there's no other conversation source
+            _ => conversations
         };
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -1029,13 +1102,8 @@ public class TutorController : Controller
         return View(vm);
     }
 
-    // ---------------------------------------------------------------------
-    // ADDED: this action was missing. Views/Tutor/Messages.cshtml (line 172)
-    // already posts here with `studentProfileId` (hidden input) and `content`
-    // (text input) - without this action the tutor-side Send button had
-    // nothing to call. Mirrors StudentController.SendMessage, but checks the
-    // booking relationship from the tutor's side instead of the student's.
-    // ---------------------------------------------------------------------
+    // ── 1c/1d: SendMessage (was missing — added) ──────────────────────────
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SendMessage(int studentProfileId, string content)
@@ -1044,12 +1112,8 @@ public class TutorController : Controller
         if (tutor == null) return RedirectToAction("Index", "Home");
 
         if (string.IsNullOrWhiteSpace(content))
-        {
             return RedirectToAction("Messages", new { studentProfileId });
-        }
 
-        // Only allow messaging a student the tutor actually has a booking
-        // relationship with (same rule as the Student side's SendMessage).
         var hasRelationship = await _context.Bookings
             .AnyAsync(b => b.TutorProfileId == tutor.Id && b.StudentProfileId == studentProfileId);
 
@@ -1103,21 +1167,18 @@ public class TutorController : Controller
 
         scoped = sort == "oldest" ? scoped.OrderBy(r => r.CreatedAt) : scoped.OrderByDescending(r => r.CreatedAt);
 
-        // "What students say most" - real keyword matching over actual comment
-        // text, not an invented/AI-generated summary. Only phrases that
-        // genuinely appear (case-insensitively) in real comments show up here.
         var phraseGroups = new (string Label, string[] Matches)[]
         {
             ("Clear explanations", new[] { "clear" }),
-            ("Patient", new[] { "patient" }),
-            ("Well-prepared", new[] { "prepared" }),
-            ("Improved grades", new[] { "improved", "grade" }),
-            ("Punctual", new[] { "punctual", "on time" }),
-            ("Exam-focused", new[] { "exam", "see prep", "board exam" }),
-            ("Helpful", new[] { "helpful" }),
-            ("Friendly", new[] { "friendly" }),
-            ("Recommend", new[] { "recommend" }),
-            ("Runs long", new[] { "long", "runs over" }),
+            ("Patient",            new[] { "patient" }),
+            ("Well-prepared",      new[] { "prepared" }),
+            ("Improved grades",    new[] { "improved", "grade" }),
+            ("Punctual",           new[] { "punctual", "on time" }),
+            ("Exam-focused",       new[] { "exam", "see prep", "board exam" }),
+            ("Helpful",            new[] { "helpful" }),
+            ("Friendly",           new[] { "friendly" }),
+            ("Recommend",          new[] { "recommend" }),
+            ("Runs long",          new[] { "long", "runs over" }),
         };
 
         var allComments = reviews.Where(r => !string.IsNullOrWhiteSpace(r.Comment)).Select(r => r.Comment!.ToLowerInvariant()).ToList();
@@ -1129,20 +1190,16 @@ public class TutorController : Controller
             .Select(p => p.Label)
             .ToList();
 
-        // Platform average - real cross-tutor query, simple mean across every
-        // reviewed tutor (not weighted by review count).
         var platformRatings = await _context.TutorProfiles
             .Where(t => t.ReviewCount > 0)
             .Select(t => t.AverageRating)
             .ToListAsync();
         var platformAverage = platformRatings.Any() ? Math.Round(platformRatings.Average(), 2) : 0m;
 
-        // Lifetime response rate (accept/decline vs total requests received)
         var allBookings = await _context.Bookings.Where(b => b.TutorProfileId == tutor.Id).ToListAsync();
         var decidedCount = allBookings.Count(b => b.DecidedAt.HasValue);
         var responseRate = allBookings.Any() ? (int?)Math.Round(decidedCount * 100.0 / allBookings.Count) : null;
 
-        // Repeat booking rate - % of students who booked more than once
         var studentBookingCounts = allBookings
             .Where(b => b.Status != "Cancelled")
             .GroupBy(b => b.StudentProfileId)
@@ -1152,7 +1209,6 @@ public class TutorController : Controller
             ? (int?)Math.Round(studentBookingCounts.Count(c => c >= 2) * 100.0 / studentBookingCounts.Count)
             : null;
 
-        // Top 5% - real percentile rank among all reviewed tutors by average rating
         var isTopFivePercent = false;
         if (platformRatings.Count >= 2 && tutor.ReviewCount > 0)
         {
@@ -1202,9 +1258,7 @@ public class TutorController : Controller
         if (tutor == null) return RedirectToAction("Index", "Home");
 
         if (string.IsNullOrWhiteSpace(reply))
-        {
             return RedirectToAction("Reviews");
-        }
 
         var review = await _context.Reviews
             .FirstOrDefaultAsync(r => r.Id == reviewId && r.TutorProfileId == tutor.Id);
@@ -1239,8 +1293,6 @@ public class TutorController : Controller
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
 
-        // Top tutor badge - genuine percentile rank among reviewed tutors,
-        // same computation as the "Top 5%" badge on the Reviews page.
         var platformRatings = await _context.TutorProfiles
             .Where(t => t.ReviewCount > 0)
             .Select(t => t.AverageRating)
@@ -1299,27 +1351,23 @@ public class TutorController : Controller
         return View(vm);
     }
 
-    // Weighted checklist behind the "Profile completion" bar. "Video intro"
-    // has no upload feature yet, so it never counts as complete - that's why
-    // the bar can never reach 100% honestly until that feature exists.
     private static (int Percent, string? Hint) CalculateProfileCompletion(TutorProfile tutor, int subjectCount, int credentialCount, int languageCount, int teachingStyleCount)
     {
         var checklist = new (bool Done, string Label)[]
         {
-        (!string.IsNullOrWhiteSpace(tutor.DisplayName), "Add a display name"),
-        (!string.IsNullOrWhiteSpace(tutor.Bio) && tutor.Bio.Trim().Length >= 20, "Write a bio"),
-        (!string.IsNullOrWhiteSpace(tutor.User.District), "Add your district"),
-        (tutor.YearsOfExperience > 0, "Add your years of experience"),
-        (!string.IsNullOrWhiteSpace(tutor.TeachingMode), "Set your teaching mode"),
-        (languageCount > 0, "Add a language you teach in"),
-        (teachingStyleCount > 0, "Add a teaching style tag"),
-        (subjectCount > 0, "Add a subject"),
-        (credentialCount > 0, "Add a credential or document"),
-        (false, "Add a video intro"), // never true - no upload feature yet
+            (!string.IsNullOrWhiteSpace(tutor.DisplayName),                          "Add a display name"),
+            (!string.IsNullOrWhiteSpace(tutor.Bio) && tutor.Bio.Trim().Length >= 20, "Write a bio"),
+            (!string.IsNullOrWhiteSpace(tutor.User.District),                        "Add your district"),
+            (tutor.YearsOfExperience > 0,                                            "Add your years of experience"),
+            (!string.IsNullOrWhiteSpace(tutor.TeachingMode),                         "Set your teaching mode"),
+            (languageCount > 0,                                                       "Add a language you teach in"),
+            (teachingStyleCount > 0,                                                  "Add a teaching style tag"),
+            (subjectCount > 0,                                                        "Add a subject"),
+            (credentialCount > 0,                                                     "Add a credential or document"),
+            (false,                                                                   "Add a video intro"),
         };
 
         var doneCount = checklist.Count(c => c.Done);
-        // ... (leave the rest of this method exactly as it already is below this point)
         var percent = (int)Math.Round(doneCount * 100.0 / checklist.Length);
         var firstMissing = checklist.FirstOrDefault(c => !c.Done).Label;
 
@@ -1405,7 +1453,94 @@ public class TutorController : Controller
         return RedirectToAction("Profile");
     }
 
-    private async Task<TutorSettingsPageViewModel> BuildSettingsViewModelAsync(TutorProfile tutor)
+    // ── 1c/1d: UploadVerificationDocument / RemoveVerificationDocument ────
+    // redirect target now depends on verification state
+
+    public async Task<IActionResult> UploadVerificationDocument(string documentType, IFormFile file)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var allowedTypes = RequiredVerificationDocuments.Select(d => d.Type).ToArray();
+        if (!allowedTypes.Contains(documentType))
+            return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
+
+        if (file == null || file.Length == 0)
+            return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
+
+        var uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "credentials");
+        Directory.CreateDirectory(uploadsFolder);
+        var uniqueFileName = $"{tutor.Id}_{documentType}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+        var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+        await using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        var existing = await _context.TutorCredentials
+            .FirstOrDefaultAsync(c => c.TutorProfileId == tutor.Id && c.DocumentType == documentType);
+
+        var docMeta = RequiredVerificationDocuments.First(d => d.Type == documentType);
+
+        if (existing != null)
+        {
+            existing.FileName = file.FileName;
+            existing.FilePath = $"/uploads/credentials/{uniqueFileName}";
+            existing.UploadedAt = DateTime.Now;
+        }
+        else
+        {
+            var maxOrder = await _context.TutorCredentials
+                .Where(c => c.TutorProfileId == tutor.Id)
+                .Select(c => (int?)c.SortOrder)
+                .MaxAsync() ?? -1;
+
+            _context.TutorCredentials.Add(new TutorCredential
+            {
+                TutorProfileId = tutor.Id,
+                DocumentType = documentType,
+                Title = docMeta.Label,
+                FileName = file.FileName,
+                FilePath = $"/uploads/credentials/{uniqueFileName}",
+                Icon = docMeta.Icon,
+                SortOrder = maxOrder + 1,
+                UploadedAt = DateTime.Now
+            });
+        }
+
+        await _context.SaveChangesAsync();
+
+        TempData["ProfileSuccess"] = "Document uploaded.";
+        return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveVerificationDocument(int credentialId)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var credential = await _context.TutorCredentials
+            .FirstOrDefaultAsync(c => c.Id == credentialId && c.TutorProfileId == tutor.Id);
+
+        if (credential != null)
+        {
+            _context.TutorCredentials.Remove(credential);
+            await _context.SaveChangesAsync();
+        }
+
+        TempData["ProfileSuccess"] = "Document removed.";
+        return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
+    }
+
+    private async Task BuildSettingsViewModelAsync(TutorProfile tutor)
+    {
+        // intentional no-op placeholder; real implementation in BuildSettingsViewModelAsync below
+    }
+
+    private async Task<TutorSettingsPageViewModel> BuildSettingsVmAsync(TutorProfile tutor)
     {
         return new TutorSettingsPageViewModel
         {
@@ -1430,7 +1565,7 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
         await SetTutorSidebarContextAsync("settings", tutor);
-        return View(await BuildSettingsViewModelAsync(tutor));
+        return View(await BuildSettingsVmAsync(tutor));
     }
 
     public async Task<IActionResult> SettingsAvailability()
@@ -1438,7 +1573,7 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
         await SetTutorSidebarContextAsync("settings", tutor);
-        return View(await BuildSettingsViewModelAsync(tutor));
+        return View(await BuildSettingsVmAsync(tutor));
     }
 
     public async Task<IActionResult> SettingsBookingPolicy()
@@ -1446,7 +1581,7 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
         await SetTutorSidebarContextAsync("settings", tutor);
-        return View(await BuildSettingsViewModelAsync(tutor));
+        return View(await BuildSettingsVmAsync(tutor));
     }
 
     public async Task<IActionResult> SettingsNotifications()
@@ -1454,7 +1589,7 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
         await SetTutorSidebarContextAsync("settings", tutor);
-        return View(await BuildSettingsViewModelAsync(tutor));
+        return View(await BuildSettingsVmAsync(tutor));
     }
 
     public async Task<IActionResult> SettingsPrivacy()
@@ -1462,7 +1597,7 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
         await SetTutorSidebarContextAsync("settings", tutor);
-        return View(await BuildSettingsViewModelAsync(tutor));
+        return View(await BuildSettingsVmAsync(tutor));
     }
 
     public async Task<IActionResult> SettingsDevices()
@@ -1470,7 +1605,7 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
         await SetTutorSidebarContextAsync("settings", tutor);
-        return View(await BuildSettingsViewModelAsync(tutor));
+        return View(await BuildSettingsVmAsync(tutor));
     }
 
     public async Task<IActionResult> SettingsCalendar()
@@ -1478,7 +1613,7 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
         await SetTutorSidebarContextAsync("settings", tutor);
-        return View(await BuildSettingsViewModelAsync(tutor));
+        return View(await BuildSettingsVmAsync(tutor));
     }
 
     public async Task<IActionResult> SettingsDeactivate()
@@ -1486,7 +1621,7 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
         await SetTutorSidebarContextAsync("settings", tutor);
-        return View(await BuildSettingsViewModelAsync(tutor));
+        return View(await BuildSettingsVmAsync(tutor));
     }
 
     [HttpPost]
@@ -1554,10 +1689,6 @@ public class TutorController : Controller
         return RedirectToAction("SettingsAccount");
     }
 
-    // Invalidates every existing login cookie for this account (this device
-    // included) by rotating the Identity security stamp - a real ASP.NET Core
-    // Identity mechanism, not a fabricated device list. There is no per-device
-    // tracking table, so we can't show/target individual devices.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SignOutAllDevices()
@@ -1656,6 +1787,7 @@ public class TutorController : Controller
         TempData["SettingsSuccessGlobal"] = "Your tutor account has been deactivated. Contact support to reactivate it.";
         return RedirectToAction("TutorLogin", "Account");
     }
+
     public async Task<IActionResult> HelpSupport()
     {
         var tutor = await GetCurrentTutorProfileAsync();

@@ -13,6 +13,27 @@ public class TutorProfile
     // Optional public-facing name shown instead of FullName (e.g. "Ram Sir").
     public string? DisplayName { get; set; }
 
+    // --- Verification application fields (Admin > Tutor Verification) ---
+
+    // Free text, same storage pattern as Bio/TeachingStyle, e.g.
+    // "B.Sc Chemistry, Tribhuvan University (2021)". Shown on the
+    // verification review card; entered by the tutor at registration/profile
+    // edit time, reviewed (not edited) by the admin.
+    public string? Education { get; set; }
+
+    // Free text summary of prior tutoring/teaching experience, e.g.
+    // "3 years private tutoring · Grade 9-12, NEB Board". Distinct from
+    // YearsOfExperience (a number used across the platform for search/
+    // sorting) - this is the human-readable sentence shown to reviewers.
+    public string? ExperienceSummary { get; set; }
+
+    // Set the moment an admin approves or rejects the application (see
+    // AdminController.ApproveTutor/RejectTutor). Null while pending. Used
+    // together with User.CreatedAt (treated as the submission date) to
+    // compute review turnaround time and this month's approved/rejected
+    // counts on the Tutor Verification page.
+    public DateTime? VerificationDecidedAt { get; set; }
+
     // e.g. "Online & In-person" - free text, matches the select options in the view.
     public string? TeachingMode { get; set; }
 

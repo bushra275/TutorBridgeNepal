@@ -42,6 +42,14 @@
                 <div class="alert alert-success">@TempData["2faSuccess"]</div>
             }
 
+            @if (Model.Is2faEnabled)
+            {
+                <form asp-action="AdminDisableAuthenticator" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="tb-btn-outline">Disable two-factor authentication</button>
+                </form>
+            }
+
             <ol class="mb-4">
                 <li>Install an authenticator app (Google Authenticator, Authy, Microsoft Authenticator).</li>
                 <li>Scan this QR code, or enter the key manually if scanning isn't possible.</li>

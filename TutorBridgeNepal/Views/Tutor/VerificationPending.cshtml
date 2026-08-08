@@ -1,0 +1,163 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorVerificationPendingViewModel
+@{
+    ViewData["Title"] = "Verification Pending";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verification Pending - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
+    <style>
+        .vp-shell {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--cream);
+            padding: 2.5rem 1.2rem;
+        }
+
+        .vp-topbar {
+            width: 100%;
+            max-width: 720px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .vp-card {
+            width: 100%;
+            max-width: 720px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 2rem;
+        }
+
+        .vp-head {
+            display: flex;
+            align-items: center;
+            gap: .9rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .vp-head .avatar {
+            width: 50px;
+            height: 50px;
+            font-size: 1rem;
+        }
+
+        .vp-title {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--ink);
+        }
+
+        .vp-subtitle {
+            font-size: .86rem;
+            color: var(--muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="vp-shell">
+        <div class="vp-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <a asp-controller="Account" asp-action="Logout" class="tb-btn-outline" style="padding:.5rem 1rem; font-size:.82rem;">Log out</a>
+        </div>
+
+        <div class="vp-card">
+            <div class="vp-head">
+                <div class="avatar">@Model.Initials</div>
+                <div>
+                    <div class="vp-title">@Model.FullName</div>
+                    <div class="vp-subtitle">Applied @Model.SubmittedAt.ToString("MMM d, yyyy")</div>
+                </div>
+            </div>
+
+            @if (Model.IsRejected)
+            {
+                <div class="status-banner error mb-3">
+                    Your application wasn't approved. Please review the documents below, replace anything missing or incorrect, and resubmit - your application will go back to an admin for another look automatically.
+                </div>
+            }
+            else if (Model.AllDocumentsUploaded)
+            {
+                <div class="status-banner warn mb-3">
+                    Your documents are submitted and waiting for an admin to review them. You'll be able to access your dashboard as soon as your application is approved - check back here anytime to see the current status.
+                </div>
+            }
+            else
+            {
+                <div class="status-banner info mb-3">
+                    Before you can access your tutor dashboard, an admin needs to verify your identity and credentials. Upload the documents below to submit your application for review.
+                </div>
+            }
+
+            @if (TempData["ProfileSuccess"] != null)
+            {
+                <div class="status-banner success mb-3">@TempData["ProfileSuccess"]</div>
+            }
+            @if (TempData["ProfileError"] != null)
+            {
+                <div class="status-banner error mb-3">@TempData["ProfileError"]</div>
+            }
+
+            <div class="panel-head"><h2>Required documents</h2></div>
+
+            <div class="mp-doc-checklist">
+                @foreach (var doc in Model.RequiredDocuments)
+                {
+                    <div class="mp-doc-row">
+                        <div class="mp-doc-info">
+                            <span class="mp-doc-icon">@doc.Icon</span>
+                            <div>
+                                <div class="mp-doc-label">@doc.Label</div>
+                                @if (doc.IsUploaded)
+                                {
+                                    <div class="mp-doc-meta">Uploaded @(doc.UploadedAt?.ToString("MMM d, yyyy"))</div>
+                                }
+                                else
+                                {
+                                    <div class="mp-doc-meta mp-doc-missing">Not uploaded yet</div>
+                                }
+                            </div>
+                        </div>
+                        <div class="mp-doc-actions">
+                            @if (doc.IsUploaded)
+                            {
+                                <a class="mp-doc-btn" asp-action="DownloadOwnVerificationDocument" asp-route-credentialId="@doc.CredentialId" target="_blank">View</a>
+                                <form asp-action="RemoveVerificationDocument" method="post" style="margin:0;" onsubmit="return confirm('Remove this document? You will need to re-upload it before an admin can approve your application.');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="credentialId" value="@doc.CredentialId" />
+                                    <button type="submit" class="mp-doc-btn mp-doc-btn-danger">Remove</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form asp-action="UploadVerificationDocument" method="post" enctype="multipart/form-data" style="margin:0; display:flex; gap:.4rem; align-items:center;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="documentType" value="@doc.DocumentType" />
+                                    <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required class="mp-doc-file-input" />
+                                    <button type="submit" class="mp-doc-btn mp-doc-btn-primary">Upload</button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+            <p class="mp-doc-hint">PDF, JPG, or PNG - up to 10 MB. Reviewed manually by an admin - there's no fixed turnaround time, but you can check back on this page anytime for your current status.</p>
+        </div>
+    </div>
+</body>
+</html>

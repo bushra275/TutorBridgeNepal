@@ -30,6 +30,27 @@ public class TutorProfilePageViewModel
     public string? ProfileCompletionHint { get; set; }
 }
 
+public class TutorVerificationPendingViewModel
+{
+    public string FullName { get; set; } = string.Empty;
+    public string Initials { get; set; } = string.Empty;
+    public bool IsRejected { get; set; }
+    public DateTime SubmittedAt { get; set; }
+    public List<TutorDocumentSlotViewModel> RequiredDocuments { get; set; } = new();
+    public bool AllDocumentsUploaded => RequiredDocuments.All(d => d.IsUploaded);
+}
+
+public class TutorDocumentSlotViewModel
+{
+    public string DocumentType { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public string Icon { get; set; } = "📄";
+    public bool IsUploaded { get; set; }
+    public int? CredentialId { get; set; }
+    public string? OriginalFileName { get; set; }
+    public DateTime? UploadedAt { get; set; }
+}
+
 public class TutorSubjectRowViewModel
 {
     public int Id { get; set; }

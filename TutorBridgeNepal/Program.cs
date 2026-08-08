@@ -18,6 +18,12 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 .AddRoles<IdentityRole>()
 .AddEntityFrameworkStores<ApplicationDbContext>();
 
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.AccessDeniedPath = "/Account/Login";
+});
+
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
@@ -43,6 +49,7 @@ using (var scope = app.Services.CreateScope())
 {
     await DbSeeder.SeedRolesAndAdminAsync(scope.ServiceProvider);
     await DbSeeder.SeedSampleTutorsAsync(scope.ServiceProvider);
+    await DbSeeder.SeedTutorVerificationApplicationsAsync(scope.ServiceProvider);
 }
 
 app.Run();

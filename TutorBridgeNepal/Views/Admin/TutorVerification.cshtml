@@ -1,0 +1,288 @@
+﻿@model TutorBridgeNepal.ViewModels.AdminTutorVerificationViewModel
+@{
+    ViewData["Title"] = "Tutor Verification";
+    Layout = null;
+
+    string TabUrl(string tab) => Url.Action("TutorVerification", new
+    {
+        tab,
+        search = Model.Search,
+        subject = Model.SubjectFilter,
+        district = Model.DistrictFilter,
+        submitted = Model.SubmittedFilter,
+        sort = Model.Sort,
+        visibleCount = 3
+    })!;
+
+    string TrendBadgeClass(int? trend) => trend switch { null => "neutral", >= 0 => "up", _ => "urgent" };
+    string TrendBadgeText(int? trend) => trend switch { null => "New", >= 0 => $"+{trend}%", _ => $"{trend}%" };
+
+    string DaysAgoText(int days) => days switch
+    {
+        0 => "Submitted today",
+        1 => "Submitted 1d ago",
+        _ => $"Submitted {days}d ago"
+    };
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tutor Verification - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <div class="dash-search">
+                <input type="text" placeholder="Search users, sessions..." />
+            </div>
+            <span class="admin-chip">Admin</span>
+            <div class="dash-topbar-right">
+                <a href="#" class="icon-btn" title="Notifications">
+                    🔔
+                    @if (Model.PendingCount > 0)
+                    {
+                        <span class="dot"></span>
+                    }
+                </a>
+                <div class="topbar-avatar">@Model.AdminInitials</div>
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    <div class="avatar">@Model.AdminInitials</div>
+                    <div>
+                        <div class="name">@Model.AdminName</div>
+                        <div class="meta">Platform Administrator</div>
+                        <span class="role-chip" style="background:#fff1d5;color:#a96808;">Super Admin</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
+                    <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="TutorVerification" class="active">
+                            <span class="nav-icon">✅</span> Tutor Verification
+                            @if (Model.PendingCount > 0)
+                            {
+                                <span class="badge-count">@Model.PendingCount</span>
+                            }
+                        </a>
+                    </li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🗒️</span> Session Logs</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">📈</span> Reports</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚠️</span> Complaints</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🔔</span> Notifications</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚙️</span> Settings</span></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">❓</span> Help center</span></li>
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <main class="dash-main">
+                <div class="dash-greeting" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                    <div>
+                        <h1>Tutor Verification</h1>
+                        <p>Review submitted credentials and approve or reject new tutor applications</p>
+                    </div>
+                    <div class="um-header-actions">
+                        <a class="um-btn-outline" asp-action="ExportTutorVerificationCsv" asp-route-tab="@Model.ActiveTab" asp-route-search="@Model.Search" asp-route-subject="@Model.SubjectFilter" asp-route-district="@Model.DistrictFilter" asp-route-submitted="@Model.SubmittedFilter">Export list</a>
+                    </div>
+                </div>
+
+                <!-- KPI strip -->
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Pending review</span>
+                            @if (Model.PendingCount > 0)
+                            {
+                                <span class="kpi-badge urgent">Urgent</span>
+                            }
+                        </div>
+                        <div class="kpi-value">@Model.PendingCount</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Approved (@Model.MonthLabel)</span>
+                            <span class="kpi-badge @TrendBadgeClass(Model.ApprovedTrendPercent)">@TrendBadgeText(Model.ApprovedTrendPercent)</span>
+                        </div>
+                        <div class="kpi-value">@Model.ApprovedThisMonth</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Rejected (@Model.MonthLabel)</span>
+                            <span class="kpi-badge neutral">@(Model.RejectedRatePercent.HasValue ? $"{Model.RejectedRatePercent}% rate" : "—")</span>
+                        </div>
+                        <div class="kpi-value">@Model.RejectedThisMonth</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Avg review time</span></div>
+                        <div class="kpi-value">@(Model.AvgReviewTimeDays.HasValue ? $"{Model.AvgReviewTimeDays} days" : "—")</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Approval rate</span></div>
+                        <div class="kpi-value" style="color:var(--green);">@Model.ApprovalRatePercent%</div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="um-tabs">
+                    <a class="um-tab @(Model.ActiveTab == "pending" ? "active" : "")" href="@TabUrl("pending")">Pending (@Model.PendingTabCount)</a>
+                    <a class="um-tab @(Model.ActiveTab == "approved" ? "active" : "")" href="@TabUrl("approved")">Approved</a>
+                    <a class="um-tab @(Model.ActiveTab == "rejected" ? "active" : "")" href="@TabUrl("rejected")">Rejected</a>
+                    <a class="um-tab @(Model.ActiveTab == "all" ? "active" : "")" href="@TabUrl("all")">All applications</a>
+                </div>
+
+                <!-- Filters -->
+                <form method="get" asp-action="TutorVerification" id="filterForm">
+                    <input type="hidden" name="tab" value="@Model.ActiveTab" />
+                    <div class="um-toolbar">
+                        <div class="um-search">
+                            <input type="text" name="search" value="@Model.Search" placeholder="Search by name or subject..." />
+                        </div>
+                        <select class="um-select" name="subject" onchange="this.form.submit()">
+                            <option value="">Subject</option>
+                            @foreach (var s in Model.Subjects)
+                            {
+                                <option value="@s" selected="@(Model.SubjectFilter == s)">@s</option>
+                            }
+                        </select>
+                        <select class="um-select" name="district" onchange="this.form.submit()">
+                            <option value="">District</option>
+                            @foreach (var d in Model.Districts)
+                            {
+                                <option value="@d" selected="@(Model.DistrictFilter == d)">@d</option>
+                            }
+                        </select>
+                        <select class="um-select" name="submitted" onchange="this.form.submit()">
+                            <option value="all" selected="@(Model.SubmittedFilter == "all")">Submitted date</option>
+                            <option value="last7" selected="@(Model.SubmittedFilter == "last7")">Last 7 days</option>
+                            <option value="last30" selected="@(Model.SubmittedFilter == "last30")">Last 30 days</option>
+                            <option value="last90" selected="@(Model.SubmittedFilter == "last90")">Last 90 days</option>
+                        </select>
+                        <select class="um-select um-select-sort" name="sort" onchange="this.form.submit()">
+                            <option value="newest" selected="@(Model.Sort == "newest")">Sort: Newest first</option>
+                            <option value="oldest" selected="@(Model.Sort == "oldest")">Sort: Oldest first</option>
+                            <option value="name_asc" selected="@(Model.Sort == "name_asc")">Sort: Name (A-Z)</option>
+                            <option value="name_desc" selected="@(Model.Sort == "name_desc")">Sort: Name (Z-A)</option>
+                        </select>
+                    </div>
+                </form>
+
+                <!-- Application cards -->
+                <div class="tv-list">
+                    @if (Model.Applications.Any())
+                    {
+                        @foreach (var a in Model.Applications)
+                        {
+                            <div class="tv-card tv-border-@a.UrgencyClass">
+                                <div class="avatar tv-avatar">@a.Initials</div>
+                                <div class="tv-body">
+                                    <div class="tv-head">
+                                        <span class="tv-name">@a.Name</span>
+                                        <span class="tv-submitted">🕒 @DaysAgoText(a.DaysAgo)</span>
+                                    </div>
+                                    <div class="tv-contact">
+                                        @a.Email @if (!string.IsNullOrEmpty(a.MaskedPhone)) {
+                                        <text>· @a.MaskedPhone</text>
+                                    }
+                                </div>
+                                <div class="tv-applying">
+                                    @(a.District ?? "District not set") · Applying for: @(a.Subjects.Any() ? string.Join(", ", a.Subjects) : "—")
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(a.Education))
+                                {
+                                    <div class="tv-line">Education: @a.Education</div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(a.ExperienceSummary))
+                                {
+                                    <div class="tv-line">Experience: @a.ExperienceSummary</div>
+                                }
+                                <a asp-action="UserManagement" asp-route-search="@a.Email" class="tv-view-link">View full profile</a>
+                            </div>
+                            <div class="tv-docs">
+                                <div class="tv-docs-label">SUBMITTED DOCUMENTS</div>
+                                <div class="tv-docs-grid">
+                                    @foreach (var doc in a.Documents)
+                                    {
+                                        if (doc.IsMissing)
+                                        {
+                                            <span class="tv-doc-chip tv-doc-missing" title="Not uploaded">⚠️ @doc.Label missing</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="tv-doc-chip">@doc.Icon @doc.Label</span>
+                                        }
+                                    }
+                                </div>
+                                @if (a.Status == "Pending")
+                                {
+                                    <div class="tv-actions">
+                                        <form asp-controller="Admin" asp-action="ApproveTutor" method="post" style="margin:0;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
+                                            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                            <button type="submit" class="mini-btn green">✓ Approve</button>
+                                        </form>
+                                        <form asp-controller="Admin" asp-action="RejectTutor" method="post" style="margin:0;" onsubmit="return confirm('Reject this tutor application?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
+                                            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                            <button type="submit" class="mini-btn danger">✕ Reject</button>
+                                        </form>
+                                        <span class="mini-btn" style="opacity:.6;cursor:not-allowed;" title="Coming soon - messaging isn't built yet">Request more info</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="tv-actions">
+                                        <span class="pill @(a.Status == "Approved" ? "pill-active" : "pill-suspended")">@a.Status</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (Model.HasMore)
+                    {
+                        <a class="view-all-link tv-more-link" href="@Url.Action("TutorVerification", new
+                           {
+                               tab = Model.ActiveTab,
+                               search = Model.Search,
+                               subject = Model.SubjectFilter,
+                               district = Model.DistrictFilter,
+                               submitted = Model.SubmittedFilter,
+                               sort = Model.Sort,
+                               visibleCount = Model.VisibleCount + 10
+                           })">
+                            View @Model.RemainingCount more @(Model.ActiveTab) application@(Model.RemainingCount == 1 ? "" : "s") →
+                        </a>
+                    }
+                }
+                    else
+                {
+                    <p class="empty-row">No applications match these filters.</p>
+                }
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

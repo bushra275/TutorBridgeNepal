@@ -1,0 +1,409 @@
+﻿@model TutorBridgeNepal.ViewModels.AdminUserManagementViewModel
+@{
+    ViewData["Title"] = "User Management";
+    Layout = null;
+
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+
+    string TabUrl(string tab) => Url.Action("UserManagement", new
+    {
+        tab,
+        search = Model.Search,
+        role = Model.RoleFilter,
+        district = Model.DistrictFilter,
+        status = Model.StatusFilter,
+        registered = Model.RegisteredFilter,
+        sort = Model.Sort,
+        page = 1,
+        pageSize = Model.PageSize
+    })!;
+
+    string PageUrl(int page) => Url.Action("UserManagement", new
+    {
+        tab = Model.ActiveTab,
+        search = Model.Search,
+        role = Model.RoleFilter,
+        district = Model.DistrictFilter,
+        status = Model.StatusFilter,
+        registered = Model.RegisteredFilter,
+        sort = Model.Sort,
+        page,
+        pageSize = Model.PageSize
+    })!;
+
+    string RoleClass(string role) => role == "Tutor" ? "role-pill tutor" : "role-pill";
+
+    string StatusPillClass(string status) => status switch
+    {
+        "Active" => "pill pill-active",
+        "Pending" => "pill pill-pending2",
+        _ => "pill pill-suspended" // Suspended or Rejected
+    };
+
+    string TrendBadgeClass(int? trend) => trend switch { null => "neutral", >= 0 => "up", _ => "urgent" };
+    string TrendBadgeText(int? trend) => trend switch { null => "New", >= 0 => $"+{trend}%", _ => $"{trend}%" };
+
+    var rangeStart = Model.TotalMatching == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
+    var rangeEnd = Math.Min(Model.Page * Model.PageSize, Model.TotalMatching);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Management - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@@400;500;600;700;800;900&family=Playfair+Display:wght@@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <div class="dash-search">
+                <input type="text" placeholder="Search users, sessions..." />
+            </div>
+            <span class="admin-chip">Admin</span>
+            <div class="dash-topbar-right">
+                <a href="#" class="icon-btn" title="Notifications">
+                    🔔
+                    @if (Model.PendingApprovalCount > 0 || Model.SuspendedCount > 0)
+                    {
+                        <span class="dot"></span>
+                    }
+                </a>
+                <div class="topbar-avatar">@Model.AdminInitials</div>
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    <div class="avatar">@Model.AdminInitials</div>
+                    <div>
+                        <div class="name">@Model.AdminName</div>
+                        <div class="meta">Platform Administrator</div>
+                        <span class="role-chip" style="background:#fff1d5;color:#a96808;">Super Admin</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
+                    <li><a asp-controller="Admin" asp-action="UserManagement" class="active"><span class="nav-icon">👥</span> User Management</a></li>
+                    <li>
+                        <span class="disabled-nav-link" title="Coming soon">
+                            <span class="nav-icon">✅</span> Tutor Verification
+                            @if (Model.PendingApprovalCount > 0)
+                            {
+                                <span class="badge-count">@Model.PendingApprovalCount</span>
+                            }
+                        </span>
+                    </li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🗒️</span> Session Logs</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">📈</span> Reports</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚠️</span> Complaints</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🔔</span> Notifications</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚙️</span> Settings</span></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">❓</span> Help center</span></li>
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <main class="dash-main">
+                <div class="dash-greeting" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                    <div>
+                        <h1>User Management</h1>
+                        <p>Manage all students, tutors and their account status</p>
+                    </div>
+                    <div class="um-header-actions">
+                        <a class="um-btn-outline" asp-action="ExportUsersCsv" asp-route-tab="@Model.ActiveTab" asp-route-search="@Model.Search" asp-route-role="@Model.RoleFilter" asp-route-district="@Model.DistrictFilter" asp-route-status="@Model.StatusFilter" asp-route-registered="@Model.RegisteredFilter">Export CSV</a>
+                        <span class="um-btn" style="opacity:.6;cursor:not-allowed;" title="Coming soon - account creation isn't built yet">+ Add user</span>
+                    </div>
+                </div>
+
+                <!-- KPI row -->
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Total users</span>
+                            <span class="kpi-badge @TrendBadgeClass(Model.TotalUsersTrendPercent)">@TrendBadgeText(Model.TotalUsersTrendPercent)</span>
+                        </div>
+                        <div class="kpi-value">@Model.TotalUsers.ToString("N0")</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Students</span>
+                            <span class="kpi-badge @TrendBadgeClass(Model.StudentsTrendPercent)">@TrendBadgeText(Model.StudentsTrendPercent)</span>
+                        </div>
+                        <div class="kpi-value">@Model.TotalStudents.ToString("N0")</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Tutors</span>
+                            <span class="kpi-badge @TrendBadgeClass(Model.TutorsTrendPercent)">@TrendBadgeText(Model.TutorsTrendPercent)</span>
+                        </div>
+                        <div class="kpi-value">@Model.TotalTutors.ToString("N0")</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Pending approval</span>
+                            @if (Model.PendingApprovalCount > 0)
+                            {
+                                <span class="kpi-badge urgent">Urgent</span>
+                            }
+                            else
+                            {
+                                <span class="kpi-badge up">Clear</span>
+                            }
+                        </div>
+                        <div class="kpi-value">@Model.PendingApprovalCount</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Suspended</span>
+                            @if (Model.SuspendedCount > 0)
+                            {
+                                <span class="kpi-badge review">Review</span>
+                            }
+                            else
+                            {
+                                <span class="kpi-badge up">Clear</span>
+                            }
+                        </div>
+                        <div class="kpi-value">@Model.SuspendedCount</div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="um-tabs">
+                    <a class="um-tab @(Model.ActiveTab == "all" ? "active" : "")" href="@TabUrl("all")">All users (@Model.TotalUsers.ToString("N0"))</a>
+                    <a class="um-tab @(Model.ActiveTab == "students" ? "active" : "")" href="@TabUrl("students")">Students (@Model.TotalStudents.ToString("N0"))</a>
+                    <a class="um-tab @(Model.ActiveTab == "tutors" ? "active" : "")" href="@TabUrl("tutors")">Tutors (@Model.TotalTutors.ToString("N0"))</a>
+                    <a class="um-tab @(Model.ActiveTab == "suspended" ? "active" : "")" href="@TabUrl("suspended")">Suspended</a>
+                    <a class="um-tab @(Model.ActiveTab == "pending" ? "active" : "")" href="@TabUrl("pending")">Pending</a>
+                </div>
+
+                <!-- Filters -->
+                <form method="get" asp-action="UserManagement" id="filterForm">
+                    <input type="hidden" name="tab" value="@Model.ActiveTab" />
+                    <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                    <div class="um-toolbar">
+                        <div class="um-search">
+                            <input type="text" name="search" value="@Model.Search" placeholder="Search by name, email or ID..." />
+                        </div>
+                        <select class="um-select" name="role" onchange="this.form.submit()">
+                            <option value="">Role</option>
+                            <option value="Student" selected="@(Model.RoleFilter == "Student")">Student</option>
+                            <option value="Tutor" selected="@(Model.RoleFilter == "Tutor")">Tutor</option>
+                        </select>
+                        <select class="um-select" name="district" onchange="this.form.submit()">
+                            <option value="">District</option>
+                            @foreach (var d in Model.Districts)
+                            {
+                                <option value="@d" selected="@(Model.DistrictFilter == d)">@d</option>
+                            }
+                        </select>
+                        <select class="um-select" name="status" onchange="this.form.submit()">
+                            <option value="">Status</option>
+                            <option value="Active" selected="@(Model.StatusFilter == "Active")">Active</option>
+                            <option value="Pending" selected="@(Model.StatusFilter == "Pending")">Pending</option>
+                            <option value="Suspended" selected="@(Model.StatusFilter == "Suspended")">Suspended</option>
+                            <option value="Rejected" selected="@(Model.StatusFilter == "Rejected")">Rejected</option>
+                        </select>
+                        <select class="um-select" name="registered" onchange="this.form.submit()">
+                            <option value="all" selected="@(Model.RegisteredFilter == "all")">Registered date</option>
+                            <option value="last7" selected="@(Model.RegisteredFilter == "last7")">Last 7 days</option>
+                            <option value="last30" selected="@(Model.RegisteredFilter == "last30")">Last 30 days</option>
+                            <option value="last90" selected="@(Model.RegisteredFilter == "last90")">Last 90 days</option>
+                        </select>
+                        <select class="um-select um-select-sort" name="sort" onchange="this.form.submit()">
+                            <option value="name_asc" selected="@(Model.Sort == "name_asc")">Sort: Name (A-Z)</option>
+                            <option value="name_desc" selected="@(Model.Sort == "name_desc")">Sort: Name (Z-A)</option>
+                            <option value="joined_desc" selected="@(Model.Sort == "joined_desc")">Sort: Newest first</option>
+                            <option value="joined_asc" selected="@(Model.Sort == "joined_asc")">Sort: Oldest first</option>
+                            <option value="sessions_desc" selected="@(Model.Sort == "sessions_desc")">Sort: Most sessions</option>
+                            <option value="sessions_asc" selected="@(Model.Sort == "sessions_asc")">Sort: Fewest sessions</option>
+                        </select>
+                    </div>
+                </form>
+
+                <!-- Bulk action form (checkboxes below reference this via form="bulkForm") -->
+                <form id="bulkForm" asp-action="BulkUserAction" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                </form>
+
+                <div class="um-bulkbar">
+                    <label class="um-select-all">
+                        <input type="checkbox" id="selectAllBox" onclick="umToggleAll(this)" />
+                        Select all
+                    </label>
+                    <span class="um-selected-count" id="selectedCount">0 selected</span>
+                    <div class="um-bulk-actions">
+                        <button type="submit" form="bulkForm" name="bulkAction" value="activate" class="um-bulk-btn">Bulk activate</button>
+                        <button type="submit" form="bulkForm" name="bulkAction" value="suspend" class="um-bulk-btn">Bulk suspend</button>
+                        <button type="button" class="um-bulk-btn danger" disabled title="Deleting users with session history isn't supported yet">Bulk delete</button>
+                    </div>
+                </div>
+
+                <div class="um-table-wrap">
+                    @if (Model.Rows.Any())
+                    {
+                        <table class="um-table">
+                            <thead>
+                                <tr>
+                                    <th class="um-checkbox-cell"></th>
+                                    <th>User</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>District</th>
+                                    <th>Joined</th>
+                                    <th>Sessions</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var u in Model.Rows)
+                                {
+                                    <tr>
+                                        <td class="um-checkbox-cell">
+                                            <input type="checkbox" class="um-row-check" form="bulkForm" name="selectedUserIds" value="@u.UserId" onclick="umUpdateCount()" />
+                                        </td>
+                                        <td>
+                                            <div class="um-user-cell">
+                                                <div class="avatar @u.AvatarClass">@u.Initials</div>
+                                                <div>
+                                                    <div class="um-user-name">@u.Name</div>
+                                                    <div class="um-user-sub">ID: @u.IdCode@(string.IsNullOrEmpty(u.SubLabel) ? "" : $" · {u.SubLabel}")</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>@u.Email</td>
+                                        <td><span class="@RoleClass(u.Role)">@u.Role</span></td>
+                                        <td>@(u.District ?? "—")</td>
+                                        <td>@u.JoinedAt.ToString("d MMM yyyy")</td>
+                                        <td>@(u.SessionCount > 0 ? $"{u.SessionCount} sessions" : "—")</td>
+                                        <td><span class="@StatusPillClass(u.Status)">@u.Status</span></td>
+                                        <td>
+                                            <div class="um-actions-cell">
+                                                @if (u.Status == "Pending" && u.TutorProfileId != null)
+                                                {
+                                                    <form asp-controller="Admin" asp-action="ApproveTutor" method="post" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="tutorProfileId" value="@u.TutorProfileId" />
+                                                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                        <button type="submit" class="mini-btn green">Approve</button>
+                                                    </form>
+                                                    <form asp-controller="Admin" asp-action="RejectTutor" method="post" style="margin:0;" onsubmit="return confirm('Reject this tutor application?');">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="tutorProfileId" value="@u.TutorProfileId" />
+                                                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                        <button type="submit" class="mini-btn danger">Reject</button>
+                                                    </form>
+                                                }
+                                                else if (u.Status == "Suspended")
+                                                {
+                                                    <span class="mini-btn" style="opacity:.6;cursor:not-allowed;" title="Coming soon">View</span>
+                                                    <form asp-controller="Admin" asp-action="ReactivateUser" method="post" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="userId" value="@u.UserId" />
+                                                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                        <button type="submit" class="mini-btn green">Reactivate</button>
+                                                    </form>
+                                                }
+                                                else
+                                                {
+                                                    <span class="mini-btn" style="opacity:.6;cursor:not-allowed;" title="Coming soon">View</span>
+                                                    <form asp-controller="Admin" asp-action="SuspendUser" method="post" style="margin:0;" onsubmit="return confirm('Suspend this account?');">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="userId" value="@u.UserId" />
+                                                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                        <button type="submit" class="mini-btn">Suspend</button>
+                                                    </form>
+                                                }
+                                                <button type="button" class="um-kebab" title="More">⋮</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <p class="um-empty">No users match these filters.</p>
+                    }
+
+                    <div class="um-pagination-bar">
+                        <span class="um-pagination-info">
+                            @if (Model.TotalMatching == 0)
+                            {
+                                <text>No users found</text>
+                            }
+                            else
+                            {
+                                <text>Showing @rangeStart–@rangeEnd of @Model.TotalMatching.ToString("N0") users</text>
+                            }
+                        </span>
+
+                        <div class="um-pagination">
+                            <a class="um-page-btn @(Model.Page <= 1 ? "disabled" : "")" href="@PageUrl(Model.Page - 1)">‹</a>
+                            @foreach (var p in Model.PageWindow)
+                            {
+                                if (p == null)
+                                {
+                                    <span class="um-page-ellipsis">…</span>
+                                }
+                                else
+                                {
+                                    <a class="um-page-btn @(p == Model.Page ? "active" : "")" href="@PageUrl(p.Value)">@p</a>
+                                }
+                            }
+                            <a class="um-page-btn @(Model.Page >= Model.TotalPages ? "disabled" : "")" href="@PageUrl(Model.Page + 1)">›</a>
+                        </div>
+
+                        <select class="um-pagesize-select" onchange="umChangePageSize(this.value)">
+                            <option value="8" selected="@(Model.PageSize == 8)">8 per page</option>
+                            <option value="20" selected="@(Model.PageSize == 20)">20 per page</option>
+                            <option value="50" selected="@(Model.PageSize == 50)">50 per page</option>
+                            <option value="100" selected="@(Model.PageSize == 100)">100 per page</option>
+                        </select>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            function umUpdateCount() {
+                var checked = document.querySelectorAll('.um-row-check:checked').length;
+                document.getElementById('selectedCount').textContent = checked + ' selected';
+                var all = document.querySelectorAll('.um-row-check').length;
+                document.getElementById('selectAllBox').checked = all > 0 && checked === all;
+            }
+
+            function umToggleAll(box) {
+                document.querySelectorAll('.um-row-check').forEach(function(cb) { cb.checked = box.checked; });
+                umUpdateCount();
+            }
+
+            function umChangePageSize(value) {
+                var url = new URL(window.location.href);
+                url.searchParams.set('pageSize', value);
+                url.searchParams.set('page', '1');
+                window.location.href = url.toString();
+            }
+    </script>
+</body>
+</html>

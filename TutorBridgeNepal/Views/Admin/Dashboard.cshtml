@@ -41,7 +41,7 @@
     <title>Admin Dashboard - TutorBridge Nepal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@@400;500;600;700;800;900&family=Playfair+Display:wght@@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
@@ -81,15 +81,15 @@
 
                 <ul class="dash-nav">
                     <li><a asp-controller="Admin" asp-action="Dashboard" class="active"><span class="nav-icon">📊</span> Dashboard</a></li>
-                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">👥</span> User Management</span></li>
+                    <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
                     <li>
-                        <span class="disabled-nav-link" title="Coming soon">
+                        <a asp-controller="Admin" asp-action="TutorVerification">
                             <span class="nav-icon">✅</span> Tutor Verification
                             @if (Model.PendingVerificationsCount > 0)
                             {
                                 <span class="badge-count">@Model.PendingVerificationsCount</span>
                             }
-                        </span>
+                        </a>
                     </li>
                     <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🗒️</span> Session Logs</span></li>
                     <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">📈</span> Reports</span></li>
@@ -103,7 +103,6 @@
                         </span>
                     </li>
                     <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🔔</span> Notifications</span></li>
-                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚙️</span> Settings</span></li>
                 </ul>
 
                 <ul class="dash-nav-secondary">
@@ -309,7 +308,7 @@
                                         </div>
                                     </div>
                                 }
-                                <a href="#" class="view-all-link">View all @Model.PendingVerificationsCount pending →</a>
+                                <a asp-controller="Admin" asp-action="TutorVerification" class="view-all-link">View all @Model.PendingVerificationsCount pending →</a>
                             }
                             else
                             {

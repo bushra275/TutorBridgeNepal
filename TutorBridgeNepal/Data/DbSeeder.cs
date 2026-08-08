@@ -127,4 +127,199 @@ public static class DbSeeder
 
         await context.SaveChangesAsync();
     }
+
+    public static async Task SeedTutorVerificationApplicationsAsync(IServiceProvider serviceProvider)
+    {
+        var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var context = serviceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var applications = new[]
+        {
+            new
+            {
+                Email = "nirajan.pradhan@tutorbridge.com",
+                FullName = "Nirajan Pradhan",
+                Phone = "9841234512",
+                District = "Kaski",
+                Subjects = "Chemistry, Physics",
+                Education = "B.Sc Chemistry, Tribhuvan University (2021)",
+                Experience = "3 years private tutoring · Grade 9-12, NEB Board",
+                Years = 3,
+                DaysAgo = 2,
+                Status = "Pending",
+                Documents = new[] { "Citizenship", "CVResume", "DegreeCertificate", "PoliceReport" }
+            },
+            new
+            {
+                Email = "sunita.rai.apply@tutorbridge.com",
+                FullName = "Sunita Rai",
+                Phone = "9845678945",
+                District = "Lalitpur",
+                Subjects = "English, Nepali, Social Studies",
+                Education = "M.Ed English, Kathmandu University (2019)",
+                Experience = "7 years school + private tutoring · Class 6-10",
+                Years = 7,
+                DaysAgo = 1,
+                Status = "Pending",
+                Documents = new[] { "Citizenship", "CVResume", "DegreeCertificate" } // Police report intentionally missing
+            },
+            new
+            {
+                Email = "bikram.tamang@tutorbridge.com",
+                FullName = "Bikram Tamang",
+                Phone = "9851239878",
+                District = "Bhaktapur",
+                Subjects = "Physics, Mathematics",
+                Education = "B.Sc Physics, Purbanchal University (2023)",
+                Experience = "2 years private tutoring · Grade 11-12, NEB Board",
+                Years = 2,
+                DaysAgo = 3,
+                Status = "Pending",
+                Documents = new[] { "Citizenship", "CVResume", "DegreeCertificate", "PoliceReport" }
+            },
+            new
+            {
+                Email = "manisha.thapa@tutorbridge.com",
+                FullName = "Manisha Thapa",
+                Phone = "9812345601",
+                District = "Kathmandu",
+                Subjects = "Accountancy, Economics",
+                Education = "BBA Finance, Pokhara University (2020)",
+                Experience = "4 years college + private tutoring · +2 level",
+                Years = 4,
+                DaysAgo = 5,
+                Status = "Pending",
+                Documents = new[] { "Citizenship", "CVResume", "DegreeCertificate", "PoliceReport" }
+            },
+            new
+            {
+                Email = "suresh.magar@tutorbridge.com",
+                FullName = "Suresh Magar",
+                Phone = "9860012399",
+                District = "Chitwan",
+                Subjects = "Computer Science",
+                Education = "BE Computer Engineering, Tribhuvan University (2022)",
+                Experience = "2 years private tutoring · Programming basics",
+                Years = 2,
+                DaysAgo = 1,
+                Status = "Pending",
+                Documents = new[] { "Citizenship", "CVResume" } // Degree certificate and police report missing
+            },
+            new
+            {
+                Email = "sabina.karki@tutorbridge.com",
+                FullName = "Sabina Karki",
+                Phone = "9803456712",
+                District = "Kathmandu",
+                Subjects = "Biology, Science",
+                Education = "M.Sc Zoology, Tribhuvan University (2018)",
+                Experience = "9 years school teaching · SEE and NEB Board",
+                Years = 9,
+                DaysAgo = 40,
+                Status = "Approved",
+                Documents = new[] { "Citizenship", "CVResume", "DegreeCertificate", "PoliceReport" }
+            },
+            new
+            {
+                Email = "deepak.oli@tutorbridge.com",
+                FullName = "Deepak Oli",
+                Phone = "9827788112",
+                District = "Pokhara",
+                Subjects = "Mathematics",
+                Education = "B.Ed Mathematics, Tribhuvan University (2017)",
+                Experience = "6 years private tutoring · Grade 9-12",
+                Years = 6,
+                DaysAgo = 20,
+                Status = "Approved",
+                Documents = new[] { "Citizenship", "CVResume", "DegreeCertificate", "PoliceReport" }
+            },
+            new
+            {
+                Email = "ritu.shah@tutorbridge.com",
+                FullName = "Ritu Shah",
+                Phone = "9819900221",
+                District = "Kathmandu",
+                Subjects = "English",
+                Education = "Not disclosed",
+                Experience = "No verifiable tutoring history provided",
+                Years = 0,
+                DaysAgo = 15,
+                Status = "Rejected",
+                Documents = new[] { "Citizenship" } // Missing everything else - rejected for incomplete documents
+            },
+        };
+
+        foreach (var app in applications)
+        {
+            var user = await userManager.FindByEmailAsync(app.Email);
+
+            if (user == null)
+            {
+                user = new ApplicationUser
+                {
+                    UserName = app.Email,
+                    Email = app.Email,
+                    FullName = app.FullName,
+                    District = app.District,
+                    PhoneNumber = app.Phone,
+                    EmailConfirmed = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-app.DaysAgo)
+                };
+
+                await userManager.CreateAsync(user, "Tutor@123");
+                await userManager.AddToRoleAsync(user, "Tutor");
+            }
+
+            var profile = await context.TutorProfiles.FirstOrDefaultAsync(t => t.UserId == user.Id);
+            if (profile == null)
+            {
+                profile = new TutorProfile
+                {
+                    UserId = user.Id,
+                    Subjects = app.Subjects,
+                    Education = app.Education,
+                    ExperienceSummary = app.Experience,
+                    YearsOfExperience = app.Years,
+                    AverageRating = 0m,
+                    ReviewCount = 0,
+                    IsVerified = app.Status == "Approved",
+                    VerificationRejected = app.Status == "Rejected",
+                    VerificationDecidedAt = app.Status == "Pending"
+                        ? null
+                        : DateTime.UtcNow.AddDays(-app.DaysAgo + 1)
+                };
+                context.TutorProfiles.Add(profile);
+                await context.SaveChangesAsync();
+            }
+
+            var hasDocuments = await context.TutorCredentials.AnyAsync(c => c.TutorProfileId == profile.Id);
+            if (!hasDocuments)
+            {
+                var docLabels = new Dictionary<string, (string FileName, string Icon)>
+                {
+                    ["Citizenship"] = ("Citizenship.pdf", "🪪"),
+                    ["CVResume"] = ("CV_Resume.pdf", "📄"),
+                    ["DegreeCertificate"] = ("Degree_Certificate.pdf", "🎓"),
+                    ["PoliceReport"] = ("Police_Report.pdf", "🛡️"),
+                };
+
+                var order = 0;
+                foreach (var docType in app.Documents)
+                {
+                    var (fileName, icon) = docLabels[docType];
+                    context.TutorCredentials.Add(new TutorCredential
+                    {
+                        TutorProfileId = profile.Id,
+                        Title = fileName,
+                        FileName = fileName,
+                        Icon = icon,
+                        SortOrder = order++,
+                        DocumentType = docType
+                    });
+                }
+            }
+        }
+
+        await context.SaveChangesAsync();
+    }
 }

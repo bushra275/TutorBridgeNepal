@@ -56,6 +56,12 @@ public class AccountController : Controller
             return View(model);
         }
 
+        if (user.IsSuspended)
+        {
+            ModelState.AddModelError("", "This account has been suspended. Contact support for help.");
+            return View(model);
+        }
+
         if (model.Role == "Tutor")
         {
             var tutorProfile = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.UserId == user.Id);
@@ -82,8 +88,7 @@ public class AccountController : Controller
 
         return model.Role switch
         {
-            "Admin" => RedirectToAction("Dashboard", "Admin"),
-            "Tutor" => RedirectToAction("Dashboard", "Tutor"),
+            "Tutor" => RedirectToAction("VerificationPending", "Tutor"),
             "Student" => RedirectToAction("Dashboard", "Student"),
             _ => RedirectToAction("Index", "Home")
         };
@@ -176,6 +181,20 @@ public class AccountController : Controller
 
         await _userManager.SetTwoFactorEnabledAsync(user, true);
         TempData["2faSuccess"] = "Two-factor authentication has been enabled for your admin account.";
+        return RedirectToAction("AdminSetupAuthenticator");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> AdminDisableAuthenticator()
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return RedirectToAction("Login");
+
+        await _userManager.SetTwoFactorEnabledAsync(user, false);
+        await _userManager.ResetAuthenticatorKeyAsync(user);
+
         return RedirectToAction("AdminSetupAuthenticator");
     }
 

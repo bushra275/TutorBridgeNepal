@@ -12,8 +12,20 @@ public class TutorCredential
     public string Title { get; set; } = string.Empty;
     public string? FileName { get; set; }
 
+    public string? FilePath { get; set; }        
+
     // Small emoji shown in the chip, e.g. "🎓" for a degree, "📄" for a
     // generic document, "🪪" for an ID document.
     public string Icon { get; set; } = "📄";
     public int SortOrder { get; set; }
-}   
+    public DateTime UploadedAt { get; set; }
+
+    // Tags a row as one of the four documents the verification checklist
+    // looks for: "Citizenship", "CVResume", "DegreeCertificate",
+    // "PoliceReport". Null for rows that are general credentials (e.g. a
+    // listed degree title) rather than one of the required checklist
+    // documents. Lets the Tutor Verification page detect which required
+    // documents are missing for a given applicant instead of guessing from
+    // the title text.
+    public string? DocumentType { get; set; }
+}

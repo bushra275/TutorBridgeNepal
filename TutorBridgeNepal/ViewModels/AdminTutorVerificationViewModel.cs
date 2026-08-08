@@ -1,0 +1,63 @@
+﻿namespace TutorBridgeNepal.ViewModels;
+
+public class AdminTutorVerificationViewModel
+{
+    public string AdminName { get; set; } = string.Empty;
+    public string AdminInitials { get; set; } = string.Empty;
+
+    public string MonthLabel { get; set; } = string.Empty;
+    public int PendingCount { get; set; }
+    public int ApprovedThisMonth { get; set; }
+    public int? ApprovedTrendPercent { get; set; }
+    public int RejectedThisMonth { get; set; }
+    public int? RejectedRatePercent { get; set; }
+    public double? AvgReviewTimeDays { get; set; }
+    public int ApprovalRatePercent { get; set; }
+
+    public string ActiveTab { get; set; } = "pending";
+    public int PendingTabCount { get; set; }
+    public int ApprovedTabCount { get; set; }
+    public int RejectedTabCount { get; set; }
+    public int AllTabCount { get; set; }
+
+    public string? Search { get; set; }
+    public string? SubjectFilter { get; set; }
+    public string? DistrictFilter { get; set; }
+    public string SubmittedFilter { get; set; } = "all";
+    public string Sort { get; set; } = "newest";
+    public List<string> Subjects { get; set; } = new();
+    public List<string> Districts { get; set; } = new();
+
+    public List<AdminTutorVerificationRowViewModel> Applications { get; set; } = new();
+    public int VisibleCount { get; set; }
+    public int TotalMatching { get; set; }
+
+    public bool HasMore => TotalMatching > Applications.Count;
+    public int RemainingCount => Math.Max(0, TotalMatching - Applications.Count);
+}
+
+public class AdminTutorVerificationRowViewModel
+{
+    public int TutorProfileId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Initials { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string? MaskedPhone { get; set; }
+    public string? District { get; set; }
+    public List<string> Subjects { get; set; } = new();
+    public string? Education { get; set; }
+    public string? ExperienceSummary { get; set; }
+    public int YearsOfExperience { get; set; }
+    public DateTime SubmittedAt { get; set; }
+    public int DaysAgo { get; set; }
+    public string UrgencyClass { get; set; } = "orange"; // "orange" or "red"
+    public List<AdminTutorVerificationDocumentViewModel> Documents { get; set; } = new();
+    public string Status { get; set; } = "Pending"; // Pending / Approved / Rejected
+}
+
+public class AdminTutorVerificationDocumentViewModel
+{
+    public string Label { get; set; } = string.Empty;
+    public string Icon { get; set; } = string.Empty;
+    public bool IsMissing { get; set; }
+}
