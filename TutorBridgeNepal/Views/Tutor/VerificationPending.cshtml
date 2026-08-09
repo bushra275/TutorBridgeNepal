@@ -17,56 +17,164 @@
     <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tutor-dashboard.css" asp-append-version="true" />
     <style>
-        .vp-shell {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background: var(--cream);
-            padding: 2.5rem 1.2rem;
-        }
+            .vp-shell {
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background: var(--cream);
+                padding: 2.5rem 1.2rem;
+            }
 
-        .vp-topbar {
-            width: 100%;
-            max-width: 720px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
+            .vp-topbar {
+                width: 100%;
+                max-width: 720px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 1.5rem;
+            }
 
-        .vp-card {
-            width: 100%;
-            max-width: 720px;
-            background: #fff;
-            border: 1px solid var(--line);
-            border-radius: 16px;
-            padding: 2rem;
-        }
+            .vp-card {
+                width: 100%;
+                max-width: 720px;
+                background: #fff;
+                border: 1px solid var(--line);
+                border-radius: 16px;
+                padding: 2rem;
+            }
 
-        .vp-head {
-            display: flex;
-            align-items: center;
-            gap: .9rem;
-            margin-bottom: 1.2rem;
-        }
+            .vp-head {
+                display: flex;
+                align-items: center;
+                gap: .9rem;
+                margin-bottom: 1.2rem;
+            }
 
-        .vp-head .avatar {
-            width: 50px;
-            height: 50px;
-            font-size: 1rem;
-        }
+                .vp-head .avatar {
+                    width: 50px;
+                    height: 50px;
+                    font-size: 1rem;
+                }
 
-        .vp-title {
-            font-size: 1.3rem;
-            font-weight: 800;
-            color: var(--ink);
-        }
+            .vp-title {
+                font-size: 1.3rem;
+                font-weight: 800;
+                color: var(--ink);
+            }
 
-        .vp-subtitle {
-            font-size: .86rem;
-            color: var(--muted);
-        }
+            .vp-subtitle {
+                font-size: .86rem;
+                color: var(--muted);
+            }
+
+            /* Inline copy of the checklist's interactive styles - kept here too
+                       (not just in tutor-dashboard.css) so this page still looks and
+                       behaves right even if that stylesheet hasn't been refreshed. */
+            .mp-doc-row {
+                transition: box-shadow .15s ease, border-color .15s ease, background .15s ease;
+            }
+
+                .mp-doc-row:hover {
+                    box-shadow: 0 4px 14px rgba(18, 122, 91, .08);
+                    border-color: var(--green-2);
+                }
+
+                .mp-doc-row.uploaded {
+                    background: var(--mint);
+                    border-color: var(--mint-2);
+                }
+
+            .mp-doc-status-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: .25rem;
+                font-size: .74rem;
+                font-weight: 700;
+                margin-top: .15rem;
+            }
+
+                .mp-doc-status-badge.success {
+                    color: var(--green-dark);
+                }
+
+                .mp-doc-status-badge.pending {
+                    color: var(--orange);
+                }
+
+            .mp-upload-form {
+                display: flex;
+                align-items: center;
+                gap: .5rem;
+                flex-wrap: wrap;
+            }
+
+            .mp-file-picker {
+                display: inline-flex;
+                align-items: center;
+                gap: .4rem;
+                background: #fff;
+                border: 1px dashed var(--line);
+                border-radius: 8px;
+                padding: .45rem .7rem;
+                font-size: .78rem;
+                font-weight: 600;
+                color: var(--muted);
+                cursor: pointer;
+                max-width: 190px;
+                transition: border-color .15s ease, color .15s ease, background .15s ease;
+            }
+
+                .mp-file-picker:hover {
+                    border-color: var(--green);
+                    color: var(--green-dark);
+                }
+
+                .mp-file-picker::before {
+                    content: "📎";
+                    flex: 0 0 auto;
+                }
+
+                .mp-file-picker span {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+            .mp-upload-form.has-file .mp-file-picker {
+                border-style: solid;
+                border-color: var(--green);
+                background: var(--mint);
+                color: var(--green-dark);
+            }
+
+            .mp-file-input-native {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+
+            .mp-doc-btn {
+                transition: transform .1s ease, box-shadow .15s ease;
+            }
+
+                .mp-doc-btn:hover:not(:disabled) {
+                    transform: translateY(-1px);
+                    box-shadow: 0 3px 8px rgba(0, 0, 0, .08);
+                }
+
+                .mp-doc-btn:disabled {
+                    opacity: .5;
+                    cursor: not-allowed;
+                    transform: none;
+                    box-shadow: none;
+                }
     </style>
 </head>
 <body>
@@ -118,18 +226,18 @@
             <div class="mp-doc-checklist">
                 @foreach (var doc in Model.RequiredDocuments)
                 {
-                    <div class="mp-doc-row">
+                    <div class="mp-doc-row @(doc.IsUploaded ? "uploaded" : "")">
                         <div class="mp-doc-info">
                             <span class="mp-doc-icon">@doc.Icon</span>
                             <div>
                                 <div class="mp-doc-label">@doc.Label</div>
                                 @if (doc.IsUploaded)
                                 {
-                                    <div class="mp-doc-meta">Uploaded @(doc.UploadedAt?.ToString("MMM d, yyyy"))</div>
+                                    <div class="mp-doc-status-badge success">✓ Uploaded @(doc.UploadedAt?.ToString("MMM d, yyyy"))</div>
                                 }
                                 else
                                 {
-                                    <div class="mp-doc-meta mp-doc-missing">Not uploaded yet</div>
+                                    <div class="mp-doc-status-badge pending">Not uploaded yet</div>
                                 }
                             </div>
                         </div>
@@ -145,11 +253,14 @@
                             }
                             else
                             {
-                                <form asp-action="UploadVerificationDocument" method="post" enctype="multipart/form-data" style="margin:0; display:flex; gap:.4rem; align-items:center;">
+                                <form asp-action="UploadVerificationDocument" method="post" enctype="multipart/form-data" class="mp-upload-form" data-doc-form>
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="documentType" value="@doc.DocumentType" />
-                                    <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required class="mp-doc-file-input" />
-                                    <button type="submit" class="mp-doc-btn mp-doc-btn-primary">Upload</button>
+                                    <label class="mp-file-picker">
+                                        <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required class="mp-file-input-native" data-file-input />
+                                        <span data-file-label>Choose file</span>
+                                    </label>
+                                    <button type="submit" class="mp-doc-btn mp-doc-btn-primary" data-upload-btn disabled>Upload</button>
                                 </form>
                             }
                         </div>
@@ -159,5 +270,30 @@
             <p class="mp-doc-hint">PDF, JPG, or PNG - up to 10 MB. Reviewed manually by an admin - there's no fixed turnaround time, but you can check back on this page anytime for your current status.</p>
         </div>
     </div>
+
+    <script>
+            document.querySelectorAll('[data-doc-form]').forEach(function(form) {
+                var input = form.querySelector('[data-file-input]');
+                var label = form.querySelector('[data-file-label]');
+                var button = form.querySelector('[data-upload-btn]');
+
+                input.addEventListener('change', function() {
+                    if (input.files && input.files.length > 0) {
+                        label.textContent = input.files[0].name;
+                        form.classList.add('has-file');
+                        button.disabled = false;
+                    } else {
+                        label.textContent = 'Choose file';
+                        form.classList.remove('has-file');
+                        button.disabled = true;
+                    }
+                });
+
+                form.addEventListener('submit', function() {
+                    button.disabled = true;
+                    button.textContent = 'Uploading…';
+                });
+            });
+    </script>
 </body>
 </html>

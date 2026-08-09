@@ -26,12 +26,6 @@ public class TutorController : Controller
         _webHostEnvironment = webHostEnvironment;
     }
 
-    // The only actions an unverified (pending or rejected) tutor may reach.
-    // Everything else in this controller - dashboard, bookings, messages,
-    // settings, the full profile editor - is off limits until an admin sets
-    // IsVerified = true. This is the actual access gate; the login/register
-    // flow just routes people toward VerificationPending, it doesn't enforce
-    // anything by itself.
     private static readonly string[] AllowedWhileUnverified =
     {
         "VerificationPending",
@@ -75,13 +69,12 @@ public class TutorController : Controller
         ["Biratnagar"] = "Koshi Province",
     };
 
-    // The four documents the verification checklist always looks for.
     private static readonly (string Type, string Label, string Icon)[] RequiredVerificationDocuments =
     {
-        ("Citizenship",        "Citizenship.pdf",         "🪪"),
-        ("CVResume",           "CV_Resume.pdf",           "📄"),
-        ("DegreeCertificate",  "Degree_Certificate.pdf",  "🎓"),
-        ("PoliceReport",       "Police_Report.pdf",       "🛡️"),
+        ("Citizenship",       "Citizenship",       "🪪"),
+        ("CVResume",          "CV / Resume",       "📄"),
+        ("DegreeCertificate", "Degree Certificate","🎓"),
+        ("PoliceReport",      "Police Report",     "🛡️"),
     };
 
     private async Task<TutorProfile?> GetCurrentTutorProfileAsync()
@@ -110,21 +103,15 @@ public class TutorController : Controller
         ViewData["ShowAvailabilityBadge"] = tutor.ShowAvailabilityBadge;
     }
 
-    // ── 1b: VerificationPending ───────────────────────────────────────────
+    // ── VerificationPending ───────────────────────────────────────────────
 
-    // Landing page for a tutor whose application hasn't been approved yet.
-    // Reachable regardless of verification state (see AllowedWhileUnverified
-    // above); every other action in this controller redirects here instead
-    // of running until IsVerified becomes true.
     public async Task<IActionResult> VerificationPending()
     {
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
 
         if (tutor.IsVerified)
-        {
             return RedirectToAction("Dashboard");
-        }
 
         var credentials = await _context.TutorCredentials
             .Where(c => c.TutorProfileId == tutor.Id)
@@ -711,9 +698,7 @@ public class TutorController : Controller
                 TimeSpan? parsedEnd = i < endTime.Count && TimeSpan.TryParse(endTime[i], out var e) ? e : null;
 
                 if (parsedStart == null || parsedEnd == null || parsedStart >= parsedEnd)
-                {
                     dayOff = true;
-                }
                 else
                 {
                     start = parsedStart;
@@ -1102,8 +1087,6 @@ public class TutorController : Controller
         return View(vm);
     }
 
-    // ── 1c/1d: SendMessage (was missing — added) ──────────────────────────
-
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SendMessage(int studentProfileId, string content)
@@ -1453,45 +1436,43 @@ public class TutorController : Controller
         return RedirectToAction("Profile");
     }
 
-    // ── 1c/1d: UploadVerificationDocument / RemoveVerificationDocument ────
-    // redirect target now depends on verification state
+    // ── UploadVerificationDocument / RemoveVerificationDocument ──────────
 
-    public async Task<IActionResult> UploadVerificationDocument(string documentType, IFormFile file)
+    public async Task<IActionResult> UploadVerificationDocument(IFormFile? file, string documentType)
     {
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
 
-        var allowedTypes = RequiredVerificationDocuments.Select(d => d.Type).ToArray();
-        if (!allowedTypes.Contains(documentType))
-            return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
-
-        if (file == null || file.Length == 0)
-            return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
-
-        var uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "credentials");
-        Directory.CreateDirectory(uploadsFolder);
-        var uniqueFileName = $"{tutor.Id}_{documentType}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-        var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-        await using (var stream = new FileStream(filePath, FileMode.Create))
+        if (!RequiredVerificationDocuments.Any(rd => rd.Type == documentType))
         {
-            await file.CopyToAsync(stream);
+            TempData["ProfileError"] = "Unknown document type.";
+            return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
+        }
+
+        var (relativePath, originalFileName, sizeBytes, error) =
+            await FileUploadHelper.SaveVerificationDocumentAsync(file, _webHostEnvironment.ContentRootPath, tutor.Id);
+
+        if (error != null)
+        {
+            TempData["ProfileError"] = error;
+            return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
         }
 
         var existing = await _context.TutorCredentials
             .FirstOrDefaultAsync(c => c.TutorProfileId == tutor.Id && c.DocumentType == documentType);
 
-        var docMeta = RequiredVerificationDocuments.First(d => d.Type == documentType);
-
         if (existing != null)
         {
-            existing.FileName = file.FileName;
-            existing.FilePath = $"/uploads/credentials/{uniqueFileName}";
+            FileUploadHelper.TryDeleteVerificationDocument(_webHostEnvironment.ContentRootPath, existing.FilePath);
+            existing.FilePath = relativePath;
+            existing.FileName = originalFileName;
+            existing.FileSizeBytes = sizeBytes ?? 0;
             existing.UploadedAt = DateTime.Now;
         }
         else
         {
-            var maxOrder = await _context.TutorCredentials
+            var docMeta = RequiredVerificationDocuments.First(rd => rd.Type == documentType);
+            var maxSortOrder = await _context.TutorCredentials
                 .Where(c => c.TutorProfileId == tutor.Id)
                 .Select(c => (int?)c.SortOrder)
                 .MaxAsync() ?? -1;
@@ -1499,14 +1480,21 @@ public class TutorController : Controller
             _context.TutorCredentials.Add(new TutorCredential
             {
                 TutorProfileId = tutor.Id,
-                DocumentType = documentType,
                 Title = docMeta.Label,
-                FileName = file.FileName,
-                FilePath = $"/uploads/credentials/{uniqueFileName}",
+                FileName = originalFileName,
                 Icon = docMeta.Icon,
-                SortOrder = maxOrder + 1,
+                SortOrder = maxSortOrder + 1,
+                DocumentType = documentType,
+                FilePath = relativePath,
+                FileSizeBytes = sizeBytes ?? 0,
                 UploadedAt = DateTime.Now
             });
+        }
+
+        if (tutor.VerificationRejected)
+        {
+            tutor.VerificationRejected = false;
+            tutor.VerificationDecidedAt = null;
         }
 
         await _context.SaveChangesAsync();
@@ -1527,6 +1515,7 @@ public class TutorController : Controller
 
         if (credential != null)
         {
+            FileUploadHelper.TryDeleteVerificationDocument(_webHostEnvironment.ContentRootPath, credential.FilePath);
             _context.TutorCredentials.Remove(credential);
             await _context.SaveChangesAsync();
         }
@@ -1535,10 +1524,34 @@ public class TutorController : Controller
         return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
     }
 
-    private async Task BuildSettingsViewModelAsync(TutorProfile tutor)
+    // ── DownloadOwnVerificationDocument ──────────────────────────────────
+
+    // Served inline so the browser renders the PDF/image directly in a new
+    // tab rather than downloading it.
+    public async Task<IActionResult> DownloadOwnVerificationDocument(int credentialId)
     {
-        // intentional no-op placeholder; real implementation in BuildSettingsViewModelAsync below
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var credential = await _context.TutorCredentials
+            .FirstOrDefaultAsync(c => c.Id == credentialId && c.TutorProfileId == tutor.Id);
+
+        if (credential == null || string.IsNullOrWhiteSpace(credential.FilePath))
+            return NotFound();
+
+        var fullPath = FileUploadHelper.ResolveVerificationDocumentPath(_webHostEnvironment.ContentRootPath, credential.FilePath);
+        if (!System.IO.File.Exists(fullPath))
+            return NotFound();
+
+        var bytes = await System.IO.File.ReadAllBytesAsync(fullPath);
+        var displayName = credential.FileName ?? Path.GetFileName(fullPath);
+        Response.Headers.Append("Content-Disposition", FileUploadHelper.BuildInlineContentDisposition(displayName));
+        return File(bytes, FileUploadHelper.GetContentType(displayName));
     }
+
+    // ── Settings ──────────────────────────────────────────────────────────
+
+    private async Task BuildSettingsViewModelAsync(TutorProfile tutor) { }
 
     private async Task<TutorSettingsPageViewModel> BuildSettingsVmAsync(TutorProfile tutor)
     {

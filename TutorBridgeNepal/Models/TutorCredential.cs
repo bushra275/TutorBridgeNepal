@@ -12,7 +12,10 @@ public class TutorCredential
     public string Title { get; set; } = string.Empty;
     public string? FileName { get; set; }
 
-    public string? FilePath { get; set; }        
+    public string? FilePath { get; set; }
+
+    // Size of the uploaded file in bytes, as recorded at upload time.
+    public long FileSizeBytes { get; set; }
 
     // Small emoji shown in the chip, e.g. "🎓" for a degree, "📄" for a
     // generic document, "🪪" for an ID document.

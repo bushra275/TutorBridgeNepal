@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TutorBridgeNepal.Data;
+using TutorBridgeNepal.Helpers;
 using TutorBridgeNepal.Models;
 using TutorBridgeNepal.ViewModels;
 
@@ -13,11 +14,13 @@ public class AdminController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IWebHostEnvironment _webHostEnvironment;
 
-    public AdminController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+    public AdminController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment webHostEnvironment)
     {
         _context = context;
         _userManager = userManager;
+        _webHostEnvironment = webHostEnvironment;
     }
 
     // ── 5a: Helper methods ────────────────────────────────────────────────
@@ -50,10 +53,10 @@ public class AdminController : Controller
     // view all agree on labels/icons.
     private static readonly (string Type, string Label, string Icon)[] RequiredVerificationDocuments =
     {
-        ("Citizenship",        "Citizenship.pdf",         "🪪"),
-        ("CVResume",           "CV_Resume.pdf",           "📄"),
-        ("DegreeCertificate",  "Degree_Certificate.pdf",  "🎓"),
-        ("PoliceReport",       "Police_Report.pdf",       "🛡️"),
+        ("Citizenship",       "Citizenship",       "🪪"),
+        ("CVResume",          "CV_Resume",         "📄"),
+        ("DegreeCertificate", "Degree_Certificate","🎓"),
+        ("PoliceReport",      "Police_Report",     "🛡️"),
     };
 
     // ── Dashboard ─────────────────────────────────────────────────────────
@@ -753,6 +756,26 @@ public class AdminController : Controller
         return File(bytes, "text/csv", $"tutorbridge-verification-{DateTime.Now:yyyyMMdd-HHmm}.csv");
     }
 
+    // ── Document viewer ───────────────────────────────────────────────────
+
+    // Served inline so the browser renders the PDF/image directly in a new
+    // tab rather than downloading it.
+    public async Task<IActionResult> DownloadVerificationDocument(int credentialId)
+    {
+        var credential = await _context.TutorCredentials.FirstOrDefaultAsync(c => c.Id == credentialId);
+        if (credential == null || string.IsNullOrWhiteSpace(credential.FilePath))
+            return NotFound();
+
+        var fullPath = FileUploadHelper.ResolveVerificationDocumentPath(_webHostEnvironment.ContentRootPath, credential.FilePath);
+        if (!System.IO.File.Exists(fullPath))
+            return NotFound();
+
+        var bytes = await System.IO.File.ReadAllBytesAsync(fullPath);
+        var displayName = credential.FileName ?? Path.GetFileName(fullPath);
+        Response.Headers.Append("Content-Disposition", FileUploadHelper.BuildInlineContentDisposition(displayName));
+        return File(bytes, FileUploadHelper.GetContentType(displayName));
+    }
+
     // ── User actions ──────────────────────────────────────────────────────
 
     [HttpPost]
@@ -889,7 +912,7 @@ public class AdminController : Controller
         {
             tutor.IsVerified = true;
             tutor.VerificationRejected = false;
-            tutor.VerificationDecidedAt = DateTime.Now;   // ← NEW
+            tutor.VerificationDecidedAt = DateTime.Now;
             await _context.SaveChangesAsync();
         }
 
@@ -905,7 +928,7 @@ public class AdminController : Controller
         {
             tutor.IsVerified = false;
             tutor.VerificationRejected = true;
-            tutor.VerificationDecidedAt = DateTime.Now;   // ← NEW
+            tutor.VerificationDecidedAt = DateTime.Now;
             await _context.SaveChangesAsync();
         }
 

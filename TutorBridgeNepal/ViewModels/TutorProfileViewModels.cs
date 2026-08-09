@@ -26,18 +26,15 @@ public class TutorProfilePageViewModel
     public List<TutorSubjectRowViewModel> Subjects { get; set; } = new();
     public List<TutorCredentialRowViewModel> Credentials { get; set; } = new();
 
+    // The 4-slot verification checklist (Citizenship, CV/Resume, Degree
+    // Certificate, Police Report) shown on the tutor's own Profile page,
+    // mirroring what Admin > Tutor Verification checks for. Separate from
+    // Credentials above (which can also list free-text entries like a
+    // listed degree title with no uploaded file).
+    public List<TutorDocumentSlotViewModel> RequiredDocuments { get; set; } = new();
+
     public int ProfileCompletionPercent { get; set; }
     public string? ProfileCompletionHint { get; set; }
-}
-
-public class TutorVerificationPendingViewModel
-{
-    public string FullName { get; set; } = string.Empty;
-    public string Initials { get; set; } = string.Empty;
-    public bool IsRejected { get; set; }
-    public DateTime SubmittedAt { get; set; }
-    public List<TutorDocumentSlotViewModel> RequiredDocuments { get; set; } = new();
-    public bool AllDocumentsUploaded => RequiredDocuments.All(d => d.IsUploaded);
 }
 
 public class TutorDocumentSlotViewModel
@@ -49,6 +46,16 @@ public class TutorDocumentSlotViewModel
     public int? CredentialId { get; set; }
     public string? OriginalFileName { get; set; }
     public DateTime? UploadedAt { get; set; }
+}
+
+public class TutorVerificationPendingViewModel
+{
+    public string FullName { get; set; } = string.Empty;
+    public string Initials { get; set; } = string.Empty;
+    public bool IsRejected { get; set; }
+    public DateTime SubmittedAt { get; set; }
+    public List<TutorDocumentSlotViewModel> RequiredDocuments { get; set; } = new();
+    public bool AllDocumentsUploaded => RequiredDocuments.All(d => d.IsUploaded);
 }
 
 public class TutorSubjectRowViewModel
