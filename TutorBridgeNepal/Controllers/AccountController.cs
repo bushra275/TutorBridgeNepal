@@ -90,6 +90,7 @@ public class AccountController : Controller
         {
             "Tutor" => RedirectToAction("VerificationPending", "Tutor"),
             "Student" => RedirectToAction("Dashboard", "Student"),
+            "Admin" => RedirectToAction("Dashboard", "Admin"),
             _ => RedirectToAction("Index", "Home")
         };
     }
@@ -356,7 +357,7 @@ public class AccountController : Controller
 
         return model.Role switch
         {
-            "Tutor" => RedirectToAction("Dashboard", "Tutor"),
+            "Tutor" => RedirectToAction("VerificationPending", "Tutor"),
             "Student" => RedirectToAction("Dashboard", "Student"),
             _ => RedirectToAction("Index", "Home")
         };
