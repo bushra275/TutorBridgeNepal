@@ -200,89 +200,117 @@
                                         <span class="tv-submitted">🕒 @DaysAgoText(a.DaysAgo)</span>
                                     </div>
                                     <div class="tv-contact">
-                                        @a.Email @if (!string.IsNullOrEmpty(a.MaskedPhone)) {
-                                        <text>· @a.MaskedPhone</text>
-                                    }
-                                </div>
-                                <div class="tv-applying">
-                                    @(a.District ?? "District not set") · Applying for: @(a.Subjects.Any() ? string.Join(", ", a.Subjects) : "—")
-                                </div>
-                                @if (!string.IsNullOrWhiteSpace(a.Education))
-                                {
-                                    <div class="tv-line">Education: @a.Education</div>
-                                }
-                                @if (!string.IsNullOrWhiteSpace(a.ExperienceSummary))
-                                {
-                                    <div class="tv-line">Experience: @a.ExperienceSummary</div>
-                                }
-                                <a asp-action="UserManagement" asp-route-search="@a.Email" class="tv-view-link">View full profile</a>
-                            </div>
-                            <div class="tv-docs">
-                                <div class="tv-docs-label">SUBMITTED DOCUMENTS</div>
-                                <div class="tv-docs-grid">
-                                    @foreach (var doc in a.Documents)
+                                        @a.Email
+                                        @if (!string.IsNullOrEmpty(a.MaskedPhone))
+                                        {
+                                            <text>· @a.MaskedPhone</text>
+                                        }
+                                    </div>
+                                    <div class="tv-applying">
+                                        @(a.District ?? "District not set") · Applying for: @(a.Subjects.Any() ? string.Join(", ", a.Subjects) : "—")
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(a.Education))
                                     {
-                                        if (doc.IsMissing)
+                                        <div class="tv-line">Education: @a.Education</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(a.ExperienceSummary))
+                                    {
+                                        <div class="tv-line">Experience: @a.ExperienceSummary</div>
+                                    }
+                                    <a asp-action="UserManagement" asp-route-search="@a.Email" class="tv-view-link">View full profile</a>
+                                </div>
+                                <div class="tv-docs">
+                                    <div class="tv-docs-label">SUBMITTED DOCUMENTS</div>
+                                    <div class="tv-docs-grid">
+                                        @foreach (var doc in a.Documents)
                                         {
-                                            <span class="tv-doc-chip tv-doc-missing" title="Not uploaded">⚠️ @doc.Label missing</span>
+                                            if (doc.IsMissing)
+                                            {
+                                                <span class="tv-doc-chip tv-doc-missing" title="Not uploaded">⚠️ @doc.Label missing</span>
+                                            }
+                                            else
+                                            {
+                                                <a class="tv-doc-chip" asp-action="DownloadVerificationDocument" asp-route-credentialId="@doc.CredentialId" target="_blank">@doc.Icon @doc.Label</a>
+                                            }
                                         }
-                                        else
+                                    </div>
+
+                                    @if (a.Status == "Pending")
+                                    {
+                                        <div class="tv-actions">
+                                            <form asp-controller="Admin" asp-action="ApproveTutor" method="post" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
+                                                <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                                <button type="submit" class="mini-btn green">✓ Approve</button>
+                                            </form>
+                                            <button type="button" class="mini-btn danger" data-note-toggle="tv-reject-@a.TutorProfileId">✕ Reject</button>
+                                            <button type="button" class="mini-btn" data-note-toggle="tv-note-@a.TutorProfileId">Request more info</button>
+                                        </div>
+
+                                        <form asp-controller="Admin" asp-action="RejectTutor" method="post" class="tv-note-form" id="tv-reject-@a.TutorProfileId">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
+                                            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                            <textarea name="reason" maxlength="500" required placeholder="Why is this application being rejected? e.g. Citizenship document is unreadable, please re-upload a clearer scan."></textarea>
+                                            <button type="submit" class="mini-btn danger">Confirm reject</button>
+                                        </form>
+
+                                        @if (!string.IsNullOrWhiteSpace(a.VerificationNote))
                                         {
-                                            <span class="tv-doc-chip">@doc.Icon @doc.Label</span>
+                                            <div class="tv-note-sent">📝 Sent: "@a.VerificationNote"</div>
                                         }
+
+                                        <form asp-controller="Admin" asp-action="RequestMoreInfoTutor" method="post" class="tv-note-form" id="tv-note-@a.TutorProfileId">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
+                                            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                            <textarea name="note" maxlength="500" required placeholder="What's missing or needs fixing? e.g. Police report is blurry, please re-upload.">@a.VerificationNote</textarea>
+                                            <button type="submit" class="mini-btn green">Send to tutor</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <div class="tv-actions">
+                                            <span class="pill @(a.Status == "Approved" ? "pill-active" : "pill-suspended")">@a.Status</span>
+                                        </div>
                                     }
                                 </div>
-                                @if (a.Status == "Pending")
-                                {
-                                    <div class="tv-actions">
-                                        <form asp-controller="Admin" asp-action="ApproveTutor" method="post" style="margin:0;">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
-                                            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                                            <button type="submit" class="mini-btn green">✓ Approve</button>
-                                        </form>
-                                        <form asp-controller="Admin" asp-action="RejectTutor" method="post" style="margin:0;" onsubmit="return confirm('Reject this tutor application?');">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
-                                            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                                            <button type="submit" class="mini-btn danger">✕ Reject</button>
-                                        </form>
-                                        <span class="mini-btn" style="opacity:.6;cursor:not-allowed;" title="Coming soon - messaging isn't built yet">Request more info</span>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <div class="tv-actions">
-                                        <span class="pill @(a.Status == "Approved" ? "pill-active" : "pill-suspended")">@a.Status</span>
-                                    </div>
-                                }
                             </div>
-                        </div>
-                    }
+                        }
 
-                    @if (Model.HasMore)
-                    {
-                        <a class="view-all-link tv-more-link" href="@Url.Action("TutorVerification", new
-                           {
-                               tab = Model.ActiveTab,
-                               search = Model.Search,
-                               subject = Model.SubjectFilter,
-                               district = Model.DistrictFilter,
-                               submitted = Model.SubmittedFilter,
-                               sort = Model.Sort,
-                               visibleCount = Model.VisibleCount + 10
-                           })">
-                            View @Model.RemainingCount more @(Model.ActiveTab) application@(Model.RemainingCount == 1 ? "" : "s") →
-                        </a>
+                        @if (Model.HasMore)
+                        {
+                            <a class="view-all-link tv-more-link" href="@Url.Action("TutorVerification", new
+                               {
+                                   tab = Model.ActiveTab,
+                                   search = Model.Search,
+                                   subject = Model.SubjectFilter,
+                                   district = Model.DistrictFilter,
+                                   submitted = Model.SubmittedFilter,
+                                   sort = Model.Sort,
+                                   visibleCount = Model.VisibleCount + 10
+                               })">
+                                View @Model.RemainingCount more @(Model.ActiveTab) application@(Model.RemainingCount == 1 ? "" : "s") →
+                            </a>
+                        }
                     }
-                }
                     else
-                {
-                    <p class="empty-row">No applications match these filters.</p>
-                }
-            </div>
-        </main>
+                    {
+                        <p class="empty-row">No applications match these filters.</p>
+                    }
+                </div>
+            </main>
+        </div>
     </div>
-</div>
+
+    <script>
+            document.querySelectorAll('[data-note-toggle]').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var form = document.getElementById(btn.dataset.noteToggle);
+                    if (form) form.classList.toggle('open');
+                });
+            });
+    </script>
 </body>
 </html>

@@ -52,11 +52,11 @@ public class AdminController : Controller
     // as a single source of truth so the query, the "missing" check and the
     // view all agree on labels/icons.
     private static readonly (string Type, string Label, string Icon)[] RequiredVerificationDocuments =
-    {
-        ("Citizenship",       "Citizenship",       "🪪"),
-        ("CVResume",          "CV_Resume",         "📄"),
-        ("DegreeCertificate", "Degree_Certificate","🎓"),
-        ("PoliceReport",      "Police_Report",     "🛡️"),
+        {
+        ("Citizenship", "Citizenship", "🪪"),
+        ("CVResume", "CV / Resume", "📄"),
+        ("DegreeCertificate", "Degree Certificate", "🎓"),
+        ("PoliceReport", "Police Report", "🛡️"),
     };
 
     // ── Dashboard ─────────────────────────────────────────────────────────
@@ -621,11 +621,16 @@ public class AdminController : Controller
             var daysAgo = (int)(now.Date - t.User.CreatedAt.Date).TotalDays;
             var tutorCredentials = credentialLookup.TryGetValue(t.Id, out var creds) ? creds : new List<TutorCredential>();
 
-            var documents = RequiredVerificationDocuments.Select(rd => new AdminTutorVerificationDocumentViewModel
+            var documents = RequiredVerificationDocuments.Select(rd =>
             {
-                Label = rd.Label,
-                Icon = rd.Icon,
-                IsMissing = !tutorCredentials.Any(c => c.DocumentType == rd.Type)
+                var match = tutorCredentials.FirstOrDefault(c => c.DocumentType == rd.Type);
+                return new AdminTutorVerificationDocumentViewModel
+                {
+                    CredentialId = match?.Id,
+                    Label = rd.Label,
+                    Icon = rd.Icon,
+                    IsMissing = match == null
+                };
             }).ToList();
 
             return new AdminTutorVerificationRowViewModel
@@ -644,7 +649,8 @@ public class AdminController : Controller
                 DaysAgo = daysAgo,
                 UrgencyClass = daysAgo >= 2 ? "red" : "orange",
                 Documents = documents,
-                Status = t.IsVerified ? "Approved" : t.VerificationRejected ? "Rejected" : "Pending"
+                Status = t.IsVerified ? "Approved" : t.VerificationRejected ? "Rejected" : "Pending",
+                VerificationNote = t.VerificationNote
             };
         }).ToList();
 
@@ -921,7 +927,7 @@ public class AdminController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RejectTutor(int tutorProfileId, string? returnUrl)
+    public async Task<IActionResult> RejectTutor(int tutorProfileId, string reason, string? returnUrl)
     {
         var tutor = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.Id == tutorProfileId);
         if (tutor != null)
@@ -929,9 +935,30 @@ public class AdminController : Controller
             tutor.IsVerified = false;
             tutor.VerificationRejected = true;
             tutor.VerificationDecidedAt = DateTime.Now;
+            tutor.VerificationNote = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
             await _context.SaveChangesAsync();
         }
 
         return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Dashboard") : LocalRedirect(returnUrl);
+    }
+
+    // Doesn't approve or reject - keeps the application in "Pending" but
+    // attaches a note the tutor sees on their VerificationPending page,
+    // explaining what needs fixing. The note clears automatically the next
+    // time the tutor uploads a document (see
+    // TutorController.UploadVerificationDocument), since a fresh upload is
+    // how the tutor "responds".
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RequestMoreInfoTutor(int tutorProfileId, string note, string? returnUrl)
+    {
+        var tutor = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.Id == tutorProfileId);
+        if (tutor != null && !string.IsNullOrWhiteSpace(note))
+        {
+            tutor.VerificationNote = note.Trim();
+            await _context.SaveChangesAsync();
+        }
+
+        return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("TutorVerification") : LocalRedirect(returnUrl);
     }
 }

@@ -52,11 +52,17 @@ public class AdminTutorVerificationRowViewModel
     public int DaysAgo { get; set; }
     public string UrgencyClass { get; set; } = "orange"; // "orange" or "red"
     public List<AdminTutorVerificationDocumentViewModel> Documents { get; set; } = new();
-    public string Status { get; set; } = "Pending"; // Pending / Approved / Rejected
+    public string Status { get; set; } = "Pending";
+
+    // Set once an admin has used "Request more info" - shown back on this
+    // card so the admin can see what they last asked for, and cleared
+    // automatically once the tutor re-uploads a document.
+    public string? VerificationNote { get; set; }
 }
 
 public class AdminTutorVerificationDocumentViewModel
 {
+    public int? CredentialId { get; set; }
     public string Label { get; set; } = string.Empty;
     public string Icon { get; set; } = string.Empty;
     public bool IsMissing { get; set; }

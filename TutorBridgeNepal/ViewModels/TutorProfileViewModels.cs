@@ -56,6 +56,10 @@ public class TutorVerificationPendingViewModel
     public DateTime SubmittedAt { get; set; }
     public List<TutorDocumentSlotViewModel> RequiredDocuments { get; set; } = new();
     public bool AllDocumentsUploaded => RequiredDocuments.All(d => d.IsUploaded);
+
+    // Set by an admin's "Request more info" action - shown as a banner
+    // above the checklist so the tutor knows exactly what to fix.
+    public string? AdminNote { get; set; }
 }
 
 public class TutorSubjectRowViewModel

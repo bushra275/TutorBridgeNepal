@@ -71,5 +71,13 @@ public class TutorProfile
     public bool IsListedInSearch { get; set; } = true;
 
     // Deactivation - reversible-in-spirit account pause; blocks login while set
+    // Deactivation - reversible-in-spirit account pause; blocks login while set
     public bool IsDeactivated { get; set; }
+
+    // Set by Admin > Tutor Verification's "Request more info" action, shown
+    // to the tutor on their VerificationPending page. Cleared automatically
+    // the next time the tutor uploads a document (see
+    // TutorController.UploadVerificationDocument), since a fresh upload is
+    // the tutor's way of responding to the request.
+    public string? VerificationNote { get; set; }
 }

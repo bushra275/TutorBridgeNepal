@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Verification Pending - TutorBridge Nepal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -196,7 +196,18 @@
             @if (Model.IsRejected)
             {
                 <div class="status-banner error mb-3">
-                    Your application wasn't approved. Please review the documents below, replace anything missing or incorrect, and resubmit - your application will go back to an admin for another look automatically.
+                    <strong>Your application wasn't approved.</strong>
+                    @if (!string.IsNullOrWhiteSpace(Model.AdminNote))
+                    {
+                        <text> Reason: @Model.AdminNote</text>
+                    }
+                    Please review the documents below, make the necessary corrections, and resubmit - your application will go back to an admin for another look automatically.
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(Model.AdminNote))
+            {
+                <div class="status-banner warn mb-3">
+                    <strong>Admin note:</strong> @Model.AdminNote
                 </div>
             }
             else if (Model.AllDocumentsUploaded)

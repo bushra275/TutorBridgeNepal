@@ -123,6 +123,7 @@ public class TutorController : Controller
             Initials = GetInitials(tutor.User.FullName),
             IsRejected = tutor.VerificationRejected,
             SubmittedAt = tutor.User.CreatedAt,
+            AdminNote = tutor.VerificationNote,
             RequiredDocuments = RequiredVerificationDocuments.Select(rd =>
             {
                 var match = credentials.FirstOrDefault(c => c.DocumentType == rd.Type);
@@ -1496,6 +1497,8 @@ public class TutorController : Controller
             tutor.VerificationRejected = false;
             tutor.VerificationDecidedAt = null;
         }
+
+        tutor.VerificationNote = null;
 
         await _context.SaveChangesAsync();
 
