@@ -96,13 +96,13 @@
                     <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
                     <li><a asp-controller="Admin" asp-action="UserManagement" class="active"><span class="nav-icon">👥</span> User Management</a></li>
                     <li>
-                        <span class="disabled-nav-link" title="Coming soon">
+                        <a asp-controller="Admin" asp-action="TutorVerification">
                             <span class="nav-icon">✅</span> Tutor Verification
                             @if (Model.PendingApprovalCount > 0)
                             {
                                 <span class="badge-count">@Model.PendingApprovalCount</span>
                             }
-                        </span>
+                        </a>
                     </li>
                     <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🗒️</span> Session Logs</span></li>
                     <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">📈</span> Reports</span></li>
