@@ -7,6 +7,10 @@
     margin-bottom: 1.75rem;
 }
 
+.kpi-row-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
 .kpi-card {
     background: #fff;
     border: 1px solid var(--line);
@@ -787,4 +791,38 @@
     .um-table {
         min-width: 820px;
     }
+}
+
+/* ==== Session Logs page ==== */
+
+.sl-pill-live {
+    background: #fff1d5;
+    color: #a96808;
+}
+
+.sl-pill-disputed {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+.sl-pill-missed {
+    background: var(--soft);
+    color: var(--muted);
+}
+
+.sl-live-badge {
+    background: var(--danger-bg);
+    color: var(--danger);
+    font-weight: 800;
+}
+
+.sl-row-disputed {
+    background: var(--danger-bg);
+}
+
+.sl-review-btn {
+    background: #fff1d5;
+    border-color: #f0d9a6;
+    color: #a96808;
+    font-weight: 700;
 }

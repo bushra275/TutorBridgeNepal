@@ -473,7 +473,22 @@ public class TutorController : Controller
             .Where(r => r.TutorProfileId == tutorProfileId)
             .ToListAsync();
 
-        if (!rules.Any()) return;
+        if (!rules.Any()) return; // tutor hasn't set up weekly availability yet
+
+        var tutorTeachingMode = await _context.TutorProfiles
+            .Where(t => t.Id == tutorProfileId)
+            .Select(t => t.TeachingMode)
+            .FirstOrDefaultAsync();
+
+        // "Online & In-person" tutors alternate by day so their real slot mix
+        // isn't 100% one or the other - a simple, deterministic rule rather
+        // than random, so regenerating slots stays consistent.
+        string ModeForDate(DateTime date) => tutorTeachingMode switch
+        {
+            "In-person only" => "In-person",
+            "Online only" => "Online",
+            _ => date.DayOfYear % 2 == 0 ? "Online" : "In-person"
+        };
 
         var now = DateTime.Now;
         var horizon = DateTime.Today.AddDays(daysAhead);
@@ -514,7 +529,8 @@ public class TutorController : Controller
                     StartTime = slotStart,
                     EndTime = slotEnd,
                     Capacity = 1,
-                    IsBooked = false
+                    IsBooked = false,
+                    Mode = ModeForDate(date)
                 });
                 existingStarts.Add(slotStart);
             }
@@ -1834,7 +1850,7 @@ public class TutorController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SubmitSupportTicket(string category, string subject, string message)
+    public async Task<IActionResult> SubmitSupportTicket(string category, string subject, string message, int? bookingId)
     {
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("TutorLogin", "Account");
@@ -1846,16 +1862,32 @@ public class TutorController : Controller
         }
 
         var validCategories = new[] { "Booking", "Schedule", "Payments", "Account", "Other" };
+        var resolvedCategory = validCategories.Contains(category) ? category : "Other";
+
+        // Only accept the booking link if it's a real "Booking" complaint
+        // about a session that actually belongs to this tutor.
+        Booking? linkedBooking = null;
+        if (resolvedCategory == "Booking" && bookingId.HasValue)
+        {
+            linkedBooking = await _context.Bookings
+                .FirstOrDefaultAsync(b => b.Id == bookingId.Value && b.TutorProfileId == tutor.Id);
+        }
 
         _context.SupportTickets.Add(new SupportTicket
         {
             TutorProfileId = tutor.Id,
-            Category = validCategories.Contains(category) ? category : "Other",
+            Category = resolvedCategory,
             Subject = subject.Trim(),
             Message = message.Trim(),
             Status = "Open",
-            CreatedAt = DateTime.Now
+            CreatedAt = DateTime.Now,
+            BookingId = linkedBooking?.Id
         });
+
+        if (linkedBooking != null)
+        {
+            linkedBooking.IsDisputed = true;
+        }
 
         await _context.SaveChangesAsync();
 

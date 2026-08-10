@@ -19,4 +19,10 @@ public class SupportTicket
     // "Open", "Resolved" - no admin UI to change this yet, defaults to Open
     public string Status { get; set; } = "Open";
     public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+    // Optional - set when a "Booking" category ticket is about a specific
+    // session, so Admin > Session Logs can show it as Disputed and link the
+    // two together. Null for tickets not tied to a particular session.
+    public int? BookingId { get; set; }
+    public Booking? Booking { get; set; }
 }

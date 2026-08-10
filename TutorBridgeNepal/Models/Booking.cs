@@ -23,4 +23,10 @@ public class Booking
 
     // Optional message the student can attach when requesting a session.
     public string? Note { get; set; }
+    // True while a linked SupportTicket (Category "Booking") on this session
+    // is still open. Set by Tutor/StudentController.SubmitSupportTicket when
+    // a ticket references this booking, or directly by an admin via
+    // AdminController.FlagSessionDisputed. Cleared by
+    // AdminController.ResolveDispute once the admin has handled it.
+    public bool IsDisputed { get; set; }
 }

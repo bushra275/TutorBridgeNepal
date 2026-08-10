@@ -14,4 +14,9 @@ public class TutorAvailabilitySlot
     // availability filters keep working unchanged.
     public int Capacity { get; set; } = 1;
     public bool IsBooked { get; set; }
+
+    // "Online" or "In-person" - set when the slot is generated (see
+    // TutorController.GenerateUpcomingSlotsAsync), inferred from the
+    // tutor's TeachingMode preference at that time.
+    public string Mode { get; set; } = "Online";
 }

@@ -961,4 +961,326 @@ public class AdminController : Controller
 
         return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("TutorVerification") : LocalRedirect(returnUrl);
     }
+
+    // ── Session Logs ──────────────────────────────────────────────────────
+
+    // Turns a raw Booking.Status + timing into what the Session Logs page
+    // actually shows - a disputed session always wins regardless of its
+    // underlying status, and "Confirmed" splits into Live/Upcoming/Completed
+    // depending on where "now" falls relative to the slot.
+    private static string ComputeSessionDisplayStatus(Booking b, DateTime now)
+    {
+        if (b.IsDisputed) return "Disputed";
+        if (b.Status == "Cancelled") return "Cancelled";
+        if (b.Status == "Completed") return "Completed";
+        if (b.Status == "Missed") return "Missed";
+
+        if (b.Status == "Confirmed")
+        {
+            if (b.TutorAvailabilitySlot.StartTime <= now && b.TutorAvailabilitySlot.EndTime >= now) return "Live";
+            if (b.TutorAvailabilitySlot.StartTime > now) return "Upcoming";
+            return "Completed"; // slot time has passed but never explicitly marked
+        }
+
+        return "Pending";
+    }
+
+    public async Task<IActionResult> SessionLogs(
+        string tab = "all",
+        string? search = null,
+        string? subject = null,
+        string? status = null,
+        string dateRange = "all",
+        string? district = null,
+        string sort = "newest",
+        int page = 1,
+        int pageSize = 8)
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        var now = DateTime.Now;
+        var monthStart = new DateTime(now.Year, now.Month, 1);
+        var previousMonthStart = monthStart.AddMonths(-1);
+
+        var allBookings = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .ToListAsync();
+
+        // ---- KPI strip ----
+        var totalSessions = allBookings.Count;
+        var createdThisMonth = allBookings.Count(b => b.CreatedAt >= monthStart);
+        var createdPreviousMonth = allBookings.Count(b => b.CreatedAt >= previousMonthStart && b.CreatedAt < monthStart);
+        int? totalTrend = createdPreviousMonth == 0
+            ? null
+            : (int)Math.Round(100.0 * (createdThisMonth - createdPreviousMonth) / createdPreviousMonth);
+
+        var completedCount = allBookings.Count(b => ComputeSessionDisplayStatus(b, now) == "Completed");
+        var ongoingNowCount = allBookings.Count(b => ComputeSessionDisplayStatus(b, now) == "Live");
+        var cancelledCount = allBookings.Count(b => b.Status == "Cancelled");
+        var disputedCount = allBookings.Count(b => b.IsDisputed);
+
+        var completedPercent = totalSessions == 0 ? 0 : (int)Math.Round(100.0 * completedCount / totalSessions);
+        var cancelledPercent = totalSessions == 0 ? 0 : (int)Math.Round(100.0 * cancelledCount / totalSessions);
+
+        // ---- Tab filter ----
+        IEnumerable<Booking> filtered = tab switch
+        {
+            "completed" => allBookings.Where(b => ComputeSessionDisplayStatus(b, now) == "Completed"),
+            "ongoing" => allBookings.Where(b => ComputeSessionDisplayStatus(b, now) == "Live"),
+            "cancelled" => allBookings.Where(b => b.Status == "Cancelled"),
+            "disputed" => allBookings.Where(b => b.IsDisputed),
+            _ => allBookings
+        };
+
+        // ---- Explicit filters ----
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            filtered = filtered.Where(b =>
+                b.StudentProfile.User.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                b.TutorProfile.User.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                $"SES-{b.Id:D4}".Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                b.Id.ToString() == term);
+        }
+
+        if (!string.IsNullOrWhiteSpace(subject))
+            filtered = filtered.Where(b => b.Subject == subject);
+
+        if (!string.IsNullOrWhiteSpace(status))
+            filtered = filtered.Where(b => ComputeSessionDisplayStatus(b, now) == status);
+
+        if (!string.IsNullOrWhiteSpace(district))
+            filtered = filtered.Where(b => b.StudentProfile.User.District == district || b.TutorProfile.User.District == district);
+
+        filtered = dateRange switch
+        {
+            "last7" => filtered.Where(b => b.TutorAvailabilitySlot.StartTime >= now.AddDays(-7)),
+            "last30" => filtered.Where(b => b.TutorAvailabilitySlot.StartTime >= now.AddDays(-30)),
+            "last90" => filtered.Where(b => b.TutorAvailabilitySlot.StartTime >= now.AddDays(-90)),
+            _ => filtered
+        };
+
+        var sorted = sort switch
+        {
+            "oldest" => filtered.OrderBy(b => b.TutorAvailabilitySlot.StartTime),
+            "student_asc" => filtered.OrderBy(b => b.StudentProfile.User.FullName),
+            "tutor_asc" => filtered.OrderBy(b => b.TutorProfile.User.FullName),
+            _ => filtered.OrderByDescending(b => b.TutorAvailabilitySlot.StartTime) // "newest"
+        };
+
+        var sortedList = sorted.ToList();
+        var totalMatching = sortedList.Count;
+
+        pageSize = pageSize is 8 or 20 or 50 or 100 ? pageSize : 8;
+        var totalPages = totalMatching == 0 ? 1 : (int)Math.Ceiling(totalMatching / (double)pageSize);
+        page = Math.Clamp(page, 1, totalPages);
+
+        var pageRows = sortedList.Skip((page - 1) * pageSize).Take(pageSize).Select(b => new AdminSessionLogRowViewModel
+        {
+            BookingId = b.Id,
+            StudentName = b.StudentProfile.User.FullName,
+            StudentInitials = GetInitials(b.StudentProfile.User.FullName),
+            TutorName = b.TutorProfile.User.FullName,
+            TutorInitials = GetInitials(b.TutorProfile.User.FullName),
+            Subject = b.Subject,
+            StartTime = b.TutorAvailabilitySlot.StartTime,
+            EndTime = b.TutorAvailabilitySlot.EndTime,
+            DurationLabel = $"{(int)(b.TutorAvailabilitySlot.EndTime - b.TutorAvailabilitySlot.StartTime).TotalHours}h {(b.TutorAvailabilitySlot.EndTime - b.TutorAvailabilitySlot.StartTime).Minutes:D2}m",
+            DisplayStatus = ComputeSessionDisplayStatus(b, now),
+            Mode = b.TutorAvailabilitySlot.Mode,
+            IsDisputed = b.IsDisputed
+        }).ToList();
+
+        var pageWindow = new List<int?>();
+        if (totalPages <= 1)
+        {
+            pageWindow.Add(1);
+        }
+        else
+        {
+            pageWindow.Add(1);
+            if (page <= 3)
+            {
+                for (var i = 2; i <= Math.Min(3, totalPages - 1); i++) pageWindow.Add(i);
+            }
+            else
+            {
+                pageWindow.Add(null);
+                var start = Math.Max(2, page - 1);
+                var end = Math.Min(totalPages - 1, page + 1);
+                for (var i = start; i <= end; i++) pageWindow.Add(i);
+            }
+            if (page < totalPages - 2) pageWindow.Add(null);
+            pageWindow.Add(totalPages);
+        }
+
+        // ---- Chart: sessions over the last 14 days (non-cancelled) ----
+        var chartStart = now.Date.AddDays(-13);
+        var chartCounts = allBookings
+            .Where(b => b.Status != "Cancelled" && b.TutorAvailabilitySlot.StartTime.Date >= chartStart && b.TutorAvailabilitySlot.StartTime.Date <= now.Date)
+            .Select(b => b.TutorAvailabilitySlot.StartTime.Date)
+            .ToList();
+
+        var chartLabels = new List<string>();
+        var chartValues = new List<int>();
+        for (var d = chartStart; d <= now.Date; d = d.AddDays(1))
+        {
+            chartLabels.Add(d.ToString("d MMM"));
+            chartValues.Add(chartCounts.Count(x => x == d));
+        }
+
+        var subjectOptions = allBookings.Select(b => b.Subject).Distinct().OrderBy(s => s).ToList();
+        var districtOptions = allBookings
+            .SelectMany(b => new[] { b.StudentProfile.User.District, b.TutorProfile.User.District })
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Select(d => d!)
+            .Distinct()
+            .OrderBy(d => d)
+            .ToList();
+
+        var vm = new AdminSessionLogsViewModel
+        {
+            AdminName = admin?.FullName ?? "Administrator",
+            AdminInitials = GetInitials(admin?.FullName ?? "Administrator"),
+            TotalSessions = totalSessions,
+            TotalSessionsTrendPercent = totalTrend,
+            CompletedCount = completedCount,
+            CompletedPercent = completedPercent,
+            OngoingNowCount = ongoingNowCount,
+            CancelledCount = cancelledCount,
+            CancelledPercent = cancelledPercent,
+            ActiveTab = tab,
+            AllTabCount = allBookings.Count,
+            CompletedTabCount = completedCount,
+            OngoingTabCount = ongoingNowCount,
+            CancelledTabCount = cancelledCount,
+            DisputedTabCount = disputedCount,
+            Search = search,
+            SubjectFilter = subject,
+            StatusFilter = status,
+            DateRangeFilter = dateRange,
+            DistrictFilter = district,
+            Sort = sort,
+            Subjects = subjectOptions,
+            Districts = districtOptions,
+            Rows = pageRows,
+            Page = page,
+            PageSize = pageSize,
+            TotalMatching = totalMatching,
+            PageWindow = pageWindow,
+            ChartLabels = chartLabels,
+            ChartValues = chartValues
+        };
+
+        return View(vm);
+    }
+
+    // Admin-initiated flag - lets an admin mark a session as disputed
+    // directly (e.g. after a phone/email complaint) without requiring the
+    // student or tutor to have filed a ticket through the app first.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> FlagSessionDisputed(int bookingId, string? returnUrl)
+    {
+        var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId);
+        if (booking != null)
+        {
+            booking.IsDisputed = true;
+            await _context.SaveChangesAsync();
+        }
+
+        return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("SessionLogs") : LocalRedirect(returnUrl);
+    }
+
+    // Clears the dispute flag and closes any open tickets tied to this
+    // session - the admin's way of saying "handled".
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResolveDispute(int bookingId, string? returnUrl)
+    {
+        var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId);
+        if (booking != null)
+        {
+            booking.IsDisputed = false;
+
+            var openTickets = await _context.SupportTickets
+                .Where(t => t.BookingId == bookingId && t.Status == "Open")
+                .ToListAsync();
+            foreach (var ticket in openTickets)
+            {
+                ticket.Status = "Resolved";
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("SessionLogs") : LocalRedirect(returnUrl);
+    }
+
+    public async Task<IActionResult> ExportSessionLogsCsv(
+        string tab = "all",
+        string? search = null,
+        string? subject = null,
+        string? status = null,
+        string dateRange = "all",
+        string? district = null)
+    {
+        var now = DateTime.Now;
+
+        var allBookings = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .ToListAsync();
+
+        IEnumerable<Booking> filtered = tab switch
+        {
+            "completed" => allBookings.Where(b => ComputeSessionDisplayStatus(b, now) == "Completed"),
+            "ongoing" => allBookings.Where(b => ComputeSessionDisplayStatus(b, now) == "Live"),
+            "cancelled" => allBookings.Where(b => b.Status == "Cancelled"),
+            "disputed" => allBookings.Where(b => b.IsDisputed),
+            _ => allBookings
+        };
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            filtered = filtered.Where(b =>
+                b.StudentProfile.User.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                b.TutorProfile.User.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                $"SES-{b.Id:D4}".Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(subject))
+            filtered = filtered.Where(b => b.Subject == subject);
+
+        if (!string.IsNullOrWhiteSpace(status))
+            filtered = filtered.Where(b => ComputeSessionDisplayStatus(b, now) == status);
+
+        if (!string.IsNullOrWhiteSpace(district))
+            filtered = filtered.Where(b => b.StudentProfile.User.District == district || b.TutorProfile.User.District == district);
+
+        filtered = dateRange switch
+        {
+            "last7" => filtered.Where(b => b.TutorAvailabilitySlot.StartTime >= now.AddDays(-7)),
+            "last30" => filtered.Where(b => b.TutorAvailabilitySlot.StartTime >= now.AddDays(-30)),
+            "last90" => filtered.Where(b => b.TutorAvailabilitySlot.StartTime >= now.AddDays(-90)),
+            _ => filtered
+        };
+
+        var csv = new System.Text.StringBuilder();
+        csv.AppendLine("SessionId,Student,Tutor,Subject,StartTime,EndTime,Status,Mode");
+        foreach (var b in filtered.OrderByDescending(b => b.TutorAvailabilitySlot.StartTime))
+        {
+            string Esc(string? v) => "\"" + (v ?? "").Replace("\"", "\"\"") + "\"";
+            csv.AppendLine(string.Join(",",
+                Esc($"SES-{b.Id:D4}"), Esc(b.StudentProfile.User.FullName), Esc(b.TutorProfile.User.FullName), Esc(b.Subject),
+                Esc(b.TutorAvailabilitySlot.StartTime.ToString("yyyy-MM-dd HH:mm")), Esc(b.TutorAvailabilitySlot.EndTime.ToString("yyyy-MM-dd HH:mm")),
+                Esc(ComputeSessionDisplayStatus(b, now)), Esc(b.TutorAvailabilitySlot.Mode)));
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
+        return File(bytes, "text/csv", $"tutorbridge-session-logs-{DateTime.Now:yyyyMMdd-HHmm}.csv");
+    }
 }

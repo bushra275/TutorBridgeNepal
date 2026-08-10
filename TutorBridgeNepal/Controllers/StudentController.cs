@@ -1510,7 +1510,7 @@ public class StudentController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SubmitSupportTicket(string category, string subject, string message)
+    public async Task<IActionResult> SubmitSupportTicket(string category, string subject, string message, int? bookingId)
     {
         var studentProfile = await GetCurrentStudentProfileAsync();
         if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
@@ -1522,16 +1522,30 @@ public class StudentController : Controller
         }
 
         var validCategories = new[] { "Booking", "Messaging", "Account", "Other" };
+        var resolvedCategory = validCategories.Contains(category) ? category : "Other";
+
+        Booking? linkedBooking = null;
+        if (resolvedCategory == "Booking" && bookingId.HasValue)
+        {
+            linkedBooking = await _context.Bookings
+                .FirstOrDefaultAsync(b => b.Id == bookingId.Value && b.StudentProfileId == studentProfile.Id);
+        }
 
         _context.SupportTickets.Add(new SupportTicket
         {
             StudentProfileId = studentProfile.Id,
-            Category = validCategories.Contains(category) ? category : "Other",
+            Category = resolvedCategory,
             Subject = subject.Trim(),
             Message = message.Trim(),
             Status = "Open",
-            CreatedAt = DateTime.Now
+            CreatedAt = DateTime.Now,
+            BookingId = linkedBooking?.Id
         });
+
+        if (linkedBooking != null)
+        {
+            linkedBooking.IsDisputed = true;
+        }
 
         await _context.SaveChangesAsync();
 
