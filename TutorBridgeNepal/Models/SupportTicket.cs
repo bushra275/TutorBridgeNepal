@@ -16,9 +16,19 @@ public class SupportTicket
     public string Subject { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
 
-    // "Open", "Resolved" - no admin UI to change this yet, defaults to Open
+    // "Open", "UnderReview", "Resolved"
     public string Status { get; set; } = "Open";
     public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+    // "High", "Medium", "Low" - defaults to Medium at submission (the
+    // filer isn't the one who decides how urgent it is); an admin can
+    // re-set it from Admin > Complaints.
+    public string Severity { get; set; } = "Medium";
+
+    // Set by AdminController.ResolveComplaint when the ticket moves to
+    // "Resolved" - what the admin actually did about it.
+    public string? ResolutionNote { get; set; }
+    public DateTime? ResolvedAt { get; set; }
 
     // Optional - set when a "Booking" category ticket is about a specific
     // session, so Admin > Session Logs can show it as Disputed and link the

@@ -1,0 +1,504 @@
+﻿@model TutorBridgeNepal.ViewModels.AdminReportsViewModel
+@{
+    ViewData["Title"] = "Reports";
+    Layout = null;
+
+    // ---- Donut chart: build a conic-gradient stop string from SubjectShares ----
+    var donutStops = new System.Text.StringBuilder();
+    double cursor = 0;
+    var donutColors = new Dictionary<string, string>
+    {
+        ["rp-c1"] = "#0f654d",
+        ["rp-c2"] = "#169a70",
+        ["rp-c3"] = "#7fd6b3",
+        ["rp-c4"] = "#c8f0e3",
+        ["rp-c5"] = "#e6f6ef"
+    };
+    foreach (var share in Model.SubjectShares)
+    {
+        var start = cursor;
+        var end = cursor + share.Percent;
+        var color = donutColors.TryGetValue(share.ColorClass, out var c) ? c : "#c8f0e3";
+        donutStops.Append($"{color} {start}% {end}%, ");
+        cursor = end;
+    }
+    if (cursor < 100) donutStops.Append($"#eef0eb {cursor}% 100%");
+    var donutGradient = donutStops.ToString().TrimEnd(',', ' ');
+
+    // ---- Line chart: build SVG point strings for the 6-month growth chart ----
+    (string StudentPoints, string TutorPoints, List<(double X, double Y, int V)> StudentDots, List<(double X, double Y, int V)> TutorDots) BuildLineChart(List<int> students, List<int> tutors, int max, double width, double height)
+    {
+        var n = students.Count;
+        var studentDots = new List<(double, double, int)>();
+        var tutorDots = new List<(double, double, int)>();
+        for (var i = 0; i < n; i++)
+        {
+            var x = n <= 1 ? 0 : width * i / (n - 1);
+            var ys = height - (height * students[i] / max);
+            var yt = height - (height * tutors[i] / max);
+            studentDots.Add((x, ys, students[i]));
+            tutorDots.Add((x, yt, tutors[i]));
+        }
+        var sp = string.Join(" ", studentDots.Select(d => $"{d.Item1:0.#},{d.Item2:0.#}"));
+        var tp = string.Join(" ", tutorDots.Select(d => $"{d.Item1:0.#},{d.Item2:0.#}"));
+        return (sp, tp, studentDots, tutorDots);
+    }
+
+    var lineChartOverview = BuildLineChart(Model.GrowthStudentCounts, Model.GrowthTutorCounts, Model.GrowthChartMax, 640, 180);
+    var lineChart12Month = BuildLineChart(Model.Growth12MonthStudents, Model.Growth12MonthTutors, Model.Growth12MonthMax, 900, 180);
+
+    string TrendBadgeClass(int? trend) => trend switch { null => "neutral", >= 0 => "up", _ => "urgent" };
+    string TrendBadgeText(int? trend) => trend switch { null => "New", >= 0 => $"+{trend}%", _ => $"{trend}%" };
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reports - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+    <style>
+            @@media print {
+                .dash-sidebar, .dash-topbar, .rp-toolbar, .rp-tabs {
+                    display: none !important;
+                }
+            }
+    </style>
+</head>
+<body>
+    <div class="dash-shell">
+
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <div class="dash-search">
+                <input type="text" placeholder="Search users, sessions..." />
+            </div>
+            <span class="admin-chip">Admin</span>
+            <div class="dash-topbar-right">
+                <a href="#" class="icon-btn" title="Notifications">🔔</a>
+                <div class="topbar-avatar">@Model.AdminInitials</div>
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    <div class="avatar">@Model.AdminInitials</div>
+                    <div>
+                        <div class="name">@Model.AdminName</div>
+                        <div class="meta">Platform Administrator</div>
+                        <span class="role-chip" style="background:#fff1d5;color:#a96808;">Super Admin</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
+                    <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
+                    <li><a asp-controller="Admin" asp-action="TutorVerification"><span class="nav-icon">✅</span> Tutor Verification</a></li>
+                    <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
+                    <li><a asp-controller="Admin" asp-action="Reports" class="active"><span class="nav-icon">📈</span> Reports</a></li>
+                    <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🔔</span> Notifications</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚙️</span> Settings</span></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">❓</span> Help center</span></li>
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <main class="dash-main">
+                <div class="dash-greeting rp-toolbar" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                    <div>
+                        <h1>Reports</h1>
+                        <p>Platform analytics and insights across users and sessions</p>
+                    </div>
+                    <div style="display:flex;gap:.6rem;">
+                        <form method="get" asp-action="Reports" id="quarterForm">
+                            <select class="um-select" name="quarter" onchange="this.form.submit()">
+                                <option value="current" selected="@(Model.QuarterFilter == "current")">This quarter</option>
+                                <option value="last" selected="@(Model.QuarterFilter == "last")">Last quarter</option>
+                                <option value="thisyear" selected="@(Model.QuarterFilter == "thisyear")">This year</option>
+                                <option value="all" selected="@(Model.QuarterFilter == "all")">All time</option>
+                            </select>
+                        </form>
+                        <button type="button" class="tb-btn" onclick="window.print()" title="Use your browser's Print dialog to save this page as a PDF">Export PDF</button>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="um-tabs rp-tabs">
+                    <button type="button" class="um-tab rp-tab-btn active" data-rp-tab="overview">Overview</button>
+                    <button type="button" class="um-tab rp-tab-btn" data-rp-tab="growth">User growth</button>
+                    <button type="button" class="um-tab rp-tab-btn" data-rp-tab="tutors">Tutor performance</button>
+                    <button type="button" class="um-tab rp-tab-btn" data-rp-tab="subjects">Subject demand</button>
+                </div>
+
+                <!-- ===================== OVERVIEW TAB ===================== -->
+                <div class="rp-tab-panel" data-rp-panel="overview">
+
+                    <div class="kpi-row kpi-row-4">
+                        <div class="kpi-card">
+                            <div class="kpi-top"><span class="label">Total platform users</span></div>
+                            <div class="kpi-value">@Model.TotalPlatformUsers.ToString("N0")</div>
+                            <div class="rp-kpi-sub rp-trend @TrendBadgeClass(Model.TotalUsersTrendPercent)">@TrendBadgeText(Model.TotalUsersTrendPercent) QoQ</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-top"><span class="label">Sessions @Model.QuarterLabel.ToLower()</span></div>
+                            <div class="kpi-value">@Model.SessionsThisQuarter.ToString("N0")</div>
+                            <div class="rp-kpi-sub rp-trend @TrendBadgeClass(Model.SessionsTrendPercent)">@TrendBadgeText(Model.SessionsTrendPercent) QoQ</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-top"><span class="label">Avg session rating</span></div>
+                            <div class="kpi-value">@Model.AvgSessionRating.ToString("0.0") ★</div>
+                            <div class="rp-kpi-sub neutral">@Model.RatingTrendLabel</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-top"><span class="label">Retention rate</span></div>
+                            <div class="kpi-value">@Model.RetentionRatePercent%</div>
+                            <div class="rp-kpi-sub rp-trend @TrendBadgeClass(Model.RetentionTrendPercent)">@TrendBadgeText(Model.RetentionTrendPercent)</div>
+                        </div>
+                    </div>
+
+                    <div class="rp-two-col">
+                        <div class="panel chart-panel">
+                            <div class="panel-head">
+                                <h2>User growth — last 6 months</h2>
+                            </div>
+                            @if (Model.GrowthStudentCounts.Sum() == 0 && Model.GrowthTutorCounts.Sum() == 0)
+                            {
+                                <div class="chart-empty">No user growth data yet.</div>
+                            }
+                            else
+                            {
+                                <svg viewBox="0 0 640 200" class="rp-line-chart">
+                                    <polyline points="@lineChartOverview.StudentPoints" class="rp-line rp-line-student" />
+                                    <polyline points="@lineChartOverview.TutorPoints" class="rp-line rp-line-tutor" />
+                                    @foreach (var d in lineChartOverview.StudentDots)
+                                    {
+                                        <circle cx="@d.X" cy="@d.Y" r="4" class="rp-dot-student" />
+                                    }
+                                </svg>
+                                <div class="bar-labels">
+                                    @foreach (var label in Model.GrowthMonthLabels)
+                                    {
+                                        <span>@label</span>
+                                    }
+                                </div>
+                                <div class="rp-legend">
+                                    <span><i class="rp-legend-dot rp-legend-student"></i> Students</span>
+                                    <span><i class="rp-legend-dot rp-legend-tutor"></i> Tutors</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head"><h2>Sessions by subject</h2></div>
+                            @if (Model.TotalSubjectSessions == 0)
+                            {
+                                <div class="chart-empty">No sessions recorded yet.</div>
+                            }
+                            else
+                            {
+                                <div class="rp-donut-row">
+                                    <div class="rp-donut" style="background:conic-gradient(@Html.Raw(donutGradient));">
+                                        <div class="rp-donut-hole">
+                                            <div class="rp-donut-value">@Model.TotalSubjectSessions.ToString("N0")</div>
+                                            <div class="rp-donut-label">sessions</div>
+                                        </div>
+                                    </div>
+                                    <div class="rp-donut-legend">
+                                        @foreach (var share in Model.SubjectShares)
+                                        {
+                                            <div class="rp-donut-legend-row">
+                                                <span class="rp-legend-swatch @share.ColorClass"></span>
+                                                <span class="rp-legend-name">@share.Subject</span>
+                                                <span class="rp-legend-pct">@share.Percent%</span>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(Model.FastestGrowingSubject))
+                                        {
+                                            <div class="rp-fastest">Fastest growing: <strong>@Model.FastestGrowingSubject (+@Model.FastestGrowingSubjectPercent%)</strong></div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="panel" style="margin-top:1rem;">
+                        <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;">
+                            <h2>Top performing tutors</h2>
+                            <button type="button" class="rp-view-all-btn" data-rp-tab="tutors">View all →</button>
+                        </div>
+                        @if (!Model.TopTutors.Any())
+                        {
+                            <p class="empty-state">No verified tutors with sessions yet.</p>
+                        }
+                        else
+                        {
+                            <table class="um-table">
+                                <thead><tr><th>Tutor</th><th>Subjects</th><th>Sessions</th><th>Rating</th><th>Completion %</th></tr></thead>
+                                <tbody>
+                                    @foreach (var t in Model.TopTutors)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="um-user-cell">
+                                                    <div class="avatar">@t.Initials</div>
+                                                    <div class="um-user-name">@t.Name</div>
+                                                </div>
+                                            </td>
+                                            <td>@t.Subjects</td>
+                                            <td>@t.Sessions</td>
+                                            <td><span style="color:var(--orange);">★</span> @t.Rating.ToString("0.0")</td>
+                                            <td>
+                                                <div class="rp-completion-cell">
+                                                    <div class="star-bar-track rp-completion-track"><div class="star-bar-fill" style="width:@(t.CompletionPercent)%;"></div></div>
+                                                    <span>@t.CompletionPercent%</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+
+                    <h2 class="rp-section-title">Platform health summary</h2>
+                    <div class="rp-health-row">
+                        <div class="rp-health-card">
+                            <div class="rp-health-label">Tutor approval rate</div>
+                            <div class="star-bar-track rp-health-track"><div class="star-bar-fill" style="width:@(Model.TutorApprovalRatePercent)%;"></div></div>
+                            <div class="rp-health-bottom">
+                                <span class="rp-health-value">@Model.TutorApprovalRatePercent%</span>
+                                @if (Model.TutorApprovalTrendPercent.HasValue)
+                                {
+                                    <span class="rp-trend @TrendBadgeClass(Model.TutorApprovalTrendPercent)">@TrendBadgeText(Model.TutorApprovalTrendPercent) QoQ</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="rp-health-card">
+                            <div class="rp-health-label">Session completion rate</div>
+                            <div class="star-bar-track rp-health-track"><div class="star-bar-fill" style="width:@(Model.SessionCompletionRatePercent)%;"></div></div>
+                            <div class="rp-health-bottom">
+                                <span class="rp-health-value">@Model.SessionCompletionRatePercent%</span>
+                                @if (Model.SessionCompletionTrendPercent.HasValue)
+                                {
+                                    <span class="rp-trend @TrendBadgeClass(Model.SessionCompletionTrendPercent)">@TrendBadgeText(Model.SessionCompletionTrendPercent) QoQ</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="rp-health-card">
+                            <div class="rp-health-label">Student satisfaction</div>
+                            <div class="star-bar-track rp-health-track"><div class="star-bar-fill" style="width:@(Model.StudentSatisfactionPercent)%;"></div></div>
+                            <div class="rp-health-bottom">
+                                <span class="rp-health-value">@Model.StudentSatisfactionPercent%</span>
+                                <span class="rp-trend neutral">Stable</span>
+                            </div>
+                        </div>
+                        <div class="rp-health-card">
+                            <div class="rp-health-label">Complaint resolution rate</div>
+                            <div class="star-bar-track rp-health-track"><div class="star-bar-fill rp-health-fill-orange" style="width:@(Model.ComplaintResolutionRatePercent)%;"></div></div>
+                            <div class="rp-health-bottom">
+                                <span class="rp-health-value">@Model.ComplaintResolutionRatePercent%</span>
+                                @if (Model.ComplaintResolutionTrendPercent.HasValue)
+                                {
+                                    <span class="rp-trend @TrendBadgeClass(Model.ComplaintResolutionTrendPercent)">@TrendBadgeText(Model.ComplaintResolutionTrendPercent) QoQ</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== USER GROWTH TAB ===================== -->
+                <div class="rp-tab-panel" data-rp-panel="growth" style="display:none;">
+                    <div class="kpi-row kpi-row-4">
+                        <div class="kpi-card">
+                            <div class="kpi-top"><span class="label">Total platform users</span></div>
+                            <div class="kpi-value">@Model.TotalPlatformUsers.ToString("N0")</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-top"><span class="label">New students @Model.QuarterLabel.ToLower()</span></div>
+                            <div class="kpi-value">@Model.NewStudentsThisQuarter</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-top"><span class="label">New tutors @Model.QuarterLabel.ToLower()</span></div>
+                            <div class="kpi-value">@Model.NewTutorsThisQuarter</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-top"><span class="label">Retention rate</span></div>
+                            <div class="kpi-value">@Model.RetentionRatePercent%</div>
+                        </div>
+                    </div>
+
+                    <div class="panel chart-panel">
+                        <div class="panel-head"><h2>User growth — last 12 months</h2></div>
+                        @if (Model.Growth12MonthStudents.Sum() == 0 && Model.Growth12MonthTutors.Sum() == 0)
+                        {
+                            <div class="chart-empty">No user growth data yet.</div>
+                        }
+                        else
+                        {
+                            <svg viewBox="0 0 900 200" class="rp-line-chart" preserveAspectRatio="none">
+                                <polyline points="@lineChart12Month.StudentPoints" class="rp-line rp-line-student" />
+                                <polyline points="@lineChart12Month.TutorPoints" class="rp-line rp-line-tutor" />
+                            </svg>
+                            <div class="bar-labels">
+                                @foreach (var label in Model.Growth12MonthLabels)
+                                {
+                                    <span style="font-size:.68rem;">@label</span>
+                                }
+                            </div>
+                            <div class="rp-legend">
+                                <span><i class="rp-legend-dot rp-legend-student"></i> Students</span>
+                                <span><i class="rp-legend-dot rp-legend-tutor"></i> Tutors</span>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="panel" style="margin-top:1rem;">
+                        <div class="panel-head"><h2>Users by district</h2></div>
+                        @if (!Model.GrowthByDistrict.Any())
+                        {
+                            <p class="empty-state">No district data yet.</p>
+                        }
+                        else
+                        {
+                            <table class="um-table">
+                                <thead><tr><th>District</th><th>Students</th><th>Tutors</th><th>Total</th></tr></thead>
+                                <tbody>
+                                    @foreach (var d in Model.GrowthByDistrict)
+                                    {
+                                        <tr>
+                                            <td>@d.District</td>
+                                            <td>@d.StudentCount</td>
+                                            <td>@d.TutorCount</td>
+                                            <td>@(d.StudentCount + d.TutorCount)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+
+                <!-- ===================== TUTOR PERFORMANCE TAB ===================== -->
+                <div class="rp-tab-panel" data-rp-panel="tutors" style="display:none;">
+                    <div class="panel">
+                        <div class="panel-head"><h2>All tutors — ranked by session volume</h2></div>
+                        @if (!Model.AllTutorsPerformance.Any())
+                        {
+                            <p class="empty-state">No verified tutors with sessions yet.</p>
+                        }
+                        else
+                        {
+                            <table class="um-table">
+                                <thead><tr><th>#</th><th>Tutor</th><th>Subjects</th><th>Sessions</th><th>Rating</th><th>Completion %</th></tr></thead>
+                                <tbody>
+                                    @{
+                                        var rank = 1;
+                                    }
+                                    @foreach (var t in Model.AllTutorsPerformance)
+                                    {
+                                        <tr>
+                                            <td>@rank</td>
+                                            <td>
+                                                <div class="um-user-cell">
+                                                    <div class="avatar">@t.Initials</div>
+                                                    <div class="um-user-name">@t.Name</div>
+                                                </div>
+                                            </td>
+                                            <td>@t.Subjects</td>
+                                            <td>@t.Sessions</td>
+                                            <td><span style="color:var(--orange);">★</span> @t.Rating.ToString("0.0")</td>
+                                            <td>
+                                                <div class="rp-completion-cell">
+                                                    <div class="star-bar-track rp-completion-track"><div class="star-bar-fill" style="width:@(t.CompletionPercent)%;"></div></div>
+                                                    <span>@t.CompletionPercent%</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        rank++;
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+
+                <!-- ===================== SUBJECT DEMAND TAB ===================== -->
+                <div class="rp-tab-panel" data-rp-panel="subjects" style="display:none;">
+                    <div class="panel">
+                        <div class="panel-head"><h2>Sessions by subject — @Model.QuarterLabel</h2></div>
+                        @if (!Model.SubjectDemand.Any())
+                        {
+                            <p class="empty-state">No sessions recorded yet.</p>
+                        }
+                        else
+                        {
+                            <table class="um-table">
+                                <thead><tr><th>Subject</th><th>Sessions</th><th>Share</th><th>QoQ growth</th><th>Avg rating</th></tr></thead>
+                                <tbody>
+                                    @foreach (var s in Model.SubjectDemand)
+                                    {
+                                        <tr>
+                                            <td>@s.Subject</td>
+                                            <td>@s.Sessions</td>
+                                            <td>
+                                                <div class="rp-completion-cell">
+                                                    <div class="star-bar-track rp-completion-track"><div class="star-bar-fill" style="width:@(s.Percent)%;"></div></div>
+                                                    <span>@s.Percent%</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                @if (s.GrowthPercent.HasValue)
+                                                {
+                                                    <span class="rp-trend @TrendBadgeClass(s.GrowthPercent)">@TrendBadgeText(s.GrowthPercent)</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="muted">—</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (s.AvgRating > 0)
+                                                {
+                                                    <text><span style="color:var(--orange);">★</span> @s.AvgRating.ToString("0.0")</text>
+                                                }
+                                                else
+                                                {
+                                                    <span class="muted">No reviews</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <script>
+            document.querySelectorAll('[data-rp-tab]').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var target = btn.dataset.rpTab;
+                    document.querySelectorAll('.rp-tab-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.rpTab === target); });
+                    document.querySelectorAll('.rp-tab-panel').forEach(function(p) { p.style.display = (p.dataset.rpPanel === target) ? '' : 'none'; });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            });
+    </script>
+</body>
+</html>

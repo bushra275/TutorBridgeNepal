@@ -1,0 +1,407 @@
+﻿@model TutorBridgeNepal.ViewModels.AdminComplaintsViewModel
+@{
+    ViewData["Title"] = "Complaints";
+    Layout = null;
+
+    string TabUrl(string tab) => Url.Action("Complaints", new
+    {
+        tab,
+        search = Model.Search,
+        complaintType = Model.ComplaintType,
+        severity = Model.SeverityFilter,
+        dateFiled = Model.DateFiledFilter,
+        sort = Model.Sort,
+        visibleCount = 3
+    })!;
+
+    string SeverityPillClass(string s) => s switch
+    {
+        "High" => "pill cp-pill-high",
+        "Medium" => "pill cp-pill-medium",
+        _ => "pill cp-pill-low"
+    };
+
+    string StatusPillClass(string s) => s switch
+    {
+        "Open" => "pill cp-pill-open",
+        "UnderReview" => "pill pill-pending2",
+        "Resolved" => "pill pill-active",
+        _ => "pill"
+    };
+
+    string StatusLabel(string s) => s switch { "UnderReview" => "Under review", _ => s };
+    string BorderClass(string s) => s switch { "High" => "cp-border-high", "Medium" => "cp-border-medium", _ => "cp-border-low" };
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Complaints - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <div class="dash-search">
+                <input type="text" placeholder="Search users, sessions..." />
+            </div>
+            <span class="admin-chip">Admin</span>
+            <div class="dash-topbar-right">
+                <a href="#" class="icon-btn" title="Notifications">🔔</a>
+                <div class="topbar-avatar">@Model.AdminInitials</div>
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    <div class="avatar">@Model.AdminInitials</div>
+                    <div>
+                        <div class="name">@Model.AdminName</div>
+                        <div class="meta">Platform Administrator</div>
+                        <span class="role-chip" style="background:#fff1d5;color:#a96808;">Super Admin</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
+                    <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
+                    <li><a asp-controller="Admin" asp-action="TutorVerification"><span class="nav-icon">✅</span> Tutor Verification</a></li>
+                    <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
+                    <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="Complaints" class="active">
+                            <span class="nav-icon">⚠️</span> Complaints
+                            @if (Model.OpenCount + Model.UnderReviewCount > 0)
+                            {
+                                <span class="badge-count">@(Model.OpenCount + Model.UnderReviewCount)</span>
+                            }
+                        </a>
+                    </li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🔔</span> Notifications</span></li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚙️</span> Settings</span></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">❓</span> Help center</span></li>
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <main class="dash-main">
+                <div class="dash-greeting" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                    <div>
+                        <h1>Complaints</h1>
+                        <p>Review and resolve complaints filed by students and tutors</p>
+                    </div>
+                    <a class="um-btn-outline" asp-action="ExportComplaintsCsv" asp-route-tab="@Model.ActiveTab" asp-route-search="@Model.Search" asp-route-complaintType="@Model.ComplaintType" asp-route-severity="@Model.SeverityFilter" asp-route-dateFiled="@Model.DateFiledFilter">Export list</a>
+                </div>
+
+                <!-- KPI strip -->
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Open complaints</span>
+                            @if (Model.HasUrgentOpen)
+                            {
+                                <span class="kpi-badge urgent">Urgent</span>
+                            }
+                        </div>
+                        <div class="kpi-value" style="color:var(--danger);">@Model.OpenCount</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Under review</span></div>
+                        <div class="kpi-value" style="color:var(--orange);">@Model.UnderReviewCount</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <span class="label">Resolved (@Model.MonthLabel)</span>
+                            @if (Model.ResolvedTrendPercent.HasValue)
+                            {
+                                <span class="kpi-badge @(Model.ResolvedTrendPercent >= 0 ? "up" : "urgent")">@(Model.ResolvedTrendPercent >= 0 ? "+" : "")@Model.ResolvedTrendPercent%</span>
+                            }
+                        </div>
+                        <div class="kpi-value">@Model.ResolvedThisMonth</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Avg resolution time</span></div>
+                        <div class="kpi-value">@(Model.AvgResolutionDays.HasValue ? $"{Model.AvgResolutionDays} days" : "—")</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Resolution rate</span></div>
+                        <div class="kpi-value" style="color:var(--orange);">@Model.ResolutionRatePercent%</div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="um-tabs">
+                    <a class="um-tab @(Model.ActiveTab == "open" ? "active" : "")" href="@TabUrl("open")">Open (@Model.OpenTabCount)</a>
+                    <a class="um-tab @(Model.ActiveTab == "underreview" ? "active" : "")" href="@TabUrl("underreview")">Under review (@Model.UnderReviewTabCount)</a>
+                    <a class="um-tab @(Model.ActiveTab == "resolved" ? "active" : "")" href="@TabUrl("resolved")">Resolved (@Model.ResolvedTabCount)</a>
+                    <a class="um-tab @(Model.ActiveTab == "all" ? "active" : "")" href="@TabUrl("all")">All complaints</a>
+                </div>
+
+                <!-- Filters -->
+                <form method="get" asp-action="Complaints" id="filterForm">
+                    <input type="hidden" name="tab" value="@Model.ActiveTab" />
+                    <div class="um-toolbar">
+                        <div class="um-search">
+                            <input type="text" name="search" value="@Model.Search" placeholder="Search by name or session ID..." />
+                        </div>
+                        <select class="um-select" name="complaintType" onchange="this.form.submit()">
+                            <option value="">Complaint type</option>
+                            @foreach (var c in Model.ComplaintTypes)
+                            {
+                                <option value="@c" selected="@(Model.ComplaintType == c)">@c</option>
+                            }
+                        </select>
+                        <select class="um-select" name="severity" onchange="this.form.submit()">
+                            <option value="">Severity</option>
+                            <option value="High" selected="@(Model.SeverityFilter == "High")">High</option>
+                            <option value="Medium" selected="@(Model.SeverityFilter == "Medium")">Medium</option>
+                            <option value="Low" selected="@(Model.SeverityFilter == "Low")">Low</option>
+                        </select>
+                        <select class="um-select" name="dateFiled" onchange="this.form.submit()">
+                            <option value="all" selected="@(Model.DateFiledFilter == "all")">Date filed</option>
+                            <option value="last7" selected="@(Model.DateFiledFilter == "last7")">Last 7 days</option>
+                            <option value="last30" selected="@(Model.DateFiledFilter == "last30")">Last 30 days</option>
+                            <option value="last90" selected="@(Model.DateFiledFilter == "last90")">Last 90 days</option>
+                        </select>
+                        <select class="um-select um-select-sort" name="sort" onchange="this.form.submit()">
+                            <option value="newest" selected="@(Model.Sort == "newest")">Sort: Newest first</option>
+                            <option value="oldest" selected="@(Model.Sort == "oldest")">Sort: Oldest first</option>
+                            <option value="severity" selected="@(Model.Sort == "severity")">Sort: Severity</option>
+                        </select>
+                    </div>
+                </form>
+
+                <!-- Complaint cards -->
+                <div class="tv-list">
+                    @if (Model.Cards.Any())
+                    {
+                        @foreach (var c in Model.Cards)
+                        {
+                            <div class="cp-card @BorderClass(c.Severity)">
+                                <div class="cp-card-head">
+                                    <div class="cp-card-title-row">
+                                        <span class="cp-card-title">@c.Title</span>
+                                        <span class="@SeverityPillClass(c.Severity)">@c.Severity</span>
+                                        <span class="@StatusPillClass(c.Status)">@StatusLabel(c.Status)</span>
+                                    </div>
+                                    <div class="cp-card-meta">
+                                        Filed @c.FiledAt.ToString("d MMM yyyy")<br />
+                                        Complaint #@c.ComplaintCode
+                                    </div>
+                                </div>
+
+                                <div class="cp-parties">
+                                    <div class="cp-party">
+                                        <span class="cp-party-label">Filed by</span>
+                                        <div class="avatar tv-avatar" style="width:30px;height:30px;font-size:.78rem;">@c.FilerInitials</div>
+                                        <span>@c.FilerName (@c.FilerRole)</span>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(c.AgainstName))
+                                    {
+                                        <div class="cp-party">
+                                            <span class="cp-party-label">Against</span>
+                                            <div class="avatar tv-avatar purple" style="width:30px;height:30px;font-size:.78rem;">@c.AgainstInitials</div>
+                                            <span>@c.AgainstName (@c.AgainstRole)</span>
+                                        </div>
+                                    }
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(c.SessionCode))
+                                {
+                                    <div class="cp-session-row">
+                                        <span class="cp-party-label">Related session</span>
+                                        #@c.SessionCode · @c.SessionSubject @if (c.SessionDate.HasValue) {
+                                        <text>· @c.SessionDate.Value.ToString("d MMM yyyy, h:mm tt")</text>
+                                    }
+                                </div>
+                            }
+
+                            <div class="cp-quote">"@c.Message"</div>
+
+                            @if (c.Status == "Resolved" && !string.IsNullOrEmpty(c.ResolutionNote))
+                            {
+                                <div class="cp-resolution">✓ Resolved @(c.ResolvedAt?.ToString("d MMM yyyy")): @c.ResolutionNote</div>
+                            }
+
+                            <div class="cp-actions-row">
+                                <div class="cp-actions-left">
+                                    @if (c.Status == "Open")
+                                    {
+                                        <form asp-controller="Admin" asp-action="InvestigateComplaint" method="post" style="margin:0;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="complaintId" value="@c.Id" />
+                                            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                            <button type="submit" class="mini-btn green">@(c.Severity == "High" ? "Investigate" : "Review case")</button>
+                                        </form>
+                                    }
+                                    @if (c.Status == "UnderReview")
+                                    {
+                                        <button type="button" class="mini-btn green" data-cp-toggle="cp-resolve-@c.Id">Resolve</button>
+                                    }
+                                    @if (!string.IsNullOrEmpty(c.FilerEmail))
+                                    {
+                                        <a class="mini-btn" href="mailto:@c.FilerEmail">Contact @c.FilerRole.ToLower()</a>
+                                    }
+                                    @if (!string.IsNullOrEmpty(c.AgainstEmail))
+                                    {
+                                        <a class="mini-btn" href="mailto:@c.AgainstEmail">Contact @c.AgainstRole?.ToLower()</a>
+                                    }
+                                    <select class="um-select cp-severity-select" onchange="cpSetSeverity(@c.Id, this.value, '@Context.Request.Path@Context.Request.QueryString')">
+                                        <option value="">Set severity…</option>
+                                        <option value="High" selected="@(c.Severity == "High")">High</option>
+                                        <option value="Medium" selected="@(c.Severity == "Medium")">Medium</option>
+                                        <option value="Low" selected="@(c.Severity == "Low")">Low</option>
+                                    </select>
+                                </div>
+                                <span class="tv-view-link disabled-nav-link" title="Coming soon">View full case</span>
+                            </div>
+
+                            @if (c.Status == "UnderReview")
+                            {
+                                <form asp-controller="Admin" asp-action="ResolveComplaint" method="post" class="tv-note-form" id="cp-resolve-@c.Id">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="complaintId" value="@c.Id" />
+                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                    <textarea name="resolutionNote" maxlength="500" required placeholder="What was done to resolve this? e.g. Issued a formal warning to the tutor and confirmed with the student."></textarea>
+                                    <button type="submit" class="mini-btn green">Mark resolved</button>
+                                </form>
+                            }
+                        </div>
+                    }
+
+                    @if (Model.HasMore)
+                    {
+                        <a class="view-all-link tv-more-link" href="@Url.Action("Complaints", new
+                           {
+                               tab = Model.ActiveTab,
+                               search = Model.Search,
+                               complaintType = Model.ComplaintType,
+                               severity = Model.SeverityFilter,
+                               dateFiled = Model.DateFiledFilter,
+                               sort = Model.Sort,
+                               visibleCount = Model.VisibleCount + 10
+                           })">
+                            View @Model.RemainingCount more complaint@(Model.RemainingCount == 1 ? "" : "s") →
+                        </a>
+                    }
+                }
+                    else
+                {
+                    <p class="empty-row">No complaints match these filters.</p>
+                }
+            </div>
+
+            @if (Model.ActiveTab == "open" && Model.UnderReviewPreview.Any())
+            {
+                <div class="panel" style="margin-top:1.5rem;">
+                    <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;">
+                        <h2>Under review (@Model.UnderReviewTabCount)</h2>
+                        <a href="@TabUrl("underreview")" class="view-all-link">View all →</a>
+                    </div>
+                    <table class="um-table">
+                        <thead><tr><th>Complaint</th><th>Filed by</th><th>Against</th><th>Date filed</th><th>Severity</th><th>Status</th><th>Action</th></tr></thead>
+                        <tbody>
+                            @foreach (var r in Model.UnderReviewPreview)
+                            {
+                                <tr>
+                                    <td>@r.Title</td>
+                                    <td>@r.FilerName</td>
+                                    <td>@(r.AgainstName ?? "—")</td>
+                                    <td>@r.FiledAt.ToString("d MMM yyyy")</td>
+                                    <td><span class="@SeverityPillClass(r.Severity)">@r.Severity</span></td>
+                                    <td><span class="@StatusPillClass(r.Status)">@StatusLabel(r.Status)</span></td>
+                                    <td>
+                                        <button type="button" class="mini-btn" data-cp-toggle="cp-resolve-row-@r.Id">Continue</button>
+                                        <form asp-controller="Admin" asp-action="ResolveComplaint" method="post" class="tv-note-form" id="cp-resolve-row-@r.Id">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="complaintId" value="@r.Id" />
+                                            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                            <textarea name="resolutionNote" maxlength="500" required placeholder="Resolution notes..."></textarea>
+                                            <button type="submit" class="mini-btn green">Mark resolved</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @if (Model.ActiveTab == "open" && Model.ResolvedPreview.Any())
+            {
+                <div class="panel" style="margin-top:1rem;">
+                    <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;">
+                        <h2>Recently resolved</h2>
+                        <a href="@TabUrl("resolved")" class="view-all-link">View all @Model.ResolvedTabCount →</a>
+                    </div>
+                    <table class="um-table">
+                        <thead><tr><th>Complaint</th><th>Parties involved</th><th>Resolution</th><th>Resolved on</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var r in Model.ResolvedPreview)
+                            {
+                                <tr>
+                                    <td>@r.Title</td>
+                                    <td>@r.FilerName @(r.AgainstName != null ? $"vs {r.AgainstName}" : "")</td>
+                                    <td>@(r.ResolutionNote ?? "—")</td>
+                                    <td>@(r.ResolvedAt?.ToString("d MMM yyyy") ?? "—")</td>
+                                    <td><span class="@StatusPillClass(r.Status)">@StatusLabel(r.Status)</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </main>
+    </div>
+</div>
+
+<script>
+        document.querySelectorAll('[data-cp-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var form = document.getElementById(btn.dataset.cpToggle);
+                if (form) form.classList.toggle('open');
+            });
+        });
+
+        function cpSetSeverity(complaintId, severity, returnUrl) {
+            if (!severity) return;
+            var form = document.createElement('form');
+            form.method = 'post';
+            form.action = '@Url.Action("SetComplaintSeverity", "Admin")';
+
+            var token = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (token) {
+                var tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = '__RequestVerificationToken';
+                tokenInput.value = token.value;
+                form.appendChild(tokenInput);
+            }
+
+            [['complaintId', complaintId], ['severity', severity], ['returnUrl', returnUrl]].forEach(function (pair) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = pair[0];
+                input.value = pair[1];
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+</script>
+</body>
+</html>

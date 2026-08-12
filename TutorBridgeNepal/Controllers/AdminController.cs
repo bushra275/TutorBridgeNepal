@@ -99,8 +99,8 @@ public class AdminController : Controller
             .ToListAsync();
 
         var openTickets = await _context.SupportTickets
-            .Where(t => t.Status == "Open")
-            .CountAsync();
+                    .Where(t => t.Status != "Resolved")
+                    .CountAsync();
 
         var chartStart = monthStart;
         var chartEnd = now.Date;
@@ -1205,11 +1205,12 @@ public class AdminController : Controller
             booking.IsDisputed = false;
 
             var openTickets = await _context.SupportTickets
-                .Where(t => t.BookingId == bookingId && t.Status == "Open")
-                .ToListAsync();
+                            .Where(t => t.BookingId == bookingId && t.Status != "Resolved")
+                            .ToListAsync();
             foreach (var ticket in openTickets)
             {
                 ticket.Status = "Resolved";
+                ticket.ResolvedAt = DateTime.Now;
             }
 
             await _context.SaveChangesAsync();
@@ -1282,5 +1283,593 @@ public class AdminController : Controller
 
         var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
         return File(bytes, "text/csv", $"tutorbridge-session-logs-{DateTime.Now:yyyyMMdd-HHmm}.csv");
+    }
+
+    // ── Reports ────────────────────────────────────────────────────────────
+
+    private static DateTime QuarterStart(DateTime d) => new(d.Year, ((d.Month - 1) / 3) * 3 + 1, 1);
+
+    public async Task<IActionResult> Reports(string quarter = "current")
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        var now = DateTime.Now;
+
+        DateTime rangeStart, rangeEnd;
+        string quarterLabel;
+        switch (quarter)
+        {
+            case "last":
+                var thisQStart = QuarterStart(now);
+                rangeStart = thisQStart.AddMonths(-3);
+                rangeEnd = thisQStart;
+                quarterLabel = "Last quarter";
+                break;
+            case "thisyear":
+                rangeStart = new DateTime(now.Year, 1, 1);
+                rangeEnd = now.AddDays(1);
+                quarterLabel = "This year";
+                break;
+            case "all":
+                rangeStart = DateTime.MinValue;
+                rangeEnd = now.AddDays(1);
+                quarterLabel = "All time";
+                break;
+            default:
+                quarter = "current";
+                rangeStart = QuarterStart(now);
+                rangeEnd = now.AddDays(1);
+                quarterLabel = "This quarter";
+                break;
+        }
+        var previousRangeStart = rangeStart == DateTime.MinValue ? DateTime.MinValue : rangeStart.AddDays(-(rangeEnd - rangeStart).TotalDays);
+        var previousRangeEnd = rangeStart;
+
+        var allUsers = await _context.Users.ToListAsync();
+        var allBookingsFull = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .ToListAsync();
+        var allReviews = await _context.Reviews.ToListAsync();
+        var allTutorProfiles = await _context.TutorProfiles.Include(t => t.User).ToListAsync();
+        var studentProfilesAll = await _context.StudentProfiles.Include(s => s.User).ToListAsync();
+        var allTickets = await _context.SupportTickets.ToListAsync();
+
+        var studentUserIds = studentProfilesAll.Select(s => s.UserId).ToHashSet();
+        var tutorUserIds = allTutorProfiles.Select(t => t.UserId).ToHashSet();
+
+        bool InRange(DateTime d, DateTime start, DateTime end) => d >= start && d < end;
+
+        // ---- Overview KPIs ----
+        var totalPlatformUsers = allUsers.Count;
+        var usersBeforeRange = allUsers.Count(u => u.CreatedAt < rangeStart);
+        int? totalUsersTrend = usersBeforeRange == 0 ? null : (int)Math.Round(100.0 * (totalPlatformUsers - usersBeforeRange) / usersBeforeRange);
+
+        var sessionsThisRange = allBookingsFull.Count(b => b.Status != "Cancelled" && InRange(b.TutorAvailabilitySlot.StartTime, rangeStart, rangeEnd));
+        var sessionsPrevRange = allBookingsFull.Count(b => b.Status != "Cancelled" && InRange(b.TutorAvailabilitySlot.StartTime, previousRangeStart, previousRangeEnd));
+        int? sessionsTrend = sessionsPrevRange == 0 ? null : (int)Math.Round(100.0 * (sessionsThisRange - sessionsPrevRange) / sessionsPrevRange);
+
+        var avgRating = allReviews.Any() ? (decimal)allReviews.Average(r => r.Rating) : 0m;
+
+        var ratingsThisRange = allBookingsFull
+            .Where(b => InRange(b.TutorAvailabilitySlot.StartTime, rangeStart, rangeEnd))
+            .Join(allReviews, b => b.Id, r => r.BookingId, (b, r) => r.Rating).ToList();
+        var ratingsPrevRange = allBookingsFull
+            .Where(b => InRange(b.TutorAvailabilitySlot.StartTime, previousRangeStart, previousRangeEnd))
+            .Join(allReviews, b => b.Id, r => r.BookingId, (b, r) => r.Rating).ToList();
+
+        string ratingTrendLabel;
+        if (!ratingsThisRange.Any() || !ratingsPrevRange.Any())
+        {
+            ratingTrendLabel = "Stable";
+        }
+        else
+        {
+            var diff = ratingsThisRange.Average() - ratingsPrevRange.Average();
+            ratingTrendLabel = Math.Abs(diff) < 0.05 ? "Stable" : (diff > 0 ? $"+{diff:0.0}" : $"{diff:0.0}");
+        }
+
+        // Retention: students active (non-cancelled booking) in the previous
+        // range who also booked again in the current range.
+        var studentsActivePrev = allBookingsFull
+            .Where(b => b.Status != "Cancelled" && InRange(b.TutorAvailabilitySlot.StartTime, previousRangeStart, previousRangeEnd))
+            .Select(b => b.StudentProfileId).Distinct().ToHashSet();
+        var studentsActiveThis = allBookingsFull
+            .Where(b => b.Status != "Cancelled" && InRange(b.TutorAvailabilitySlot.StartTime, rangeStart, rangeEnd))
+            .Select(b => b.StudentProfileId).Distinct().ToHashSet();
+        var retainedCount = studentsActivePrev.Count(id => studentsActiveThis.Contains(id));
+        var retentionRate = studentsActivePrev.Count == 0 ? 0 : (int)Math.Round(100.0 * retainedCount / studentsActivePrev.Count);
+
+        // ---- User growth chart (last 6 months) ----
+        var growthMonthLabels = new List<string>();
+        var growthStudentCounts = new List<int>();
+        var growthTutorCounts = new List<int>();
+        for (var i = 5; i >= 0; i--)
+        {
+            var monthStart = new DateTime(now.Year, now.Month, 1).AddMonths(-i);
+            var monthEnd = monthStart.AddMonths(1);
+            growthMonthLabels.Add(monthStart.ToString("MMM"));
+            growthStudentCounts.Add(allUsers.Count(u => u.CreatedAt < monthEnd && studentUserIds.Contains(u.Id)));
+            growthTutorCounts.Add(allUsers.Count(u => u.CreatedAt < monthEnd && tutorUserIds.Contains(u.Id)));
+        }
+
+        // ---- Sessions by subject (donut) ----
+        var subjectGroups = allBookingsFull
+            .Where(b => b.Status != "Cancelled")
+            .GroupBy(b => b.Subject)
+            .Select(g => new { Subject = g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count)
+            .ToList();
+        var totalSubjectSessions = subjectGroups.Sum(g => g.Count);
+        var colorClasses = new[] { "rp-c1", "rp-c2", "rp-c3", "rp-c4", "rp-c5" };
+        var subjectShares = subjectGroups.Take(5).Select((g, i) => new SubjectShareViewModel
+        {
+            Subject = g.Subject,
+            Count = g.Count,
+            Percent = totalSubjectSessions == 0 ? 0 : (int)Math.Round(100.0 * g.Count / totalSubjectSessions),
+            ColorClass = colorClasses[i % colorClasses.Length]
+        }).ToList();
+
+        string? fastestGrowingSubject = null;
+        int? fastestGrowingPercent = null;
+        var subjectGrowthCandidates = subjectGroups.Select(g =>
+        {
+            var thisQ = allBookingsFull.Count(b => b.Subject == g.Subject && b.Status != "Cancelled" && InRange(b.TutorAvailabilitySlot.StartTime, rangeStart, rangeEnd));
+            var prevQ = allBookingsFull.Count(b => b.Subject == g.Subject && b.Status != "Cancelled" && InRange(b.TutorAvailabilitySlot.StartTime, previousRangeStart, previousRangeEnd));
+            int? growth = prevQ == 0 ? (thisQ > 0 ? 100 : (int?)null) : (int)Math.Round(100.0 * (thisQ - prevQ) / prevQ);
+            return (g.Subject, Growth: growth);
+        }).Where(x => x.Growth.HasValue).OrderByDescending(x => x.Growth).FirstOrDefault();
+        if (subjectGrowthCandidates.Subject != null)
+        {
+            fastestGrowingSubject = subjectGrowthCandidates.Subject;
+            fastestGrowingPercent = subjectGrowthCandidates.Growth;
+        }
+
+        // ---- Tutor performance (used by Overview top-4 and full tab) ----
+        var tutorPerf = allTutorProfiles.Where(t => t.IsVerified).Select(t =>
+        {
+            var tutorBookings = allBookingsFull.Where(b => b.TutorProfileId == t.Id).ToList();
+            var completed = tutorBookings.Count(b => b.Status == "Completed");
+            var decided = tutorBookings.Count(b => b.Status is "Completed" or "Missed" or "Cancelled");
+            var completionPercent = decided == 0 ? 0 : (int)Math.Round(100.0 * completed / decided);
+
+            return new TutorPerformanceRowViewModel
+            {
+                Name = t.User.FullName,
+                Initials = GetInitials(t.User.FullName),
+                Subjects = string.Join(", ", t.Subjects.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(2)),
+                Sessions = tutorBookings.Count(b => b.Status != "Cancelled"),
+                Rating = t.AverageRating,
+                CompletionPercent = completionPercent
+            };
+        })
+        .OrderByDescending(t => t.Sessions)
+        .ToList();
+
+        // ---- Platform health summary ----
+        var totalTutorDecisions = allTutorProfiles.Count(t => t.IsVerified || t.VerificationRejected);
+        var approvedTutorDecisions = allTutorProfiles.Count(t => t.IsVerified);
+        var tutorApprovalRate = totalTutorDecisions == 0 ? 0 : (int)Math.Round(100.0 * approvedTutorDecisions / totalTutorDecisions);
+
+        var totalDecidedSessions = allBookingsFull.Count(b => b.Status is "Completed" or "Missed");
+        var completedSessionsAll = allBookingsFull.Count(b => b.Status == "Completed");
+        var sessionCompletionRate = totalDecidedSessions == 0 ? 0 : (int)Math.Round(100.0 * completedSessionsAll / totalDecidedSessions);
+
+        var studentSatisfaction = allReviews.Count == 0 ? 0 : (int)Math.Round(100.0 * allReviews.Count(r => r.Rating >= 4) / allReviews.Count);
+
+        var totalTicketsAll = allTickets.Count;
+        var resolvedTicketsAll = allTickets.Count(t => t.Status == "Resolved");
+        var complaintResolutionRate = totalTicketsAll == 0 ? 0 : (int)Math.Round(100.0 * resolvedTicketsAll / totalTicketsAll);
+
+        // ---- User growth tab: 12-month view + by district ----
+        var growth12Labels = new List<string>();
+        var growth12Students = new List<int>();
+        var growth12Tutors = new List<int>();
+        for (var i = 11; i >= 0; i--)
+        {
+            var monthStart = new DateTime(now.Year, now.Month, 1).AddMonths(-i);
+            var monthEnd = monthStart.AddMonths(1);
+            growth12Labels.Add(monthStart.ToString("MMM yy"));
+            growth12Students.Add(allUsers.Count(u => u.CreatedAt < monthEnd && studentUserIds.Contains(u.Id)));
+            growth12Tutors.Add(allUsers.Count(u => u.CreatedAt < monthEnd && tutorUserIds.Contains(u.Id)));
+        }
+
+        var newStudentsThisQuarter = studentProfilesAll.Count(s => InRange(s.User.CreatedAt, rangeStart, rangeEnd));
+        var newTutorsThisQuarter = allTutorProfiles.Count(t => InRange(t.User.CreatedAt, rangeStart, rangeEnd));
+
+        var growthByDistrict = studentProfilesAll.Select(s => s.User.District)
+            .Concat(allTutorProfiles.Select(t => t.User.District))
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Select(d => d!)
+            .Distinct()
+            .OrderBy(d => d)
+            .Select(d => new DistrictGrowthRowViewModel
+            {
+                District = d,
+                StudentCount = studentProfilesAll.Count(s => s.User.District == d),
+                TutorCount = allTutorProfiles.Count(t => t.User.District == d)
+            })
+            .OrderByDescending(r => r.StudentCount + r.TutorCount)
+            .ToList();
+
+        // ---- Subject demand tab ----
+        var subjectDemand = subjectGroups.Select(g =>
+        {
+            var thisQ = allBookingsFull.Count(b => b.Subject == g.Subject && b.Status != "Cancelled" && InRange(b.TutorAvailabilitySlot.StartTime, rangeStart, rangeEnd));
+            var prevQ = allBookingsFull.Count(b => b.Subject == g.Subject && b.Status != "Cancelled" && InRange(b.TutorAvailabilitySlot.StartTime, previousRangeStart, previousRangeEnd));
+            int? growth = prevQ == 0 ? (thisQ > 0 ? 100 : (int?)null) : (int)Math.Round(100.0 * (thisQ - prevQ) / prevQ);
+
+            var subjectReviewRatings = allBookingsFull
+                .Where(b => b.Subject == g.Subject)
+                .Join(allReviews, b => b.Id, r => r.BookingId, (b, r) => r.Rating)
+                .ToList();
+
+            return new SubjectDemandRowViewModel
+            {
+                Subject = g.Subject,
+                Sessions = g.Count,
+                Percent = totalSubjectSessions == 0 ? 0 : (int)Math.Round(100.0 * g.Count / totalSubjectSessions),
+                GrowthPercent = growth,
+                AvgRating = subjectReviewRatings.Any() ? (decimal)subjectReviewRatings.Average() : 0m
+            };
+        }).ToList();
+
+        var vm = new AdminReportsViewModel
+        {
+            AdminName = admin?.FullName ?? "Administrator",
+            AdminInitials = GetInitials(admin?.FullName ?? "Administrator"),
+            QuarterFilter = quarter,
+            QuarterLabel = quarterLabel,
+            TotalPlatformUsers = totalPlatformUsers,
+            TotalUsersTrendPercent = totalUsersTrend,
+            SessionsThisQuarter = sessionsThisRange,
+            SessionsTrendPercent = sessionsTrend,
+            AvgSessionRating = Math.Round(avgRating, 1),
+            RatingTrendLabel = ratingTrendLabel,
+            RetentionRatePercent = retentionRate,
+            GrowthMonthLabels = growthMonthLabels,
+            GrowthStudentCounts = growthStudentCounts,
+            GrowthTutorCounts = growthTutorCounts,
+            SubjectShares = subjectShares,
+            FastestGrowingSubject = fastestGrowingSubject,
+            FastestGrowingSubjectPercent = fastestGrowingPercent,
+            TotalSubjectSessions = totalSubjectSessions,
+            TopTutors = tutorPerf.Take(4).ToList(),
+            TutorApprovalRatePercent = tutorApprovalRate,
+            SessionCompletionRatePercent = sessionCompletionRate,
+            StudentSatisfactionPercent = studentSatisfaction,
+            ComplaintResolutionRatePercent = complaintResolutionRate,
+            Growth12MonthLabels = growth12Labels,
+            Growth12MonthStudents = growth12Students,
+            Growth12MonthTutors = growth12Tutors,
+            NewStudentsThisQuarter = newStudentsThisQuarter,
+            NewTutorsThisQuarter = newTutorsThisQuarter,
+            GrowthByDistrict = growthByDistrict,
+            AllTutorsPerformance = tutorPerf,
+            SubjectDemand = subjectDemand
+        };
+
+        return View(vm);
+    }
+    // ── Complaints ────────────────────────────────────────────────────────
+
+    // Derives who a complaint is "against" from the linked session, since
+    // there's no separate "who is this about" field - a Booking-category
+    // ticket already has both parties (StudentProfile + TutorProfile on the
+    // booking), so whichever side didn't file it is who it's against.
+    // Tickets with no BookingId (general "Account"/"Other" support requests)
+    // simply have no "against" party - that's expected, not every ticket is
+    // a complaint about a specific person.
+    private static (string? Name, string? Initials, string? Role, string? Email) ComputeAgainst(SupportTicket t)
+    {
+        if (t.Booking == null) return (null, null, null, null);
+
+        if (t.StudentProfileId.HasValue)
+        {
+            var tutorUser = t.Booking.TutorProfile.User;
+            return (tutorUser.FullName, GetInitials(tutorUser.FullName), "Tutor", tutorUser.Email);
+        }
+
+        if (t.TutorProfileId.HasValue)
+        {
+            var studentUser = t.Booking.StudentProfile.User;
+            return (studentUser.FullName, GetInitials(studentUser.FullName), "Student", studentUser.Email);
+        }
+
+        return (null, null, null, null);
+    }
+
+    private AdminComplaintCardViewModel BuildComplaintCard(SupportTicket t)
+    {
+        var isStudentFiler = t.StudentProfileId.HasValue;
+        var filerUser = isStudentFiler ? t.StudentProfile!.User : t.TutorProfile!.User;
+        var against = ComputeAgainst(t);
+
+        return new AdminComplaintCardViewModel
+        {
+            Id = t.Id,
+            Title = t.Subject,
+            Severity = t.Severity,
+            Status = t.Status,
+            FilerName = filerUser.FullName,
+            FilerInitials = GetInitials(filerUser.FullName),
+            FilerRole = isStudentFiler ? "Student" : "Tutor",
+            FilerEmail = filerUser.Email,
+            AgainstName = against.Name,
+            AgainstInitials = against.Initials,
+            AgainstRole = against.Role,
+            AgainstEmail = against.Email,
+            SessionCode = t.BookingId.HasValue ? $"SES-{t.BookingId:D4}" : null,
+            SessionSubject = t.Booking?.Subject,
+            SessionDate = t.Booking?.TutorAvailabilitySlot.StartTime,
+            Message = t.Message,
+            FiledAt = t.CreatedAt,
+            ResolutionNote = t.ResolutionNote,
+            ResolvedAt = t.ResolvedAt
+        };
+    }
+
+    public async Task<IActionResult> Complaints(
+        string tab = "open",
+        string? search = null,
+        string? complaintType = null,
+        string? severity = null,
+        string dateFiled = "all",
+        string sort = "newest",
+        int visibleCount = 3)
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        var now = DateTime.Now;
+        var monthStart = new DateTime(now.Year, now.Month, 1);
+        var previousMonthStart = monthStart.AddMonths(-1);
+
+        var allTickets = await _context.SupportTickets
+            .Include(t => t.StudentProfile).ThenInclude(s => s!.User)
+            .Include(t => t.TutorProfile).ThenInclude(tp => tp!.User)
+            .Include(t => t.Booking).ThenInclude(b => b!.StudentProfile).ThenInclude(s => s.User)
+            .Include(t => t.Booking).ThenInclude(b => b!.TutorProfile).ThenInclude(tp => tp.User)
+            .Include(t => t.Booking).ThenInclude(b => b!.TutorAvailabilitySlot)
+            .ToListAsync();
+
+        // ---- KPI strip ----
+        var openCount = allTickets.Count(t => t.Status == "Open");
+        var hasUrgentOpen = allTickets.Any(t => t.Status == "Open" && t.Severity == "High");
+        var underReviewCount = allTickets.Count(t => t.Status == "UnderReview");
+
+        var resolvedThisMonth = allTickets.Count(t => t.Status == "Resolved" && t.ResolvedAt >= monthStart);
+        var resolvedPreviousMonth = allTickets.Count(t =>
+            t.Status == "Resolved" && t.ResolvedAt >= previousMonthStart && t.ResolvedAt < monthStart);
+        int? resolvedTrend = resolvedPreviousMonth == 0
+            ? null
+            : (int)Math.Round(100.0 * (resolvedThisMonth - resolvedPreviousMonth) / resolvedPreviousMonth);
+
+        var resolutionDurations = allTickets
+            .Where(t => t.Status == "Resolved" && t.ResolvedAt.HasValue)
+            .Select(t => (t.ResolvedAt!.Value - t.CreatedAt).TotalDays)
+            .Where(d => d >= 0)
+            .ToList();
+        double? avgResolutionDays = resolutionDurations.Count == 0 ? null : Math.Round(resolutionDurations.Average(), 1);
+
+        var resolvedAllTime = allTickets.Count(t => t.Status == "Resolved");
+        var resolutionRate = allTickets.Count == 0 ? 0 : (int)Math.Round(100.0 * resolvedAllTime / allTickets.Count);
+
+        // ---- Tab filter ----
+        IEnumerable<SupportTicket> filtered = tab switch
+        {
+            "underreview" => allTickets.Where(t => t.Status == "UnderReview"),
+            "resolved" => allTickets.Where(t => t.Status == "Resolved"),
+            "all" => allTickets,
+            _ => allTickets.Where(t => t.Status == "Open")
+        };
+
+        // ---- Explicit filters ----
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            filtered = filtered.Where(t =>
+                t.Subject.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                $"CMP-{t.Id:D4}".Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                (t.StudentProfile != null && t.StudentProfile.User.FullName.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                (t.TutorProfile != null && t.TutorProfile.User.FullName.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                (t.BookingId.HasValue && $"SES-{t.BookingId:D4}".Contains(term, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(complaintType))
+            filtered = filtered.Where(t => t.Subject == complaintType);
+
+        if (!string.IsNullOrWhiteSpace(severity))
+            filtered = filtered.Where(t => t.Severity == severity);
+
+        filtered = dateFiled switch
+        {
+            "last7" => filtered.Where(t => t.CreatedAt >= now.AddDays(-7)),
+            "last30" => filtered.Where(t => t.CreatedAt >= now.AddDays(-30)),
+            "last90" => filtered.Where(t => t.CreatedAt >= now.AddDays(-90)),
+            _ => filtered
+        };
+
+        var sorted = sort switch
+        {
+            "oldest" => filtered.OrderBy(t => t.CreatedAt),
+            "severity" => filtered.OrderByDescending(t => t.Severity == "High" ? 2 : t.Severity == "Medium" ? 1 : 0),
+            _ => filtered.OrderByDescending(t => t.CreatedAt) // "newest"
+        };
+
+        var sortedList = sorted.ToList();
+        var totalMatching = sortedList.Count;
+
+        visibleCount = Math.Max(3, visibleCount);
+        var pageTickets = sortedList.Take(visibleCount).ToList();
+        var cards = pageTickets.Select(BuildComplaintCard).ToList();
+
+        // ---- Secondary preview sections (Open tab only) ----
+        var underReviewPreview = tab == "open"
+            ? allTickets.Where(t => t.Status == "UnderReview").OrderByDescending(t => t.CreatedAt).Take(3)
+                .Select(t => new AdminComplaintTableRowViewModel
+                {
+                    Id = t.Id,
+                    Title = t.Subject,
+                    FilerName = (t.StudentProfileId.HasValue ? t.StudentProfile!.User.FullName : t.TutorProfile!.User.FullName),
+                    AgainstName = ComputeAgainst(t).Name,
+                    FiledAt = t.CreatedAt,
+                    Severity = t.Severity,
+                    Status = t.Status
+                }).ToList()
+            : new List<AdminComplaintTableRowViewModel>();
+
+        var resolvedPreview = tab == "open"
+            ? allTickets.Where(t => t.Status == "Resolved").OrderByDescending(t => t.ResolvedAt).Take(2)
+                .Select(t => new AdminComplaintTableRowViewModel
+                {
+                    Id = t.Id,
+                    Title = t.Subject,
+                    FilerName = (t.StudentProfileId.HasValue ? t.StudentProfile!.User.FullName : t.TutorProfile!.User.FullName),
+                    AgainstName = ComputeAgainst(t).Name,
+                    FiledAt = t.CreatedAt,
+                    Severity = t.Severity,
+                    Status = t.Status,
+                    ResolutionNote = t.ResolutionNote,
+                    ResolvedAt = t.ResolvedAt
+                }).ToList()
+            : new List<AdminComplaintTableRowViewModel>();
+
+        var complaintTypeOptions = allTickets.Select(t => t.Subject).Distinct().OrderBy(s => s).ToList();
+
+        var vm = new AdminComplaintsViewModel
+        {
+            AdminName = admin?.FullName ?? "Administrator",
+            AdminInitials = GetInitials(admin?.FullName ?? "Administrator"),
+            OpenCount = openCount,
+            HasUrgentOpen = hasUrgentOpen,
+            UnderReviewCount = underReviewCount,
+            MonthLabel = now.ToString("MMMM"),
+            ResolvedThisMonth = resolvedThisMonth,
+            ResolvedTrendPercent = resolvedTrend,
+            AvgResolutionDays = avgResolutionDays,
+            ResolutionRatePercent = resolutionRate,
+            ActiveTab = tab,
+            OpenTabCount = openCount,
+            UnderReviewTabCount = underReviewCount,
+            ResolvedTabCount = resolvedAllTime,
+            AllTabCount = allTickets.Count,
+            Search = search,
+            ComplaintType = complaintType,
+            SeverityFilter = severity,
+            DateFiledFilter = dateFiled,
+            Sort = sort,
+            ComplaintTypes = complaintTypeOptions,
+            Cards = cards,
+            VisibleCount = visibleCount,
+            TotalMatching = totalMatching,
+            UnderReviewPreview = underReviewPreview,
+            ResolvedPreview = resolvedPreview
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> InvestigateComplaint(int complaintId, string? returnUrl)
+    {
+        var ticket = await _context.SupportTickets.FirstOrDefaultAsync(t => t.Id == complaintId);
+        if (ticket != null && ticket.Status == "Open")
+        {
+            ticket.Status = "UnderReview";
+            await _context.SaveChangesAsync();
+        }
+
+        return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Complaints") : LocalRedirect(returnUrl);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResolveComplaint(int complaintId, string resolutionNote, string? returnUrl)
+    {
+        var ticket = await _context.SupportTickets.FirstOrDefaultAsync(t => t.Id == complaintId);
+        if (ticket != null && !string.IsNullOrWhiteSpace(resolutionNote))
+        {
+            ticket.Status = "Resolved";
+            ticket.ResolutionNote = resolutionNote.Trim();
+            ticket.ResolvedAt = DateTime.Now;
+
+            if (ticket.BookingId.HasValue)
+            {
+                var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == ticket.BookingId.Value);
+                if (booking != null) booking.IsDisputed = false;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Complaints") : LocalRedirect(returnUrl);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetComplaintSeverity(int complaintId, string severity, string? returnUrl)
+    {
+        var validSeverities = new[] { "High", "Medium", "Low" };
+        var ticket = await _context.SupportTickets.FirstOrDefaultAsync(t => t.Id == complaintId);
+        if (ticket != null && validSeverities.Contains(severity))
+        {
+            ticket.Severity = severity;
+            await _context.SaveChangesAsync();
+        }
+
+        return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Complaints") : LocalRedirect(returnUrl);
+    }
+
+    public async Task<IActionResult> ExportComplaintsCsv(
+        string tab = "all",
+        string? search = null,
+        string? complaintType = null,
+        string? severity = null,
+        string dateFiled = "all")
+    {
+        var allTickets = await _context.SupportTickets
+            .Include(t => t.StudentProfile).ThenInclude(s => s!.User)
+            .Include(t => t.TutorProfile).ThenInclude(tp => tp!.User)
+            .ToListAsync();
+        var now = DateTime.Now;
+
+        IEnumerable<SupportTicket> filtered = tab switch
+        {
+            "underreview" => allTickets.Where(t => t.Status == "UnderReview"),
+            "resolved" => allTickets.Where(t => t.Status == "Resolved"),
+            "open" => allTickets.Where(t => t.Status == "Open"),
+            _ => allTickets
+        };
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            filtered = filtered.Where(t => t.Subject.Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+        if (!string.IsNullOrWhiteSpace(complaintType))
+            filtered = filtered.Where(t => t.Subject == complaintType);
+        if (!string.IsNullOrWhiteSpace(severity))
+            filtered = filtered.Where(t => t.Severity == severity);
+        filtered = dateFiled switch
+        {
+            "last7" => filtered.Where(t => t.CreatedAt >= now.AddDays(-7)),
+            "last30" => filtered.Where(t => t.CreatedAt >= now.AddDays(-30)),
+            "last90" => filtered.Where(t => t.CreatedAt >= now.AddDays(-90)),
+            _ => filtered
+        };
+
+        var csv = new System.Text.StringBuilder();
+        csv.AppendLine("ComplaintId,Title,FiledBy,Severity,Status,DateFiled,ResolvedOn,Resolution");
+        foreach (var t in filtered.OrderByDescending(t => t.CreatedAt))
+        {
+            string Esc(string? v) => "\"" + (v ?? "").Replace("\"", "\"\"") + "\"";
+            var filerName = t.StudentProfileId.HasValue ? t.StudentProfile!.User.FullName : t.TutorProfile!.User.FullName;
+            csv.AppendLine(string.Join(",",
+                Esc($"CMP-{t.Id:D4}"), Esc(t.Subject), Esc(filerName), Esc(t.Severity), Esc(t.Status),
+                Esc(t.CreatedAt.ToString("yyyy-MM-dd")), Esc(t.ResolvedAt?.ToString("yyyy-MM-dd") ?? ""), Esc(t.ResolutionNote)));
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
+        return File(bytes, "text/csv", $"tutorbridge-complaints-{DateTime.Now:yyyyMMdd-HHmm}.csv");
     }
 }
