@@ -328,11 +328,23 @@ public class TutorController : Controller
 
         var booking = await _context.Bookings
             .Include(b => b.TutorAvailabilitySlot)
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
             .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id && b.Status == "Confirmed");
 
+        // Can only mark a session complete once it has actually started - stops
+        // a tutor from marking a future session done before it happens.
         if (booking != null && booking.TutorAvailabilitySlot.StartTime <= DateTime.Now)
         {
             booking.Status = "Completed";
+
+            NotificationHelper.Create(_context,
+                type: "System",
+                title: "Session completed successfully",
+                message: $"{tutor.User.FullName} completed {booking.Subject} session with {booking.StudentProfile.User.FullName}",
+                icon: "✅",
+                actionLabel: "View details",
+                actionUrl: Url.Action("SessionLogs", "Admin", new { search = $"SES-{booking.Id:D4}" }));
+
             await _context.SaveChangesAsync();
         }
 
@@ -1516,6 +1528,33 @@ public class TutorController : Controller
 
         tutor.VerificationNote = null;
 
+        // Fire "verification submitted" the moment the tutor's document set
+        // becomes complete (not on every individual upload) - checks the
+        // in-memory state we've been building this request, since the new
+        // TutorCredential row may not be saved yet.
+        if (!tutor.IsVerified && !tutor.VerificationRejected)
+        {
+            var currentDocTypes = (await _context.TutorCredentials
+                .Where(c => c.TutorProfileId == tutor.Id)
+                .Select(c => c.DocumentType)
+                .ToListAsync())
+                .Where(d => d != null)
+                .ToHashSet();
+            currentDocTypes.Add(documentType);
+
+            var allComplete = RequiredVerificationDocuments.All(rd => currentDocTypes.Contains(rd.Type));
+            if (allComplete)
+            {
+                NotificationHelper.Create(_context,
+                    type: "Verification",
+                    title: "New tutor verification submitted",
+                    message: $"{tutor.User.FullName} submitted documents for {tutor.Subjects}",
+                    icon: "🎓",
+                    actionLabel: "Review now",
+                    actionUrl: Url.Action("TutorVerification", "Admin"));
+            }
+        }
+
         await _context.SaveChangesAsync();
 
         TempData["ProfileSuccess"] = "Document uploaded.";
@@ -1870,6 +1909,7 @@ public class TutorController : Controller
         if (resolvedCategory == "Booking" && bookingId.HasValue)
         {
             linkedBooking = await _context.Bookings
+                .Include(b => b.StudentProfile).ThenInclude(s => s.User)
                 .FirstOrDefaultAsync(b => b.Id == bookingId.Value && b.TutorProfileId == tutor.Id);
         }
 
@@ -1888,6 +1928,14 @@ public class TutorController : Controller
         {
             linkedBooking.IsDisputed = true;
         }
+
+        NotificationHelper.Create(_context,
+            type: "Complaint",
+            title: "New complaint filed — Medium severity",
+            message: $"{tutor.User.FullName} reported: {subject.Trim()}" + (linkedBooking != null ? $" (against {linkedBooking.StudentProfile.User.FullName})" : ""),
+            icon: "⚠️",
+            actionLabel: "Investigate",
+            actionUrl: Url.Action("Complaints", "Admin"));
 
         await _context.SaveChangesAsync();
 

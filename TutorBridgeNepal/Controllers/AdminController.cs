@@ -913,12 +913,19 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ApproveTutor(int tutorProfileId, string? returnUrl)
     {
-        var tutor = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.Id == tutorProfileId);
+        var tutor = await _context.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorProfileId);
         if (tutor != null)
         {
             tutor.IsVerified = true;
             tutor.VerificationRejected = false;
             tutor.VerificationDecidedAt = DateTime.Now;
+
+            NotificationHelper.Create(_context,
+                type: "Verification",
+                title: "Tutor application approved",
+                message: $"{tutor.User.FullName}'s application for {tutor.Subjects} was approved",
+                icon: "✔️");
+
             await _context.SaveChangesAsync();
         }
 
@@ -929,13 +936,20 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RejectTutor(int tutorProfileId, string reason, string? returnUrl)
     {
-        var tutor = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.Id == tutorProfileId);
+        var tutor = await _context.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorProfileId);
         if (tutor != null)
         {
             tutor.IsVerified = false;
             tutor.VerificationRejected = true;
             tutor.VerificationDecidedAt = DateTime.Now;
             tutor.VerificationNote = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+
+            NotificationHelper.Create(_context,
+                type: "Verification",
+                title: "Tutor application rejected",
+                message: $"{tutor.User.FullName}'s application was rejected" + (string.IsNullOrWhiteSpace(reason) ? "" : $": {reason.Trim()}"),
+                icon: "✖️");
+
             await _context.SaveChangesAsync();
         }
 
@@ -1786,7 +1800,10 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ResolveComplaint(int complaintId, string resolutionNote, string? returnUrl)
     {
-        var ticket = await _context.SupportTickets.FirstOrDefaultAsync(t => t.Id == complaintId);
+        var ticket = await _context.SupportTickets
+            .Include(t => t.StudentProfile).ThenInclude(s => s!.User)
+            .Include(t => t.TutorProfile).ThenInclude(tp => tp!.User)
+            .FirstOrDefaultAsync(t => t.Id == complaintId);
         if (ticket != null && !string.IsNullOrWhiteSpace(resolutionNote))
         {
             ticket.Status = "Resolved";
@@ -1798,6 +1815,13 @@ public class AdminController : Controller
                 var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == ticket.BookingId.Value);
                 if (booking != null) booking.IsDisputed = false;
             }
+
+            var filerName = ticket.StudentProfileId.HasValue ? ticket.StudentProfile!.User.FullName : ticket.TutorProfile!.User.FullName;
+            NotificationHelper.Create(_context,
+                type: "Complaint",
+                title: "Complaint resolved",
+                message: $"{ticket.Subject} filed by {filerName} — {resolutionNote.Trim()}",
+                icon: "📋");
 
             await _context.SaveChangesAsync();
         }
@@ -1871,5 +1895,112 @@ public class AdminController : Controller
 
         var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
         return File(bytes, "text/csv", $"tutorbridge-complaints-{DateTime.Now:yyyyMMdd-HHmm}.csv");
+    }
+
+    // ── Notifications ──────────────────────────────────────────────────────
+
+    public async Task<IActionResult> Notifications(
+        string tab = "all",
+        string? type = null,
+        string sort = "newest",
+        int visibleCount = 10)
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        var now = DateTime.Now;
+        var today = now.Date;
+        var weekStart = today.AddDays(-(int)today.DayOfWeek + (today.DayOfWeek == DayOfWeek.Sunday ? -6 : 1));
+
+        var allNotifications = await _context.Notifications.ToListAsync();
+
+        var unreadCount = allNotifications.Count(n => !n.IsRead);
+        var requiresActionCount = allNotifications.Count(n => !n.IsRead && !string.IsNullOrEmpty(n.ActionUrl));
+        var todayCount = allNotifications.Count(n => n.CreatedAt.Date == today);
+        var thisWeekCount = allNotifications.Count(n => n.CreatedAt.Date >= weekStart);
+
+        IEnumerable<Notification> filtered = tab switch
+        {
+            "verifications" => allNotifications.Where(n => n.Type == "Verification"),
+            "complaints" => allNotifications.Where(n => n.Type == "Complaint"),
+            "system" => allNotifications.Where(n => n.Type == "System"),
+            "read" => allNotifications.Where(n => n.IsRead),
+            _ => allNotifications
+        };
+
+        if (!string.IsNullOrWhiteSpace(type))
+            filtered = filtered.Where(n => n.Type == type);
+
+        var sorted = sort == "oldest" ? filtered.OrderBy(n => n.CreatedAt) : filtered.OrderByDescending(n => n.CreatedAt);
+        var sortedList = sorted.ToList();
+        var totalMatching = sortedList.Count;
+
+        visibleCount = Math.Max(10, visibleCount);
+        var pageItems = sortedList.Take(visibleCount).ToList();
+
+        var groups = pageItems
+            .GroupBy(n => n.CreatedAt.Date)
+            .OrderByDescending(g => g.Key)
+            .Select(g => new NotificationDayGroupViewModel
+            {
+                DayLabel = g.Key == today ? "Today" : g.Key == today.AddDays(-1) ? "Yesterday" : g.Key.ToString("d MMMM yyyy"),
+                Items = g.Select(n => new NotificationRowViewModel
+                {
+                    Id = n.Id,
+                    Type = n.Type,
+                    Title = n.Title,
+                    Message = n.Message,
+                    Icon = n.Icon,
+                    ActionLabel = n.ActionLabel,
+                    ActionUrl = n.ActionUrl,
+                    IsRead = n.IsRead,
+                    IsHighPriority = n.IsHighPriority,
+                    CreatedAt = n.CreatedAt
+                }).ToList()
+            }).ToList();
+
+        var vm = new AdminNotificationsViewModel
+        {
+            AdminName = admin?.FullName ?? "Administrator",
+            AdminInitials = GetInitials(admin?.FullName ?? "Administrator"),
+            UnreadCount = unreadCount,
+            RequiresActionCount = requiresActionCount,
+            TodayCount = todayCount,
+            ThisWeekCount = thisWeekCount,
+            ActiveTab = tab,
+            TypeFilter = type,
+            Sort = sort,
+            Groups = groups,
+            VisibleCount = visibleCount,
+            TotalMatching = totalMatching
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MarkNotificationRead(int notificationId, string? returnUrl)
+    {
+        var notification = await _context.Notifications.FirstOrDefaultAsync(n => n.Id == notificationId);
+        if (notification != null)
+        {
+            notification.IsRead = true;
+            await _context.SaveChangesAsync();
+        }
+
+        return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Notifications") : LocalRedirect(returnUrl);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MarkAllNotificationsRead(string? returnUrl)
+    {
+        var unread = await _context.Notifications.Where(n => !n.IsRead).ToListAsync();
+        foreach (var n in unread)
+        {
+            n.IsRead = true;
+        }
+        await _context.SaveChangesAsync();
+
+        return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Notifications") : LocalRedirect(returnUrl);
     }
 }

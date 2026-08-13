@@ -53,7 +53,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>User Management - TutorBridge Nepal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@@400;500;600;700;800;900&family=Playfair+Display:wght@@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -105,9 +105,9 @@
                         </a>
                     </li>
                     <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
-                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">📈</span> Reports</span></li>
+                    <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
                     <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
-                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">🔔</span> Notifications</span></li>
+                    <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
                     <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚙️</span> Settings</span></li>
                 </ul>
 

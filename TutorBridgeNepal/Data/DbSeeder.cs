@@ -322,4 +322,62 @@ public static class DbSeeder
 
         await context.SaveChangesAsync();
     }
+
+    // Backfills notifications from data that already genuinely exists in
+    // the database (seeded tutors, their real verification state, any
+    // seeded support tickets) - never fabricates an event that didn't
+    // happen. Only runs once: skips entirely if any notification already
+    // exists, so it won't duplicate rows on every app restart or interfere
+    // with notifications created live by real user actions afterward.
+    public static async Task SeedNotificationsAsync(IServiceProvider serviceProvider)
+    {
+        var context = serviceProvider.GetRequiredService<ApplicationDbContext>();
+
+        if (await context.Notifications.AnyAsync()) return;
+
+        var tutors = await context.TutorProfiles.Include(t => t.User).ToListAsync();
+
+        foreach (var t in tutors.Where(t => !t.IsVerified && !t.VerificationRejected))
+        {
+            context.Notifications.Add(new Notification
+            {
+                Type = "Verification",
+                Title = "New tutor verification submitted",
+                Message = $"{t.User.FullName} submitted documents for {t.Subjects}",
+                Icon = "🎓",
+                ActionLabel = "Review now",
+                ActionUrl = "/Admin/TutorVerification",
+                CreatedAt = t.User.CreatedAt.AddHours(1),
+                IsRead = false
+            });
+        }
+
+        foreach (var t in tutors.Where(t => t.IsVerified && t.VerificationDecidedAt.HasValue))
+        {
+            context.Notifications.Add(new Notification
+            {
+                Type = "Verification",
+                Title = "Tutor application approved",
+                Message = $"{t.User.FullName}'s application for {t.Subjects} was approved",
+                Icon = "✔️",
+                CreatedAt = t.VerificationDecidedAt!.Value,
+                IsRead = true
+            });
+        }
+
+        foreach (var t in tutors.Where(t => t.VerificationRejected && t.VerificationDecidedAt.HasValue))
+        {
+            context.Notifications.Add(new Notification
+            {
+                Type = "Verification",
+                Title = "Tutor application rejected",
+                Message = $"{t.User.FullName}'s application was rejected" + (string.IsNullOrWhiteSpace(t.VerificationNote) ? "" : $": {t.VerificationNote}"),
+                Icon = "✖️",
+                CreatedAt = t.VerificationDecidedAt!.Value,
+                IsRead = true
+            });
+        }
+
+        await context.SaveChangesAsync();
+    }
 }

@@ -50,6 +50,7 @@ using (var scope = app.Services.CreateScope())
     await DbSeeder.SeedRolesAndAdminAsync(scope.ServiceProvider);
     await DbSeeder.SeedSampleTutorsAsync(scope.ServiceProvider);
     await DbSeeder.SeedTutorVerificationApplicationsAsync(scope.ServiceProvider);
+    await DbSeeder.SeedNotificationsAsync(scope.ServiceProvider);
 }
 
 app.Run();

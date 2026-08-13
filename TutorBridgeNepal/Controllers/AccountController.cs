@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using TutorBridgeNepal.Data;
+using TutorBridgeNepal.Helpers;
 using TutorBridgeNepal.Models;
 using TutorBridgeNepal.ViewModels;
 using Microsoft.EntityFrameworkCore;
@@ -342,6 +343,14 @@ public class AccountController : Controller
                 YearsOfExperience = model.YearsOfExperience,
                 IsVerified = false
             });
+
+            NotificationHelper.Create(_context,
+                type: "System",
+                title: "New tutor registration",
+                message: $"{user.FullName} registered to teach {(string.IsNullOrWhiteSpace(model.Subjects) ? "unspecified subjects" : model.Subjects)}",
+                icon: "🧑‍🏫",
+                actionLabel: "View profile",
+                actionUrl: Url.Action("UserManagement", "Admin", new { search = user.Email }));
         }
         else
         {
@@ -350,6 +359,14 @@ public class AccountController : Controller
                 UserId = user.Id,
                 GradeLevel = model.GradeLevel
             });
+
+            NotificationHelper.Create(_context,
+                type: "System",
+                title: "New student registration",
+                message: $"{user.FullName} registered" + (string.IsNullOrWhiteSpace(user.District) ? "" : $" from {user.District}") + (string.IsNullOrWhiteSpace(model.GradeLevel) ? "" : $" · {model.GradeLevel}"),
+                icon: "🧑‍🎓",
+                actionLabel: "View profile",
+                actionUrl: Url.Action("UserManagement", "Admin", new { search = user.Email }));
         }
 
         await _context.SaveChangesAsync();

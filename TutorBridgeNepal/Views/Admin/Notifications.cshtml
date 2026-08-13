@@ -1,0 +1,210 @@
+﻿@model TutorBridgeNepal.ViewModels.AdminNotificationsViewModel
+@{
+    ViewData["Title"] = "Notifications";
+    Layout = null;
+
+    string TabUrl(string tab) => Url.Action("Notifications", new { tab, type = Model.TypeFilter, sort = Model.Sort, visibleCount = 10 })!;
+
+    string RowClass(TutorBridgeNepal.ViewModels.NotificationRowViewModel n)
+    {
+        if (n.IsRead) return "nt-row";
+        return n.IsHighPriority ? "nt-row nt-row-unread nt-row-priority" : "nt-row nt-row-unread";
+    }
+
+    string TimeAgo(DateTime t)
+    {
+        var span = DateTime.Now - t;
+        if (span.TotalMinutes < 60) return $"{Math.Max(1, (int)span.TotalMinutes)} minutes ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours} hour{((int)span.TotalHours == 1 ? "" : "s")} ago";
+        return t.ToString("d MMM");
+    }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Notifications - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <div class="dash-search">
+                <input type="text" placeholder="Search users, sessions..." />
+            </div>
+            <span class="admin-chip">Admin</span>
+            <div class="dash-topbar-right">
+                <a asp-controller="Admin" asp-action="Notifications" class="icon-btn nt-bell-active" title="Notifications">
+                    🔔
+                    @if (Model.UnreadCount > 0)
+                    {
+                        <span class="dot"></span>
+                    }
+                </a>
+                <div class="topbar-avatar">@Model.AdminInitials</div>
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    <div class="avatar">@Model.AdminInitials</div>
+                    <div>
+                        <div class="name">@Model.AdminName</div>
+                        <div class="meta">Platform Administrator</div>
+                        <span class="role-chip" style="background:#fff1d5;color:#a96808;">Super Admin</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
+                    <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
+                    <li><a asp-controller="Admin" asp-action="TutorVerification"><span class="nav-icon">✅</span> Tutor Verification</a></li>
+                    <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
+                    <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
+                    <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="Notifications" class="active">
+                            <span class="nav-icon">🔔</span> Notifications
+                            @if (Model.UnreadCount > 0)
+                            {
+                                <span class="badge-count">@Model.UnreadCount</span>
+                            }
+                        </a>
+                    </li>
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚙️</span> Settings</span></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">❓</span> Help center</span></li>
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <main class="dash-main">
+                <div class="dash-greeting" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                    <div>
+                        <h1>Notifications</h1>
+                        <p>Stay updated on platform activity requiring your attention</p>
+                    </div>
+                    <form asp-controller="Admin" asp-action="MarkAllNotificationsRead" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                        <button type="submit" class="um-btn-outline">Mark all read</button>
+                    </form>
+                </div>
+
+                <!-- KPI strip -->
+                <div class="kpi-row kpi-row-4">
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Unread</span></div>
+                        <div class="kpi-value" style="color:var(--danger);">@Model.UnreadCount</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Requires action</span></div>
+                        <div class="kpi-value" style="color:var(--orange);">@Model.RequiresActionCount</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Today</span></div>
+                        <div class="kpi-value">@Model.TodayCount</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">This week</span></div>
+                        <div class="kpi-value">@Model.ThisWeekCount</div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="um-tabs" style="justify-content:space-between;">
+                    <div style="display:flex;">
+                        <a class="um-tab @(Model.ActiveTab == "all" ? "active" : "")" href="@TabUrl("all")">All (@Model.UnreadCount)</a>
+                        <a class="um-tab @(Model.ActiveTab == "verifications" ? "active" : "")" href="@TabUrl("verifications")">Verifications</a>
+                        <a class="um-tab @(Model.ActiveTab == "complaints" ? "active" : "")" href="@TabUrl("complaints")">Complaints</a>
+                        <a class="um-tab @(Model.ActiveTab == "system" ? "active" : "")" href="@TabUrl("system")">System</a>
+                        <a class="um-tab @(Model.ActiveTab == "read" ? "active" : "")" href="@TabUrl("read")">Read</a>
+                    </div>
+                </div>
+
+                <form method="get" asp-action="Notifications" id="filterForm" class="nt-toolbar">
+                    <input type="hidden" name="tab" value="@Model.ActiveTab" />
+                    <select class="um-select" name="sort" onchange="this.form.submit()">
+                        <option value="newest" selected="@(Model.Sort == "newest")">Newest first</option>
+                        <option value="oldest" selected="@(Model.Sort == "oldest")">Oldest first</option>
+                    </select>
+                    <select class="um-select" name="type" onchange="this.form.submit()">
+                        <option value="">All types</option>
+                        <option value="Verification" selected="@(Model.TypeFilter == "Verification")">Verification</option>
+                        <option value="Complaint" selected="@(Model.TypeFilter == "Complaint")">Complaint</option>
+                        <option value="System" selected="@(Model.TypeFilter == "System")">System</option>
+                    </select>
+                </form>
+
+                @if (!Model.Groups.Any())
+                {
+                    <p class="empty-row">No notifications match these filters.</p>
+                }
+                else
+                {
+                    @foreach (var group in Model.Groups)
+                    {
+                        <div class="nt-day-label">@group.DayLabel.ToUpper()</div>
+                        <div class="nt-list">
+                            @foreach (var n in group.Items)
+                            {
+                                <div class="@RowClass(n)">
+                                    @if (!n.IsRead)
+                                    {
+                                        <span class="nt-dot"></span>
+                                    }
+                                    <div class="nt-icon">@n.Icon</div>
+                                    <div class="nt-body">
+                                        <div class="nt-title">@n.Title</div>
+                                        <div class="nt-message">@n.Message</div>
+                                        <div class="nt-time">@n.CreatedAt.ToString("h:mm tt") · @TimeAgo(n.CreatedAt)</div>
+                                    </div>
+                                    <div class="nt-actions">
+                                        @if (!string.IsNullOrEmpty(n.ActionLabel) && !string.IsNullOrEmpty(n.ActionUrl))
+                                        {
+                                            <form asp-controller="Admin" asp-action="MarkNotificationRead" method="post" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="notificationId" value="@n.Id" />
+                                                <input type="hidden" name="returnUrl" value="@n.ActionUrl" />
+                                                <button type="submit" class="mini-btn @(n.IsHighPriority ? "danger" : "green")">@n.ActionLabel</button>
+                                            </form>
+                                        }
+                                        @if (!n.IsRead)
+                                        {
+                                            <form asp-controller="Admin" asp-action="MarkNotificationRead" method="post" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="notificationId" value="@n.Id" />
+                                                <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                                <button type="submit" class="nt-kebab" title="Mark as read">⋮</button>
+                                            </form>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (Model.HasMore)
+                    {
+                        <a class="view-all-link nt-more-link" href="@Url.Action("Notifications", new { tab = Model.ActiveTab, type = Model.TypeFilter, sort = Model.Sort, visibleCount = Model.VisibleCount + 20 })">
+                            View older notifications →
+                        </a>
+                    }
+                }
+            </main>
+        </div>
+    </div>
+</body>
+</html>

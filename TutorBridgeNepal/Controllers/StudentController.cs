@@ -1528,6 +1528,7 @@ public class StudentController : Controller
         if (resolvedCategory == "Booking" && bookingId.HasValue)
         {
             linkedBooking = await _context.Bookings
+                .Include(b => b.TutorProfile).ThenInclude(t => t.User)
                 .FirstOrDefaultAsync(b => b.Id == bookingId.Value && b.StudentProfileId == studentProfile.Id);
         }
 
@@ -1546,6 +1547,15 @@ public class StudentController : Controller
         {
             linkedBooking.IsDisputed = true;
         }
+
+        var filingStudentUser = await _userManager.GetUserAsync(User);
+        NotificationHelper.Create(_context,
+            type: "Complaint",
+            title: "New complaint filed — Medium severity",
+            message: $"{filingStudentUser?.FullName} reported: {subject.Trim()}" + (linkedBooking != null ? $" (against {linkedBooking.TutorProfile.User.FullName})" : ""),
+            icon: "⚠️",
+            actionLabel: "Investigate",
+            actionUrl: Url.Action("Complaints", "Admin"));
 
         await _context.SaveChangesAsync();
 
