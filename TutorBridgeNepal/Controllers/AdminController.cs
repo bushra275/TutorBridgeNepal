@@ -14,13 +14,58 @@ public class AdminController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IWebHostEnvironment _webHostEnvironment;
 
-    public AdminController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment webHostEnvironment)
+    public AdminController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment)
     {
         _context = context;
         _userManager = userManager;
+        _signInManager = signInManager;
         _webHostEnvironment = webHostEnvironment;
+    }
+
+    // Returns the single PlatformSettings row, creating it with defaults
+    // the first time it's needed (belt-and-braces alongside the row the
+    // AddPlatformSettings migration seeds).
+    private async Task<PlatformSettings> GetOrCreatePlatformSettingsAsync()
+    {
+        var settings = await _context.PlatformSettings.FirstOrDefaultAsync();
+        if (settings == null)
+        {
+            settings = new PlatformSettings();
+            _context.PlatformSettings.Add(settings);
+            await _context.SaveChangesAsync();
+        }
+        return settings;
+    }
+
+    // Populates ViewData with the unread-notification bell preview
+    // (icon/title/subtitle for the latest few unread notifications, plus
+    // the total unread count) so the shared admin layout can render the
+    // notification bell dropdown without every action having to build it
+    // by hand. Call this from any action whose view uses the admin layout.
+    private async Task SetAdminNotificationBellAsync()
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        ViewData["AdminProfileName"] = admin?.FullName ?? "Administrator";
+        ViewData["AdminProfileInitials"] = GetInitials(admin?.FullName ?? "Administrator");
+
+        var unreadCount = await _context.Notifications.CountAsync(n => !n.IsRead);
+        var preview = await _context.Notifications
+            .Where(n => !n.IsRead)
+            .OrderByDescending(n => n.CreatedAt)
+            .Take(6)
+            .Select(n => new AdminNotifBellItemViewModel
+            {
+                Icon = n.Icon,
+                Title = n.Title,
+                Subtitle = n.Message.Length > 70 ? n.Message.Substring(0, 70) + "…" : n.Message
+            })
+            .ToListAsync();
+
+        ViewData["AdminNotifications"] = preview;
+        ViewData["AdminNotificationCount"] = unreadCount;
     }
 
     // ── 5a: Helper methods ────────────────────────────────────────────────
@@ -63,6 +108,7 @@ public class AdminController : Controller
 
     public async Task<IActionResult> Dashboard()
     {
+        await SetAdminNotificationBellAsync();
         var admin = await _userManager.GetUserAsync(User);
         var now = DateTime.Now;
         var monthStart = new DateTime(now.Year, now.Month, 1);
@@ -304,6 +350,114 @@ public class AdminController : Controller
         return View(vm);
     }
 
+    // Exports a snapshot of what's currently on the Admin Dashboard: the
+    // top KPI strip, the platform health rates, and the most recent
+    // sessions/registrations tables - recomputed independently (same
+    // pattern as the other Export*Csv actions) rather than reusing the
+    // Dashboard() view model.
+    public async Task<IActionResult> ExportDashboardReportCsv()
+    {
+        var now = DateTime.Now;
+        var monthStart = new DateTime(now.Year, now.Month, 1);
+        var previousMonthStart = monthStart.AddMonths(-1);
+
+        var totalUsers = await _context.Users.CountAsync();
+        var usersBeforeThisMonth = await _context.Users.CountAsync(u => u.CreatedAt < monthStart);
+        int? totalUsersTrend = usersBeforeThisMonth == 0 ? null : (int)Math.Round(100.0 * (totalUsers - usersBeforeThisMonth) / usersBeforeThisMonth);
+
+        var activeTutors = await _context.TutorProfiles.CountAsync(t => t.IsVerified && !t.IsDeactivated);
+        var tutorsBeforeThisMonth = await _context.TutorProfiles.CountAsync(t => t.User.CreatedAt < monthStart);
+        var totalTutors = await _context.TutorProfiles.CountAsync();
+        int? activeTutorsTrend = tutorsBeforeThisMonth == 0 ? null : (int)Math.Round(100.0 * (totalTutors - tutorsBeforeThisMonth) / tutorsBeforeThisMonth);
+
+        var sessionsThisMonth = await _context.Bookings
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.Status != "Cancelled" && b.TutorAvailabilitySlot.StartTime >= monthStart)
+            .CountAsync();
+        var sessionsPreviousMonth = await _context.Bookings
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.Status != "Cancelled"
+                && b.TutorAvailabilitySlot.StartTime >= previousMonthStart
+                && b.TutorAvailabilitySlot.StartTime < monthStart)
+            .CountAsync();
+        int? sessionsTrend = sessionsPreviousMonth == 0 ? null : (int)Math.Round(100.0 * (sessionsThisMonth - sessionsPreviousMonth) / sessionsPreviousMonth);
+
+        var pendingVerifications = await _context.TutorProfiles.CountAsync(t => !t.IsVerified && !t.VerificationRejected);
+        var openComplaints = await _context.SupportTickets.CountAsync(t => t.Status != "Resolved");
+
+        var totalTutorDecisions = await _context.TutorProfiles.CountAsync(t => t.IsVerified || t.VerificationRejected);
+        var approvedTutorDecisions = await _context.TutorProfiles.CountAsync(t => t.IsVerified);
+        var tutorApprovalRate = totalTutorDecisions == 0 ? 0 : (int)Math.Round(100.0 * approvedTutorDecisions / totalTutorDecisions);
+
+        var totalDecidedSessions = await _context.Bookings.CountAsync(b => b.Status == "Completed" || b.Status == "Missed");
+        var completedSessions = await _context.Bookings.CountAsync(b => b.Status == "Completed");
+        var sessionCompletionRate = totalDecidedSessions == 0 ? 0 : (int)Math.Round(100.0 * completedSessions / totalDecidedSessions);
+
+        var allRatings = await _context.Reviews.Select(r => r.Rating).ToListAsync();
+        var studentSatisfaction = allRatings.Count == 0 ? 0 : (int)Math.Round(20.0 * allRatings.Average());
+
+        var totalTickets = await _context.SupportTickets.CountAsync();
+        var resolvedTickets = await _context.SupportTickets.CountAsync(t => t.Status == "Resolved");
+        var complaintResolutionRate = totalTickets == 0 ? 0 : (int)Math.Round(100.0 * resolvedTickets / totalTickets);
+
+        var recentSessions = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .OrderByDescending(b => b.CreatedAt)
+            .Take(10)
+            .ToListAsync();
+
+        var recentUsers = await _context.Users
+            .OrderByDescending(u => u.CreatedAt)
+            .Take(10)
+            .ToListAsync();
+
+        string Esc(string? v) => "\"" + (v ?? "").Replace("\"", "\"\"") + "\"";
+        string Pct(int? v) => v.HasValue ? $"{v}%" : "N/A";
+
+        var csv = new System.Text.StringBuilder();
+        csv.AppendLine($"TutorBridge Nepal - Admin Dashboard Report,{now:yyyy-MM-dd HH:mm}");
+        csv.AppendLine();
+
+        csv.AppendLine("KPI,Value,TrendVsLastMonth");
+        csv.AppendLine($"Total users,{totalUsers},{Pct(totalUsersTrend)}");
+        csv.AppendLine($"Active tutors,{activeTutors},{Pct(activeTutorsTrend)}");
+        csv.AppendLine($"Sessions this month,{sessionsThisMonth},{Pct(sessionsTrend)}");
+        csv.AppendLine($"Pending tutor verifications,{pendingVerifications},");
+        csv.AppendLine($"Open complaints,{openComplaints},");
+        csv.AppendLine();
+
+        csv.AppendLine("Platform health,Rate");
+        csv.AppendLine($"Tutor approval rate,{tutorApprovalRate}%");
+        csv.AppendLine($"Session completion rate,{sessionCompletionRate}%");
+        csv.AppendLine($"Student satisfaction,{studentSatisfaction}%");
+        csv.AppendLine($"Complaint resolution rate,{complaintResolutionRate}%");
+        csv.AppendLine();
+
+        csv.AppendLine("Recent sessions");
+        csv.AppendLine("Student,Tutor,Subject,Date,Status");
+        foreach (var b in recentSessions)
+        {
+            csv.AppendLine(string.Join(",",
+                Esc(b.StudentProfile.User.FullName), Esc(b.TutorProfile.User.FullName), Esc(b.Subject),
+                Esc(b.TutorAvailabilitySlot.StartTime.ToString("yyyy-MM-dd HH:mm")), Esc(b.Status)));
+        }
+        csv.AppendLine();
+
+        csv.AppendLine("Recent registrations");
+        csv.AppendLine("Name,Role,District,Joined");
+        foreach (var u in recentUsers)
+        {
+            var isTutor = await _context.TutorProfiles.AnyAsync(t => t.UserId == u.Id);
+            var role = isTutor ? "Tutor" : "Student";
+            csv.AppendLine(string.Join(",", Esc(u.FullName), Esc(role), Esc(u.District), Esc(u.CreatedAt.ToString("yyyy-MM-dd"))));
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
+        return File(bytes, "text/csv", $"tutorbridge-dashboard-report-{DateTime.Now:yyyyMMdd-HHmm}.csv");
+    }
+
     // ── User Management ───────────────────────────────────────────────────
 
     public async Task<IActionResult> UserManagement(
@@ -317,6 +471,7 @@ public class AdminController : Controller
         int page = 1,
         int pageSize = 8)
     {
+        await SetAdminNotificationBellAsync();
         var admin = await _userManager.GetUserAsync(User);
         var now = DateTime.Now;
         var monthStart = new DateTime(now.Year, now.Month, 1);
@@ -522,6 +677,7 @@ public class AdminController : Controller
         string sort = "newest",
         int visibleCount = 3)
     {
+        await SetAdminNotificationBellAsync();
         var admin = await _userManager.GetUserAsync(User);
         var now = DateTime.Now;
         var monthStart = new DateTime(now.Year, now.Month, 1);
@@ -916,6 +1072,18 @@ public class AdminController : Controller
         var tutor = await _context.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorProfileId);
         if (tutor != null)
         {
+            var platformSettings = await GetOrCreatePlatformSettingsAsync();
+            if (platformSettings.RequirePoliceReportForTutors)
+            {
+                var hasPoliceReport = await _context.TutorCredentials
+                    .AnyAsync(c => c.TutorProfileId == tutorProfileId && c.DocumentType == "PoliceReport");
+                if (!hasPoliceReport)
+                {
+                    TempData["SettingsError"] = $"Can't approve {tutor.User.FullName} - a police report is required before approval (Settings > Platform configuration).";
+                    return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("TutorVerification") : LocalRedirect(returnUrl);
+                }
+            }
+
             tutor.IsVerified = true;
             tutor.VerificationRejected = false;
             tutor.VerificationDecidedAt = DateTime.Now;
@@ -1010,6 +1178,7 @@ public class AdminController : Controller
         int page = 1,
         int pageSize = 8)
     {
+        await SetAdminNotificationBellAsync();
         var admin = await _userManager.GetUserAsync(User);
         var now = DateTime.Now;
         var monthStart = new DateTime(now.Year, now.Month, 1);
@@ -1305,6 +1474,7 @@ public class AdminController : Controller
 
     public async Task<IActionResult> Reports(string quarter = "current")
     {
+        await SetAdminNotificationBellAsync();
         var admin = await _userManager.GetUserAsync(User);
         var now = DateTime.Now;
 
@@ -1632,6 +1802,7 @@ public class AdminController : Controller
         string sort = "newest",
         int visibleCount = 3)
     {
+        await SetAdminNotificationBellAsync();
         var admin = await _userManager.GetUserAsync(User);
         var now = DateTime.Now;
         var monthStart = new DateTime(now.Year, now.Month, 1);
@@ -1905,6 +2076,7 @@ public class AdminController : Controller
         string sort = "newest",
         int visibleCount = 10)
     {
+        await SetAdminNotificationBellAsync();
         var admin = await _userManager.GetUserAsync(User);
         var now = DateTime.Now;
         var today = now.Date;
@@ -2002,5 +2174,227 @@ public class AdminController : Controller
         await _context.SaveChangesAsync();
 
         return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Notifications") : LocalRedirect(returnUrl);
+    }
+
+    // ── Settings ───────────────────────────────────────────────────────────
+
+    public async Task<IActionResult> Settings()
+    {
+        await SetAdminNotificationBellAsync();
+        var admin = await _userManager.GetUserAsync(User);
+        if (admin == null) return RedirectToAction("AdminLogin", "Account");
+
+        var platformSettings = await GetOrCreatePlatformSettingsAsync();
+        var adminCount = (await _userManager.GetUsersInRoleAsync("Admin")).Count;
+
+        var vm = new AdminSettingsPageViewModel
+        {
+            AdminName = admin.FullName,
+            Initials = GetInitials(admin.FullName),
+            PhotoUrl = admin.PhotoUrl,
+            Profile = new AdminProfileFormModel
+            {
+                FullName = admin.FullName,
+                Email = admin.Email ?? "",
+                PhoneNumber = admin.PhoneNumber
+            },
+            TwoFactorEnabled = admin.TwoFactorEnabled,
+            PlatformConfig = new AdminPlatformConfigModel
+            {
+                AutoApproveVerifiedTutors = platformSettings.AutoApproveVerifiedTutors,
+                RequirePoliceReportForTutors = platformSettings.RequirePoliceReportForTutors,
+                AllowSameDayBooking = platformSettings.AllowSameDayBooking,
+                PlatformMaintenanceMode = platformSettings.PlatformMaintenanceMode
+            },
+            AdminCount = adminCount
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateAdminProfile(AdminProfileFormModel model)
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        if (admin == null) return RedirectToAction("AdminLogin", "Account");
+
+        if (string.IsNullOrWhiteSpace(model.FullName) || string.IsNullOrWhiteSpace(model.Email))
+        {
+            TempData["SettingsError"] = "Full name and email are required.";
+            return RedirectToAction("Settings");
+        }
+
+        admin.FullName = model.FullName.Trim();
+        admin.PhoneNumber = string.IsNullOrWhiteSpace(model.PhoneNumber) ? null : model.PhoneNumber.Trim();
+
+        if (!string.Equals(admin.Email, model.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var setEmailResult = await _userManager.SetEmailAsync(admin, model.Email.Trim());
+            if (!setEmailResult.Succeeded)
+            {
+                TempData["SettingsError"] = "Could not update email: " + string.Join(" ", setEmailResult.Errors.Select(e => e.Description));
+                return RedirectToAction("Settings");
+            }
+            await _userManager.SetUserNameAsync(admin, model.Email.Trim());
+        }
+
+        var updateResult = await _userManager.UpdateAsync(admin);
+        if (!updateResult.Succeeded)
+        {
+            TempData["SettingsError"] = "Could not save profile changes.";
+            return RedirectToAction("Settings");
+        }
+
+        await _signInManager.RefreshSignInAsync(admin);
+        TempData["SettingsSuccess"] = "Profile updated.";
+        return RedirectToAction("Settings");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadAdminPhoto(IFormFile? photo)
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        if (admin == null) return RedirectToAction("AdminLogin", "Account");
+
+        var (url, error) = await FileUploadHelper.SavePhotoAsync(photo, _webHostEnvironment.WebRootPath);
+        if (error != null)
+        {
+            TempData["SettingsError"] = error;
+            return RedirectToAction("Settings");
+        }
+
+        FileUploadHelper.TryDelete(admin.PhotoUrl, _webHostEnvironment.WebRootPath);
+        admin.PhotoUrl = url;
+        await _context.SaveChangesAsync();
+
+        TempData["SettingsSuccess"] = "Profile photo updated.";
+        return RedirectToAction("Settings");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveAdminPhoto()
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        if (admin == null) return RedirectToAction("AdminLogin", "Account");
+
+        FileUploadHelper.TryDelete(admin.PhotoUrl, _webHostEnvironment.WebRootPath);
+        admin.PhotoUrl = null;
+        await _context.SaveChangesAsync();
+
+        TempData["SettingsSuccess"] = "Profile photo removed.";
+        return RedirectToAction("Settings");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AdminChangePassword(string currentPassword, string newPassword, string confirmNewPassword)
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        if (admin == null) return RedirectToAction("AdminLogin", "Account");
+
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword != confirmNewPassword)
+        {
+            TempData["SettingsError"] = "New password and confirmation do not match.";
+            return RedirectToAction("Settings");
+        }
+
+        var result = await _userManager.ChangePasswordAsync(admin, currentPassword, newPassword);
+        if (!result.Succeeded)
+        {
+            TempData["SettingsError"] = string.Join(" ", result.Errors.Select(e => e.Description));
+            return RedirectToAction("Settings");
+        }
+
+        await _signInManager.RefreshSignInAsync(admin);
+        TempData["SettingsSuccess"] = "Password changed.";
+        return RedirectToAction("Settings");
+    }
+
+    // Generic toggle handler for the platform configuration switches.
+    // "Require police report" and "Maintenance mode" take effect
+    // immediately (see ApproveTutor and the Program.cs middleware); the
+    // other two are simply persisted for now - see PlatformSettings.cs.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdatePlatformSetting(string key, bool value)
+    {
+        var platformSettings = await GetOrCreatePlatformSettingsAsync();
+
+        switch (key)
+        {
+            case "AutoApproveVerifiedTutors": platformSettings.AutoApproveVerifiedTutors = value; break;
+            case "RequirePoliceReportForTutors": platformSettings.RequirePoliceReportForTutors = value; break;
+            case "AllowSameDayBooking": platformSettings.AllowSameDayBooking = value; break;
+            case "PlatformMaintenanceMode": platformSettings.PlatformMaintenanceMode = value; break;
+            default: return RedirectToAction("Settings");
+        }
+
+        platformSettings.UpdatedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        return RedirectToAction("Settings");
+    }
+
+    // Sole-admin safeguard shared by DeactivateAdminAccount and
+    // DeleteAdminAccount - refuses to let the last remaining Admin lock the
+    // platform out of its own console.
+    private async Task<bool> IsSoleAdminAsync()
+    {
+        var admins = await _userManager.GetUsersInRoleAsync("Admin");
+        return admins.Count <= 1;
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeactivateAdminAccount(string confirmText)
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        if (admin == null) return RedirectToAction("AdminLogin", "Account");
+
+        if (await IsSoleAdminAsync())
+        {
+            TempData["SettingsError"] = "You're the only admin account - add another admin before deactivating this one.";
+            return RedirectToAction("Settings");
+        }
+
+        if (!string.Equals(confirmText?.Trim(), "DEACTIVATE", StringComparison.Ordinal))
+        {
+            TempData["SettingsError"] = "Type DEACTIVATE exactly to confirm.";
+            return RedirectToAction("Settings");
+        }
+
+        admin.IsSuspended = true;
+        await _context.SaveChangesAsync();
+        await _signInManager.SignOutAsync();
+
+        return RedirectToAction("AdminLogin", "Account");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteAdminAccount(string confirmText)
+    {
+        var admin = await _userManager.GetUserAsync(User);
+        if (admin == null) return RedirectToAction("AdminLogin", "Account");
+
+        if (await IsSoleAdminAsync())
+        {
+            TempData["SettingsError"] = "You're the only admin account - add another admin before deleting this one.";
+            return RedirectToAction("Settings");
+        }
+
+        if (!string.Equals(confirmText?.Trim(), "DELETE", StringComparison.Ordinal))
+        {
+            TempData["SettingsError"] = "Type DELETE exactly to confirm account deletion.";
+            return RedirectToAction("Settings");
+        }
+
+        await _signInManager.SignOutAsync();
+        await _userManager.DeleteAsync(admin);
+
+        return RedirectToAction("Index", "Home");
     }
 }

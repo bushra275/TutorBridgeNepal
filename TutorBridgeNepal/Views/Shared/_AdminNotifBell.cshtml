@@ -1,0 +1,58 @@
+﻿@using TutorBridgeNepal.ViewModels
+@{
+    var notifications = ViewData["AdminNotifications"] as List<AdminNotifBellItemViewModel> ?? new List<AdminNotifBellItemViewModel>();
+    var unreadCount = ViewData["AdminNotificationCount"] as int? ?? 0;
+}
+<div class="topbar-dropdown-wrap">
+    <button type="button" class="icon-btn" id="adminNotifBellBtn" title="Notifications" style="position:relative;">
+        🔔
+        @if (unreadCount > 0)
+        {
+            <span class="topbar-badge">@(unreadCount > 9 ? "9+" : unreadCount.ToString())</span>
+        }
+    </button>
+    <div class="topbar-dropdown notif-dropdown" id="adminNotifDropdown">
+        <div class="topbar-dropdown-head">Notifications</div>
+        @if (!notifications.Any())
+        {
+            <div class="notif-empty">You're all caught up - nothing new right now.</div>
+        }
+        else
+        {
+            @foreach (var n in notifications)
+            {
+                <a class="notif-item" asp-controller="Admin" asp-action="Notifications">
+                    <span class="notif-icon">@n.Icon</span>
+                    <span class="notif-body">
+                        <span class="notif-title">@n.Title</span>
+                        <span class="notif-sub">@n.Subtitle</span>
+                    </span>
+                </a>
+            }
+            <a class="topbar-dropdown-link" asp-controller="Admin" asp-action="Notifications" style="text-align:center;border-top:1px solid #eee;">View all notifications</a>
+        }
+    </div>
+</div>
+
+<script>
+    (function () {
+        function wireDropdown(btnId, dropdownId) {
+            var btn = document.getElementById(btnId);
+            var dropdown = document.getElementById(dropdownId);
+            if (!btn || !dropdown) return;
+
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var isOpen = dropdown.classList.contains('open');
+                document.querySelectorAll('.topbar-dropdown.open').forEach(function (d) { d.classList.remove('open'); });
+                if (!isOpen) dropdown.classList.add('open');
+            });
+        }
+
+        wireDropdown('adminNotifBellBtn', 'adminNotifDropdown');
+
+        document.addEventListener('click', function () {
+            document.querySelectorAll('.topbar-dropdown.open').forEach(function (d) { d.classList.remove('open'); });
+        });
+    })();
+</script>

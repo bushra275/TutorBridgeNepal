@@ -31,7 +31,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tutor Verification - TutorBridge Nepal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -48,14 +48,8 @@
             </div>
             <span class="admin-chip">Admin</span>
             <div class="dash-topbar-right">
-                <a href="#" class="icon-btn" title="Notifications">
-                    🔔
-                    @if (Model.PendingCount > 0)
-                    {
-                        <span class="dot"></span>
-                    }
-                </a>
-                <div class="topbar-avatar">@Model.AdminInitials</div>
+                @await Html.PartialAsync("_AdminNotifBell")
+                @await Html.PartialAsync("_AdminProfileDropdown")
             </div>
         </header>
 
@@ -86,11 +80,10 @@
                     <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
                     <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
                     <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
-                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚙️</span> Settings</span></li>
+                    <li><a asp-controller="Admin" asp-action="Settings"><span class="nav-icon">⚙️</span> Settings</a></li>
                 </ul>
 
                 <ul class="dash-nav-secondary">
-                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">❓</span> Help center</span></li>
                     <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
                 </ul>
             </aside>
@@ -105,6 +98,15 @@
                         <a class="um-btn-outline" asp-action="ExportTutorVerificationCsv" asp-route-tab="@Model.ActiveTab" asp-route-search="@Model.Search" asp-route-subject="@Model.SubjectFilter" asp-route-district="@Model.DistrictFilter" asp-route-submitted="@Model.SubmittedFilter">Export list</a>
                     </div>
                 </div>
+
+                @if (TempData["SettingsSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                }
+                @if (TempData["SettingsError"] != null)
+                {
+                    <div class="status-banner error mb-3">@TempData["SettingsError"]</div>
+                }
 
                 <!-- KPI strip -->
                 <div class="kpi-row">

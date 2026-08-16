@@ -1,0 +1,357 @@
+﻿@model TutorBridgeNepal.ViewModels.AdminSettingsPageViewModel
+@{
+    ViewData["Title"] = "Admin Settings";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <div class="dash-search">
+                <input type="text" placeholder="Search users, sessions..." />
+            </div>
+            <span class="admin-chip">Admin</span>
+            <div class="dash-topbar-right">
+                @await Html.PartialAsync("_AdminNotifBell")
+                @await Html.PartialAsync("_AdminProfileDropdown")
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    <div class="avatar">@Model.Initials</div>
+                    <div>
+                        <div class="name">@Model.AdminName</div>
+                        <div class="meta">Platform Administrator</div>
+                        <span class="role-chip" style="background:#fff1d5;color:#a96808;">Super Admin</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
+                    <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
+                    <li><a asp-controller="Admin" asp-action="TutorVerification"><span class="nav-icon">✅</span> Tutor Verification</a></li>
+                    <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
+                    <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
+                    <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
+                    <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
+                    <li><a asp-controller="Admin" asp-action="Settings" class="active"><span class="nav-icon">⚙️</span> Settings</a></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <main class="dash-main">
+                <div class="page-head">
+                    <div>
+                        <h1>Settings</h1>
+                        <p>Manage your account, platform configuration and preferences</p>
+                    </div>
+                </div>
+
+                @if (TempData["SettingsSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                }
+                @if (TempData["SettingsError"] != null)
+                {
+                    <div class="status-banner error mb-3">@TempData["SettingsError"]</div>
+                }
+
+                <div class="settings-layout">
+                    <!-- Left jump nav -->
+                    <div class="settings-nav" id="settingsNav">
+                        <a href="#profile-section" data-target="profile-section" class="active">Profile</a>
+                        <a href="#security-section" data-target="security-section">Account &amp; security</a>
+                        <a href="#platform-section" data-target="platform-section">Platform configuration</a>
+                        <a href="#danger-section" data-target="danger-section" class="danger-link">Danger zone</a>
+                    </div>
+
+                    <!-- Right content -->
+                    <div class="settings-content">
+                        <div class="panel" id="profile-section">
+                            <div class="panel-head">
+                                <h2>Profile settings</h2>
+                            </div>
+
+                            <div class="settings-avatar-row">
+                                @if (!string.IsNullOrEmpty(Model.PhotoUrl))
+                                {
+                                    <img src="@Model.PhotoUrl" alt="Profile photo" class="avatar-circle-lg" style="object-fit:cover;" />
+                                }
+                                else
+                                {
+                                    <div class="avatar-circle-lg">@Model.Initials</div>
+                                }
+                                <button type="button" class="tb-btn-outline" id="adminPhotoUploadToggle">Change photo</button>
+                                <form asp-controller="Admin" asp-action="UploadAdminPhoto" method="post" enctype="multipart/form-data" style="display:none;" id="adminPhotoUploadForm">
+                                    @Html.AntiForgeryToken()
+                                    <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp" required onchange="this.form.requestSubmit()" />
+                                </form>
+                                @if (!string.IsNullOrEmpty(Model.PhotoUrl))
+                                {
+                                    <form asp-controller="Admin" asp-action="RemoveAdminPhoto" method="post" onsubmit="return confirm('Remove your profile photo?');">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="tb-btn-danger-outline">Remove</button>
+                                    </form>
+                                }
+                            </div>
+
+                            <form asp-controller="Admin" asp-action="UpdateAdminProfile" method="post" class="settings-form-grid">
+                                @Html.AntiForgeryToken()
+                                <div class="field">
+                                    <label>Full name</label>
+                                    <input type="text" name="FullName" class="tb-input" value="@Model.Profile.FullName" required maxlength="150" />
+                                </div>
+                                <div class="field">
+                                    <label>Email address</label>
+                                    <input type="email" name="Email" class="tb-input" value="@Model.Profile.Email" required maxlength="256" />
+                                </div>
+                                <div class="field">
+                                    <label>Phone number</label>
+                                    <input type="text" name="PhoneNumber" class="tb-input" value="@Model.Profile.PhoneNumber" placeholder="+977 98XXXXXXXX" maxlength="20" />
+                                </div>
+                                <div class="field">
+                                    <label>Role</label>
+                                    <input type="text" class="tb-input" value="Super Admin (cannot be changed)" disabled />
+                                </div>
+                                <div class="field full settings-actions">
+                                    <button type="submit" class="tb-btn">Save changes</button>
+                                    <a href="#profile-section" class="tb-btn-outline">Cancel</a>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="panel" id="security-section">
+                            <div class="panel-head">
+                                <h2>Account &amp; security</h2>
+                            </div>
+
+                            <form asp-controller="Admin" asp-action="AdminChangePassword" method="post" class="settings-form-grid">
+                                @Html.AntiForgeryToken()
+                                <div class="field">
+                                    <label>Current password</label>
+                                    <input type="password" name="currentPassword" class="tb-input" required />
+                                </div>
+                                <div class="field"></div>
+                                <div class="field">
+                                    <label>New password</label>
+                                    <input type="password" name="newPassword" class="tb-input" required minlength="6" />
+                                </div>
+                                <div class="field">
+                                    <label>Confirm new password</label>
+                                    <input type="password" name="confirmNewPassword" class="tb-input" required minlength="6" />
+                                </div>
+                                <div class="field full settings-actions">
+                                    <button type="submit" class="tb-btn">Change password</button>
+                                </div>
+                            </form>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Two-factor authentication</div>
+                                    <div class="settings-toggle-sub">Require an authenticator app code at login, on top of your password</div>
+                                </div>
+                                @if (Model.TwoFactorEnabled)
+                                {
+                                    <a asp-controller="Account" asp-action="AdminSetupAuthenticator" class="kpi-badge up" style="text-decoration:none;">✓ Enabled</a>
+                                }
+                                else
+                                {
+                                    <a asp-controller="Account" asp-action="AdminSetupAuthenticator" class="tb-btn-outline">Set up</a>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="panel" id="platform-section">
+                            <div class="panel-head">
+                                <h2>Platform configuration</h2>
+                            </div>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Auto-approve verified tutors</div>
+                                    <div class="settings-toggle-sub">Skip manual review for tutors with prior verified history — saved for later, not applied automatically yet</div>
+                                </div>
+                                <form asp-controller="Admin" asp-action="UpdatePlatformSetting" method="post" class="toggle-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="key" value="AutoApproveVerifiedTutors" />
+                                    <input type="hidden" name="value" value="@(!Model.PlatformConfig.AutoApproveVerifiedTutors)" />
+                                    <button type="submit" class="toggle-switch @(Model.PlatformConfig.AutoApproveVerifiedTutors ? "on" : "")" aria-label="Toggle auto-approve verified tutors"><span class="toggle-knob"></span></button>
+                                </form>
+                            </div>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Require police report for tutors</div>
+                                    <div class="settings-toggle-sub">Mandatory document for all new tutor applications — blocks approval in Tutor Verification when missing</div>
+                                </div>
+                                <form asp-controller="Admin" asp-action="UpdatePlatformSetting" method="post" class="toggle-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="key" value="RequirePoliceReportForTutors" />
+                                    <input type="hidden" name="value" value="@(!Model.PlatformConfig.RequirePoliceReportForTutors)" />
+                                    <button type="submit" class="toggle-switch @(Model.PlatformConfig.RequirePoliceReportForTutors ? "on" : "")" aria-label="Toggle require police report"><span class="toggle-knob"></span></button>
+                                </form>
+                            </div>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Allow same-day session booking</div>
+                                    <div class="settings-toggle-sub">Students can book sessions with less than 24 hours notice — saved for later, doesn't override each tutor's own notice setting yet</div>
+                                </div>
+                                <form asp-controller="Admin" asp-action="UpdatePlatformSetting" method="post" class="toggle-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="key" value="AllowSameDayBooking" />
+                                    <input type="hidden" name="value" value="@(!Model.PlatformConfig.AllowSameDayBooking)" />
+                                    <button type="submit" class="toggle-switch @(Model.PlatformConfig.AllowSameDayBooking ? "on" : "")" aria-label="Toggle allow same-day booking"><span class="toggle-knob"></span></button>
+                                </form>
+                            </div>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Platform maintenance mode</div>
+                                    <div class="settings-toggle-sub">Takes the site offline for students and tutors immediately — admins keep access</div>
+                                </div>
+                                <form asp-controller="Admin" asp-action="UpdatePlatformSetting" method="post" class="toggle-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="key" value="PlatformMaintenanceMode" />
+                                    <input type="hidden" name="value" value="@(!Model.PlatformConfig.PlatformMaintenanceMode)" />
+                                    <button type="submit" class="toggle-switch @(Model.PlatformConfig.PlatformMaintenanceMode ? "on" : "")" aria-label="Toggle platform maintenance mode"><span class="toggle-knob"></span></button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="panel danger-panel" id="danger-section">
+                            <div class="panel-head">
+                                <h2>Danger zone</h2>
+                            </div>
+                            <p class="tutor-meta mb-3">These actions are irreversible. Please proceed with caution.</p>
+
+                            @if (Model.IsSoleAdmin)
+                            {
+                                <div class="status-banner warn mb-3">
+                                    You're the only admin account on TutorBridge Nepal. Deactivation and deletion are disabled here until a second admin exists, so the platform never loses its only administrator.
+                                </div>
+                            }
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Deactivate account</div>
+                                    <div class="settings-toggle-sub">Signs you out and blocks logging back in until another admin reactivates it</div>
+                                </div>
+                                <form asp-controller="Admin" asp-action="DeactivateAdminAccount" method="post" id="deactivateAdminForm">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="confirmText" value="DEACTIVATE" />
+                                    <button type="submit" class="tb-btn-danger-outline" @(Model.IsSoleAdmin ? "disabled" : "")>Deactivate account</button>
+                                </form>
+                            </div>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Delete account</div>
+                                    <div class="settings-toggle-sub">Permanently removes this admin login. This cannot be undone</div>
+                                </div>
+                                <button type="button" class="tb-btn-danger" id="openDeleteAdminModal" @(Model.IsSoleAdmin ? "disabled" : "")>Delete account</button>
+                            </div>
+
+                            <form asp-controller="Admin" asp-action="DeleteAdminAccount" method="post" id="deleteAdminForm" class="settings-form-grid" style="@(Model.IsSoleAdmin ? "display:none;" : "margin-top:1rem;")">
+                                @Html.AntiForgeryToken()
+                                <div class="field full">
+                                    <label>Type <strong>DELETE</strong> to confirm</label>
+                                    <input type="text" name="confirmText" class="tb-input" placeholder="DELETE" autocomplete="off" id="deleteAdminConfirmInput" />
+                                </div>
+                                <div class="field full settings-actions" id="deleteAdminSubmitRow" style="display:none;">
+                                    <button type="submit" class="tb-btn-danger">Permanently delete my account</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            var adminPhotoToggle = document.getElementById('adminPhotoUploadToggle');
+            var adminPhotoForm = document.getElementById('adminPhotoUploadForm');
+            if (adminPhotoToggle && adminPhotoForm) {
+                adminPhotoToggle.addEventListener('click', function() {
+                    adminPhotoForm.querySelector('input[type="file"]').click();
+                });
+            }
+
+            // Scroll-spy: highlight the settings-nav item for whichever section is in view
+            (function() {
+                var navLinks = document.querySelectorAll('#settingsNav a[data-target]');
+                var sections = Array.prototype.slice.call(navLinks)
+                    .map(function(a) { return document.getElementById(a.dataset.target); })
+                    .filter(Boolean);
+
+                function setActive(id) {
+                    navLinks.forEach(function(a) {
+                        a.classList.toggle('active', a.dataset.target === id);
+                    });
+                }
+
+                var observer = new IntersectionObserver(function(entries) {
+                    entries.forEach(function(entry) {
+                        if (entry.isIntersecting) setActive(entry.target.id);
+                    });
+                }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+
+                sections.forEach(function(s) { observer.observe(s); });
+            })();
+
+            // Confirm before deactivating
+            var deactivateForm = document.getElementById('deactivateAdminForm');
+            if (deactivateForm) {
+                deactivateForm.addEventListener('submit', function(e) {
+                    if (!confirm('This will deactivate your admin account and sign you out. Are you sure?')) {
+                        e.preventDefault();
+                    }
+                });
+            }
+
+            // Reveal the "type DELETE" confirmation row instead of a bare confirm(),
+            // since deleting the only other admin account is high-stakes.
+            var openDeleteBtn = document.getElementById('openDeleteAdminModal');
+            var deleteForm = document.getElementById('deleteAdminForm');
+            var deleteSubmitRow = document.getElementById('deleteAdminSubmitRow');
+            var deleteConfirmInput = document.getElementById('deleteAdminConfirmInput');
+            if (openDeleteBtn && deleteForm) {
+                openDeleteBtn.addEventListener('click', function() {
+                    deleteForm.style.display = 'grid';
+                    deleteSubmitRow.style.display = 'flex';
+                    deleteConfirmInput.focus();
+                });
+            }
+            if (deleteForm) {
+                deleteForm.addEventListener('submit', function(e) {
+                    if (!confirm('This will permanently delete your admin account. Are you absolutely sure?')) {
+                        e.preventDefault();
+                    }
+                });
+            }
+    </script>
+</body>
+</html>

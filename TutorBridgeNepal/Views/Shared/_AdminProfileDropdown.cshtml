@@ -1,0 +1,42 @@
+﻿@{
+    var name = ViewData["AdminProfileName"] as string ?? "Administrator";
+    var initials = ViewData["AdminProfileInitials"] as string ?? "?";
+}
+<div class="topbar-dropdown-wrap">
+    <button type="button" class="topbar-avatar" id="adminProfileAvatarBtn" title="@name">@initials</button>
+    <div class="topbar-dropdown profile-dropdown" id="adminProfileDropdown">
+        <div class="profile-dropdown-head">
+            <div class="avatar-circle-lg" style="width:42px;height:42px;font-size:.95rem;">@initials</div>
+            <div>
+                <div class="profile-dropdown-name">@name</div>
+                <div class="profile-dropdown-meta">Platform Administrator</div>
+            </div>
+        </div>
+        <a class="topbar-dropdown-link" asp-controller="Admin" asp-action="Dashboard">📊 Dashboard</a>
+        <a class="topbar-dropdown-link" asp-controller="Admin" asp-action="Settings">⚙️ Settings</a>
+        <a class="topbar-dropdown-link danger" asp-controller="Account" asp-action="Logout">↩️ Log out</a>
+    </div>
+</div>
+
+<script>
+    (function () {
+        function wireDropdown(btnId, dropdownId) {
+            var btn = document.getElementById(btnId);
+            var dropdown = document.getElementById(dropdownId);
+            if (!btn || !dropdown) return;
+
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var isOpen = dropdown.classList.contains('open');
+                document.querySelectorAll('.topbar-dropdown.open').forEach(function (d) { d.classList.remove('open'); });
+                if (!isOpen) dropdown.classList.add('open');
+            });
+        }
+
+        wireDropdown('adminProfileAvatarBtn', 'adminProfileDropdown');
+
+        document.addEventListener('click', function () {
+            document.querySelectorAll('.topbar-dropdown.open').forEach(function (d) { d.classList.remove('open'); });
+        });
+    })();
+</script>

@@ -45,3 +45,13 @@ public class NotificationRowViewModel
     public bool IsHighPriority { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+// Lightweight shape used only by the topbar bell dropdown (_AdminNotifBell
+// partial) - a trimmed-down view of Notification for the preview list, as
+// opposed to NotificationRowViewModel which backs the full Notifications page.
+public class AdminNotifBellItemViewModel
+{
+    public string Icon { get; set; } = "🔔";
+    public string Title { get; set; } = string.Empty;
+    public string Subtitle { get; set; } = string.Empty;
+}

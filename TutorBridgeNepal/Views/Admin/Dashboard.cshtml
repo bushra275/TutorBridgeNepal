@@ -40,7 +40,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin Dashboard - TutorBridge Nepal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@@400;500;600;700;800;900&family=Playfair+Display:wght@@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -57,14 +57,8 @@
             </div>
             <span class="admin-chip">Admin</span>
             <div class="dash-topbar-right">
-                <a href="#" class="icon-btn" title="Notifications">
-                    🔔
-                    @if (Model.OpenComplaintsCount > 0 || Model.PendingVerificationsCount > 0)
-                    {
-                        <span class="dot"></span>
-                    }
-                </a>
-                <div class="topbar-avatar">@Model.AdminInitials</div>
+                @await Html.PartialAsync("_AdminNotifBell")
+                @await Html.PartialAsync("_AdminProfileDropdown")
             </div>
         </header>
 
@@ -102,14 +96,11 @@
                                 }
                             </a>
                         </li>
-                    </li>
                     <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
-                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">⚙️</span> Settings</span></li>
-
+                    <li><a asp-controller="Admin" asp-action="Settings"><span class="nav-icon">⚙️</span> Settings</a></li>
                 </ul>
 
                 <ul class="dash-nav-secondary">
-                    <li><span class="disabled-nav-link" title="Coming soon"><span class="nav-icon">❓</span> Help center</span></li>
                     <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
                 </ul>
             </aside>
@@ -120,8 +111,8 @@
                         <h1>Admin Dashboard</h1>
                         <p>@Model.TodayLabel · TutorBridge Nepal platform overview</p>
                     </div>
-                    <span class="disabled-btn" title="Coming soon">Export report</span>
-                </div>
+                        <a asp-controller="Admin" asp-action="ExportDashboardReportCsv" class="tb-btn-outline" style="text-decoration:none;">Export report</a>
+                    </div>
 
                 <!-- KPI row -->
                 <div class="kpi-row">

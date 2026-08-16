@@ -25,7 +25,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<TutorTimeOff> TutorTimeOffs => Set<TutorTimeOff>();
     public DbSet<TutorSubject> TutorSubjects => Set<TutorSubject>();
     public DbSet<TutorCredential> TutorCredentials => Set<TutorCredential>();
-    public DbSet<Notification> Notifications => Set<Notification>(); protected override void OnModelCreating(ModelBuilder builder)
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
+
+    protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
