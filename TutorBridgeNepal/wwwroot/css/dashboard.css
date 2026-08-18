@@ -1520,7 +1520,7 @@ span.mini-btn {
     padding: 1.2rem;
     display: flex;
     flex-direction: column;
-    gap: .8rem;
+    gap: .55rem;
 }
 
 .chat-empty {
@@ -1531,46 +1531,88 @@ span.mini-btn {
     max-width: 320px;
 }
 
-.msg-row {
+/* Chat bubble rows - deliberately namespaced away from the unrelated
+   .msg-row used by the conversation-list preview rows above, since the two
+   used to share a bare ".msg-row" selector and silently leaked padding/
+   border-bottom from one into the other. .self = the viewer's own message
+   (Student on the Student page, Tutor on the Tutor page); .other = the
+   other party's message. Shared by both Student/Messages.cshtml and
+   Tutor/Messages.cshtml.
+
+   .chat-msg-group is deliberately display:inline-block rather than a flex
+   item: a flex item's text content can shrink all the way down to a
+   single-character min-width when overflow-wrap:break-word is set (a
+   well-known flexbox sizing quirk), which is what previously made bubbles
+   render as a single letter per line. inline-block uses ordinary
+   shrink-to-fit sizing instead, so the bubble always sizes to its content
+   up to max-width, the way a real chat bubble should. */
+.chat-msg-row {
     display: flex;
+    width: 100%;
+    align-items: flex-end;
+    gap: .5rem;
 }
 
-    .msg-row.from-student {
+    .chat-msg-row.self {
         justify-content: flex-end;
     }
 
-.msg-bubble {
+    .chat-msg-row.other {
+        justify-content: flex-start;
+    }
+
+.chat-msg-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--mint, #dff7ef);
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .68rem;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+.chat-msg-group {
+    display: inline-block;
     max-width: 60%;
-    border-radius: 10px;
-    padding: .7rem .9rem;
-    font-size: .88rem;
+}
+
+.chat-msg-bubble {
+    display: inline-block;
+    max-width: 100%;
+    padding: .55rem 1rem;
+    font-size: .9rem;
     line-height: 1.4;
+    border-radius: 18px;
+    overflow-wrap: break-word;
 }
 
-.msg-row.from-tutor .msg-bubble {
-    background: #fff;
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--green);
-}
-
-.msg-row.from-student .msg-bubble {
+.chat-msg-row.self .chat-msg-bubble {
     background: var(--green);
     color: #fff;
 }
 
-.msg-meta {
-    font-size: .7rem;
-    margin-top: .3rem;
-    opacity: .8;
+.chat-msg-row.other .chat-msg-bubble {
+    background: var(--panel-bg, #f0f1ec);
+    color: #1c1d1a;
 }
 
-.msg-row.from-student .msg-meta {
+.chat-msg-meta {
+    font-size: .68rem;
+    margin-top: .25rem;
     color: var(--muted);
+    opacity: .85;
+}
+
+.chat-msg-row.self .chat-msg-meta {
     text-align: right;
 }
 
-.msg-row.from-tutor .msg-meta {
-    color: var(--muted);
+.chat-msg-row.other .chat-msg-meta {
+    text-align: left;
 }
 
 .chat-input-bar {
@@ -2758,29 +2800,6 @@ button.topbar-avatar {
     font-size: .82rem;
     font-weight: 700;
     background: #fff;
-}
-
-/* ===== Tutor Messages page ===== */
-/* Own-message alignment for the tutor's perspective (mirrors .from-student /
-   .from-tutor on the Student page, which are the opposite way round). */
-.msg-row.tutor-own {
-    justify-content: flex-end;
-}
-
-    .msg-row.tutor-own .msg-bubble {
-        background: var(--green, #127a5b);
-        color: #fff;
-    }
-
-    .msg-row.tutor-own .msg-meta {
-        color: var(--muted, #8c8d87);
-        text-align: right;
-    }
-
-.msg-row.student-other .msg-bubble {
-    background: #fff;
-    border: 1px solid var(--line, #deded7);
-    border-left: 3px solid var(--green-2, #169a70);
 }
 
 .badge-active-student {

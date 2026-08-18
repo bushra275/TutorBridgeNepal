@@ -995,6 +995,55 @@ public class TutorController : Controller
         return View(vm);
     }
 
+
+    // Reached from the "View profile" button on a Messages thread (and from
+    // My Students). Only shows a student the tutor actually has booking
+    // history with - a tutor can't view an arbitrary student's profile by
+    // guessing an id.
+    public async Task<IActionResult> StudentDetail(int id)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await SetTutorSidebarContextAsync("messages", tutor);
+
+        var student = await _context.StudentProfiles.Include(s => s.User).FirstOrDefaultAsync(s => s.Id == id);
+        if (student == null) return NotFound();
+
+        var bookings = await _context.Bookings
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.TutorProfileId == tutor.Id && b.StudentProfileId == id)
+            .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+            .ToListAsync();
+
+        if (!bookings.Any())
+            return NotFound();
+
+        var nonCancelled = bookings.Where(b => b.Status != "Cancelled").ToList();
+        var completed = nonCancelled.Where(b => b.Status == "Completed").ToList();
+
+        var vm = new TutorStudentDetailViewModel
+        {
+            StudentProfileId = student.Id,
+            FullName = student.User.FullName,
+            Initials = GetInitials(student.User.FullName),
+            GradeLevel = student.GradeLevel,
+            District = student.User.District,
+            SchoolName = student.SchoolName,
+            CurriculumBoard = student.CurriculumBoard,
+            LearningGoal = student.LearningGoal,
+            TotalSessions = nonCancelled.Count,
+            CompletedSessions = completed.Count,
+            RecentSessions = nonCancelled.Take(15).Select(b => new StudentSessionHistoryRow
+            {
+                Subject = b.Subject,
+                Date = b.TutorAvailabilitySlot.StartTime,
+                Status = b.Status
+            }).ToList()
+        };
+
+        return View(vm);
+    }
     public async Task<IActionResult> Messages(int? studentProfileId, string tab = "all", string? search = null)
     {
         var tutor = await GetCurrentTutorProfileAsync();

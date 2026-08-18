@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Messages - TutorBridge Nepal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -149,10 +149,14 @@
                                         }
 
                                         var isOwn = m.SenderRole == "Tutor";
-                                        <div class="msg-row @(isOwn ? "tutor-own" : "student-other")">
-                                            <div>
-                                                <div class="msg-bubble">@m.Content</div>
-                                                <div class="msg-meta">
+                                        <div class="chat-msg-row @(isOwn ? "self" : "other")">
+                                            @if (!isOwn)
+                                            {
+                                                <div class="chat-msg-avatar">@Model.ActiveStudentInitials</div>
+                                            }
+                                            <div class="chat-msg-group">
+                                                <div class="chat-msg-bubble">@m.Content</div>
+                                                <div class="chat-msg-meta">
                                                     @m.SentAt.ToString("h:mm tt")
                                                     @if (isOwn)
                                                     {

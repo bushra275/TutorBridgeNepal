@@ -40,3 +40,10 @@ public class TutorStudentCardViewModel
     public DateTime? PendingRequestedFor { get; set; }
     public string StatusLabel { get; set; } = string.Empty;
 }
+
+public class TutorStudentSessionRowViewModel
+{
+    public string Subject { get; set; } = string.Empty;
+    public DateTime Date { get; set; }
+    public string Status { get; set; } = string.Empty;
+}

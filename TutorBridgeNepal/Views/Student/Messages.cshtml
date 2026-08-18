@@ -103,10 +103,14 @@
                                     foreach (var m in Model.Messages)
                                     {
                                         var fromStudent = m.SenderRole == "Student";
-                                        <div class="msg-row @(fromStudent ? "from-student" : "from-tutor")">
-                                            <div>
-                                                <div class="msg-bubble">@m.Content</div>
-                                                <div class="msg-meta">
+                                        <div class="chat-msg-row @(fromStudent ? "self" : "other")">
+                                            @if (!fromStudent)
+                                            {
+                                                <div class="chat-msg-avatar">@Model.ActiveTutorInitials</div>
+                                            }
+                                            <div class="chat-msg-group">
+                                                <div class="chat-msg-bubble">@m.Content</div>
+                                                <div class="chat-msg-meta">
                                                     @m.SentAt.ToString("h:mm tt")
                                                     @if (fromStudent)
                                                     {
