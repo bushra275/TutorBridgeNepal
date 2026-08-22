@@ -5,6 +5,7 @@ public class TutorProfilePageViewModel
     public string FullName { get; set; } = string.Empty;
     public string? DisplayName { get; set; }
     public string Initials { get; set; } = string.Empty;
+    public string? PhotoUrl { get; set; }
     public bool IsVerified { get; set; }
     public bool IsTopTutor { get; set; }
     public int TopTutorYear { get; set; }

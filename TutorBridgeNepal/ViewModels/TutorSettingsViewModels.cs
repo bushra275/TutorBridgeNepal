@@ -16,7 +16,19 @@ public class TutorSettingsPageViewModel
 
     public bool NotifyNewSessionRequests { get; set; }
     public bool NotifyNewMessages { get; set; }
-    public bool NotifyWeeklyEarningsSummary { get; set; }
-
     public bool IsListedInSearch { get; set; }
+
+    public List<DeviceViewModel> Devices { get; set; } = new();
+    public bool GoogleCalendarConnected { get; set; }
+    public string? GoogleCalendarEmail { get; set; }
+}
+
+public class DeviceViewModel
+{
+    public int Id { get; set; }
+    public string DeviceLabel { get; set; } = string.Empty;
+    public string? IpAddress { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime LastActiveAt { get; set; }
+    public bool IsCurrentDevice { get; set; }
 }

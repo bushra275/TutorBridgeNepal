@@ -27,6 +27,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<TutorCredential> TutorCredentials => Set<TutorCredential>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
+    public DbSet<UserDevice> UserDevices => Set<UserDevice>();
+    public DbSet<TutorCalendarConnection> TutorCalendarConnections => Set<TutorCalendarConnection>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -35,7 +37,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<TutorAvailabilitySlot>()
             .HasIndex(s => new { s.TutorProfileId, s.StartTime, s.EndTime });
 
+        builder.Entity<TutorCalendarConnection>()
+        .HasOne(c => c.TutorProfile)
+        .WithMany()
+        .HasForeignKey(c => c.TutorProfileId)
+        .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Entity<TutorCalendarConnection>()
+            .HasIndex(c => c.TutorProfileId)
+            .IsUnique();
 
         builder.Entity<Booking>()
             .HasOne(b => b.StudentProfile)
@@ -172,5 +182,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<TutorTimeOff>()
             .HasIndex(t => t.TutorProfileId);
+
+        builder.Entity<UserDevice>()
+        .HasOne(d => d.User)
+        .WithMany()
+        .HasForeignKey(d => d.UserId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<UserDevice>()
+            .HasIndex(d => d.SessionToken)
+            .IsUnique();
+
+        builder.Entity<UserDevice>()
+            .HasIndex(d => d.UserId);
     }
 }

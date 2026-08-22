@@ -65,7 +65,10 @@
                         <div class="stars">
                             @if (Model.AverageRating > 0)
                             {
-                                @:★★★★★ <span class="tutor-meta">@Model.AverageRating.ToString("0.0")</span>
+                                var filled = (int)Math.Round(Model.AverageRating);
+                                @(new string('★', filled))
+                                @(new string('☆', 5 - filled))
+                                <span class="tutor-meta">@Model.AverageRating.ToString("0.0") (@Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s"))</span>
                             }
                             else
                             {
@@ -118,7 +121,43 @@
 
                         <div class="info-panel">
                             <h2>Student reviews</h2>
-                            <p class="review-empty">No reviews yet — this feature is coming soon. Once students can rate completed sessions, reviews for @Model.FullName.Split(' ')[0] will appear here.</p>
+
+                            @if (!Model.Reviews.Any())
+                            {
+                                <p class="review-empty">No reviews yet. Once a student rates a completed session with @Model.FullName.Split(' ')[0], it'll appear here.</p>
+                            }
+                            else
+                            {
+                                <div class="review-list">
+                                    @foreach (var review in Model.Reviews)
+                                    {
+                                        var filled = review.Rating;
+                                        <div class="review-row">
+                                            <div class="review-row-head">
+                                                <div class="review-avatar">@review.StudentInitials</div>
+                                                <div>
+                                                    <div class="review-student-name">@review.StudentName</div>
+                                                    <div class="review-stars">@(new string('★', filled))@(new string('☆', 5 - filled))</div>
+                                                </div>
+                                                <div class="review-date">@review.CreatedAt.ToString("d MMM yyyy")</div>
+                                            </div>
+
+                                            @if (!string.IsNullOrWhiteSpace(review.Comment))
+                                            {
+                                                <p class="review-comment">@review.Comment</p>
+                                            }
+
+                                            @if (!string.IsNullOrWhiteSpace(review.TutorReply))
+                                            {
+                                                <div class="review-reply">
+                                                    <strong>@Model.FullName.Split(' ')[0]'s reply:</strong>
+                                                    <p>@review.TutorReply</p>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
                         </div>
                     </div>
 

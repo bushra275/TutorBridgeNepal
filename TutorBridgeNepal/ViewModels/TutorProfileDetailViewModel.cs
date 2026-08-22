@@ -13,6 +13,8 @@ public class TutorProfileDetailViewModel
     public decimal AverageRating { get; set; }
     public bool IsVerified { get; set; }
     public int CompletedSessionsCount { get; set; }
+    public int ReviewCount { get; set; }
+    public List<ReviewRowViewModel> Reviews { get; set; } = new();
 
     public List<string> SubjectTags =>
         Subjects.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
@@ -45,4 +47,15 @@ public class AvailableDateGroup
 {
     public DateTime Date { get; set; }
     public List<AvailableSlotViewModel> Slots { get; set; } = new();
+}
+
+public class ReviewRowViewModel
+{
+    public string StudentName { get; set; } = string.Empty;
+    public string StudentInitials { get; set; } = string.Empty;
+    public int Rating { get; set; }
+    public string? Comment { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? TutorReply { get; set; }
+    public DateTime? TutorRepliedAt { get; set; }
 }

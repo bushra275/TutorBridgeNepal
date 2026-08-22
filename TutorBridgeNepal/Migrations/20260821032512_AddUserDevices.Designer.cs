@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TutorBridgeNepal.Data;
 
@@ -11,9 +12,11 @@ using TutorBridgeNepal.Data;
 namespace TutorBridgeNepal.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260821032512_AddUserDevices")]
+    partial class AddUserDevices
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -256,9 +259,6 @@ namespace TutorBridgeNepal.Migrations
 
                     b.Property<bool>("DeclinedByTutor")
                         .HasColumnType("bit");
-
-                    b.Property<string>("GoogleCalendarEventId")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsDisputed")
                         .HasColumnType("bit");
@@ -670,47 +670,6 @@ namespace TutorBridgeNepal.Migrations
                     b.HasIndex("TutorProfileId", "StartTime", "EndTime");
 
                     b.ToTable("TutorAvailabilitySlots");
-                });
-
-            modelBuilder.Entity("TutorBridgeNepal.Models.TutorCalendarConnection", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("AccessToken")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("AccessTokenExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("ConnectedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("GoogleAccountEmail")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RefreshToken")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("TutorProfileId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TutorProfileId")
-                        .IsUnique();
-
-                    b.ToTable("TutorCalendarConnections");
                 });
 
             modelBuilder.Entity("TutorBridgeNepal.Models.TutorCredential", b =>
@@ -1186,17 +1145,6 @@ namespace TutorBridgeNepal.Migrations
                 });
 
             modelBuilder.Entity("TutorBridgeNepal.Models.TutorAvailabilitySlot", b =>
-                {
-                    b.HasOne("TutorBridgeNepal.Models.TutorProfile", "TutorProfile")
-                        .WithMany()
-                        .HasForeignKey("TutorProfileId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TutorProfile");
-                });
-
-            modelBuilder.Entity("TutorBridgeNepal.Models.TutorCalendarConnection", b =>
                 {
                     b.HasOne("TutorBridgeNepal.Models.TutorProfile", "TutorProfile")
                         .WithMany()

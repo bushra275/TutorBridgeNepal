@@ -2,6 +2,7 @@
 @{
     var initials = ViewData["SidebarInitials"] as string ?? "?";
     var name = ViewData["SidebarName"] as string ?? "";
+    var photoUrl = ViewData["SidebarPhotoUrl"] as string;
     var meta = ViewData["SidebarMeta"] as string ?? "";
     var isAvailable = ViewData["IsAvailableNow"] as bool? ?? false;
     var showAvailabilityBadge = ViewData["ShowAvailabilityBadge"] as bool? ?? true;
@@ -58,7 +59,14 @@
         </div>
 
         <div class="topbar-dropdown-wrap">
-            <button type="button" class="topbar-avatar" id="profileAvatarBtn" title="@name">@initials</button>
+            @if (!string.IsNullOrEmpty(photoUrl))
+            {
+                <button type="button" class="topbar-avatar" id="profileAvatarBtn" title="@name" style="padding:0; overflow:hidden;"><img src="@photoUrl" alt="@name" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" /></button>
+            }
+            else
+            {
+                <button type="button" class="topbar-avatar" id="profileAvatarBtn" title="@name">@initials</button>
+            }
             <div class="topbar-dropdown profile-dropdown" id="profileDropdown">
                 <div class="profile-dropdown-head">
                     <div class="avatar-circle-lg" style="width:42px;height:42px;font-size:.95rem;">@initials</div>

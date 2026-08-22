@@ -7,6 +7,11 @@ using TutorBridgeNepal.Data;
 using TutorBridgeNepal.Helpers;
 using TutorBridgeNepal.Models;
 using TutorBridgeNepal.ViewModels;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
+using TutorBridgeNepal.Services;
 
 namespace TutorBridgeNepal.Controllers;
 
@@ -17,13 +22,26 @@ public class TutorController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IWebHostEnvironment _webHostEnvironment;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly GoogleOAuthOptions _googleOptions;
+    private readonly GoogleCalendarService _googleCalendarService;
 
-    public TutorController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment)
+    public TutorController(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
+        IWebHostEnvironment webHostEnvironment,
+        IHttpClientFactory httpClientFactory,
+        IOptions<GoogleOAuthOptions> googleOptions,
+        GoogleCalendarService googleCalendarService)
     {
         _context = context;
         _userManager = userManager;
         _signInManager = signInManager;
         _webHostEnvironment = webHostEnvironment;
+        _httpClientFactory = httpClientFactory;
+        _googleOptions = googleOptions.Value;
+        _googleCalendarService = googleCalendarService;
     }
 
     private static readonly string[] AllowedWhileUnverified =
@@ -51,6 +69,19 @@ public class TutorController : Controller
         await next();
     }
 
+    // Mirrors AdminController.GetOrCreatePlatformSettingsAsync - duplicated
+    // rather than shared, same pattern already used for RequiredVerificationDocuments.
+    private async Task<PlatformSettings> GetOrCreatePlatformSettingsAsync()
+    {
+        var settings = await _context.PlatformSettings.FirstOrDefaultAsync();
+        if (settings == null)
+        {
+            settings = new PlatformSettings();
+            _context.PlatformSettings.Add(settings);
+            await _context.SaveChangesAsync();
+        }
+        return settings;
+    }
     private static string GetInitials(string fullName)
     {
         var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -95,6 +126,7 @@ public class TutorController : Controller
 
         ViewData["SidebarName"] = tutor.User.FullName;
         ViewData["SidebarInitials"] = GetInitials(tutor.User.FullName);
+        ViewData["SidebarPhotoUrl"] = tutor.User.PhotoUrl;
         ViewData["SidebarMeta"] = string.Join(" · ", new[] { tutor.Subjects.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault(), tutor.User.District }
             .Where(x => !string.IsNullOrWhiteSpace(x)));
         ViewData["ActiveNav"] = activeNav;
@@ -274,6 +306,8 @@ public class TutorController : Controller
         if (tutor == null) return RedirectToAction("Index", "Home");
 
         var booking = await _context.Bookings
+            .Include(b => b.TutorAvailabilitySlot)
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
             .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id && b.Status == "Pending");
 
         if (booking != null)
@@ -281,6 +315,17 @@ public class TutorController : Controller
             booking.Status = "Confirmed";
             booking.DecidedAt = DateTime.Now;
             await _context.SaveChangesAsync();
+
+            var connection = await _context.TutorCalendarConnections.FirstOrDefaultAsync(c => c.TutorProfileId == tutor.Id);
+            if (connection != null)
+            {
+                var (success, eventId) = await _googleCalendarService.CreateEventAsync(connection, booking);
+                if (success)
+                {
+                    booking.GoogleCalendarEventId = eventId;
+                    await _context.SaveChangesAsync();
+                }
+            }
         }
 
         return returnTo switch
@@ -314,6 +359,15 @@ public class TutorController : Controller
             booking.TutorAvailabilitySlot.IsBooked = remainingActive >= booking.TutorAvailabilitySlot.Capacity;
 
             await _context.SaveChangesAsync();
+
+            if (booking.GoogleCalendarEventId != null)
+            {
+                var connection = await _context.TutorCalendarConnections.FirstOrDefaultAsync(c => c.TutorProfileId == tutor.Id);
+                if (connection != null)
+                {
+                    await _googleCalendarService.DeleteEventAsync(connection, booking.GoogleCalendarEventId);
+                }
+            }
         }
 
         return returnTo == "SessionRequests" ? RedirectToAction("SessionRequests") : RedirectToAction("Dashboard");
@@ -1136,6 +1190,23 @@ public class TutorController : Controller
                 var studentProfile = allBookings.First(b => b.StudentProfileId == activeStudentId.Value).StudentProfile;
                 vm.ActiveStudentGradeLevel = studentProfile.GradeLevel;
 
+                // Tutor's own open slots for the "Schedule" button - same source as the
+                // Schedule page, generated fresh so a stale/empty list never shows up.
+                await GenerateUpcomingSlotsAsync(tutor.Id);
+
+                vm.AvailableSlotsForSchedule = await _context.TutorAvailabilitySlots
+                    .Where(s => s.TutorProfileId == tutor.Id && !s.IsBooked && s.StartTime >= now)
+                    .OrderBy(s => s.StartTime)
+                    .Take(60)
+                    .Select(s => new ScheduleSlotOptionViewModel
+                    {
+                        SlotId = s.Id,
+                        StartTime = s.StartTime,
+                        EndTime = s.EndTime,
+                        Mode = s.Mode
+                    })
+                    .ToListAsync();
+
                 vm.Messages = threadMessages.Select(m => new TutorMessageBubbleViewModel
                 {
                     Id = m.Id,
@@ -1192,6 +1263,80 @@ public class TutorController : Controller
 
         await _context.SaveChangesAsync();
 
+        return RedirectToAction("Messages", new { studentProfileId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ScheduleSessionWithStudent(int studentProfileId, int slotId, string subject, string? note)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var hasRelationship = await _context.Bookings
+            .AnyAsync(b => b.TutorProfileId == tutor.Id && b.StudentProfileId == studentProfileId);
+        if (!hasRelationship)
+        {
+            TempData["SettingsError"] = "You can only schedule sessions with students you already have a relationship with.";
+            return RedirectToAction("Messages", new { studentProfileId });
+        }
+
+        var slot = await _context.TutorAvailabilitySlots
+            .FirstOrDefaultAsync(s => s.Id == slotId && s.TutorProfileId == tutor.Id);
+
+        if (slot == null || slot.StartTime < DateTime.Now)
+        {
+            TempData["SettingsError"] = "That slot is no longer available. Please pick another time.";
+            return RedirectToAction("Messages", new { studentProfileId });
+        }
+
+        var activeCount = await _context.Bookings
+            .CountAsync(b => b.TutorAvailabilitySlotId == slotId && b.Status != "Cancelled");
+        if (activeCount >= slot.Capacity)
+        {
+            TempData["SettingsError"] = "That slot is no longer available. Please pick another time.";
+            return RedirectToAction("Messages", new { studentProfileId });
+        }
+
+        var studentProfile = await _context.StudentProfiles
+            .Include(s => s.User)
+            .FirstOrDefaultAsync(s => s.Id == studentProfileId);
+        if (studentProfile == null) return RedirectToAction("Messages");
+
+        // Tutor-initiated - skips the Pending/approval step entirely, since the
+        // tutor is the one proposing the time rather than a student requesting it.
+        var booking = new Booking
+        {
+            StudentProfileId = studentProfileId,
+            TutorProfileId = tutor.Id,
+            TutorAvailabilitySlotId = slot.Id,
+            Subject = string.IsNullOrWhiteSpace(subject) ? "General" : subject,
+            Status = "Confirmed",
+            DecidedAt = DateTime.Now,
+            Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
+        };
+
+        _context.Bookings.Add(booking);
+        slot.IsBooked = (activeCount + 1) >= slot.Capacity;
+        await _context.SaveChangesAsync();
+
+        // Populate navigation properties manually (already have both loaded) so
+        // the calendar service has what it needs without a second DB round trip.
+        booking.TutorAvailabilitySlot = slot;
+        booking.StudentProfile = studentProfile;
+
+        var connection = await _context.TutorCalendarConnections.FirstOrDefaultAsync(c => c.TutorProfileId == tutor.Id);
+        if (connection != null)
+        {
+            var (success, eventId) = await _googleCalendarService.CreateEventAsync(connection, booking);
+            if (success)
+            {
+                booking.GoogleCalendarEventId = eventId;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        TempData["SettingsSuccess"] = $"Session scheduled with {studentProfile.User.FullName} for {slot.StartTime:ddd, d MMM h:mm tt}.";
         return RedirectToAction("Messages", new { studentProfileId });
     }
 
@@ -1334,6 +1479,58 @@ public class TutorController : Controller
         return RedirectToAction("Reviews");
     }
 
+    // Reuses the pre-built read-only preview page (Tutor/PreviewProfile.cshtml)
+    // - shows exactly what a student sees on this tutor's public profile,
+    // without a live booking calendar (a tutor can't book themselves).
+    public async Task<IActionResult> PreviewProfile()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        await SetTutorSidebarContextAsync("myprofile", tutor);
+
+        var subjects = await _context.TutorSubjects
+            .Where(s => s.TutorProfileId == tutor.Id)
+            .OrderBy(s => s.SortOrder)
+            .ToListAsync();
+
+        var recentReviews = await _context.Reviews
+            .Include(r => r.StudentProfile).ThenInclude(s => s.User)
+            .Where(r => r.TutorProfileId == tutor.Id)
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(5)
+            .ToListAsync();
+
+        var vm = new TutorPreviewProfileViewModel
+        {
+            PhotoUrl = tutor.User.PhotoUrl,
+            Initials = GetInitials(tutor.User.FullName),
+            FullName = tutor.User.FullName,
+            DisplayName = tutor.DisplayName,
+            IsVerified = tutor.IsVerified,
+            TeachingMode = tutor.TeachingMode,
+            District = tutor.User.District,
+            YearsOfExperience = tutor.YearsOfExperience,
+            AverageRating = tutor.AverageRating,
+            ReviewCount = tutor.ReviewCount,
+            Bio = tutor.Bio,
+            Subjects = subjects.Select(s => new TutorSubjectRowViewModel
+            {
+                Id = s.Id,
+                Subject = s.Subject,
+                Description = s.Description
+            }).ToList(),
+            RecentReviews = recentReviews.Select(r => new PreviewReviewRowViewModel
+            {
+                StudentInitials = GetInitials(r.StudentProfile.User.FullName),
+                StudentName = r.StudentProfile.User.FullName,
+                Rating = r.Rating,
+                Comment = r.Comment
+            }).ToList()
+        };
+
+        return View(vm);
+    }
     public async Task<IActionResult> Profile()
     {
         var tutor = await GetCurrentTutorProfileAsync();
@@ -1378,6 +1575,7 @@ public class TutorController : Controller
             FullName = tutor.User.FullName,
             DisplayName = tutor.DisplayName,
             Initials = GetInitials(tutor.User.FullName),
+            PhotoUrl = tutor.User.PhotoUrl,
             IsVerified = tutor.IsVerified,
             IsTopTutor = isTopTutor,
             TopTutorYear = DateTime.Now.Year,
@@ -1433,6 +1631,43 @@ public class TutorController : Controller
         var firstMissing = checklist.FirstOrDefault(c => !c.Done).Label;
 
         return (percent, percent >= 100 ? null : $"{firstMissing} to reach 100%");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadTutorPhoto(IFormFile? photo)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var (url, error) = await FileUploadHelper.SavePhotoAsync(photo, _webHostEnvironment.WebRootPath);
+        if (error != null)
+        {
+            TempData["ProfileError"] = error;
+            return RedirectToAction("Profile");
+        }
+
+        FileUploadHelper.TryDelete(tutor.User.PhotoUrl, _webHostEnvironment.WebRootPath);
+        tutor.User.PhotoUrl = url;
+        await _context.SaveChangesAsync();
+
+        TempData["ProfileSuccess"] = "Profile photo updated.";
+        return RedirectToAction("Profile");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveTutorPhoto()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        FileUploadHelper.TryDelete(tutor.User.PhotoUrl, _webHostEnvironment.WebRootPath);
+        tutor.User.PhotoUrl = null;
+        await _context.SaveChangesAsync();
+
+        TempData["ProfileSuccess"] = "Profile photo removed.";
+        return RedirectToAction("Profile");
     }
 
     [HttpPost]
@@ -1594,13 +1829,32 @@ public class TutorController : Controller
             var allComplete = RequiredVerificationDocuments.All(rd => currentDocTypes.Contains(rd.Type));
             if (allComplete)
             {
-                NotificationHelper.Create(_context,
-                    type: "Verification",
-                    title: "New tutor verification submitted",
-                    message: $"{tutor.User.FullName} submitted documents for {tutor.Subjects}",
-                    icon: "🎓",
-                    actionLabel: "Review now",
-                    actionUrl: Url.Action("TutorVerification", "Admin"));
+                var platformSettings = await GetOrCreatePlatformSettingsAsync();
+
+                if (platformSettings.AutoApproveVerifiedTutors)
+                {
+                    // RequiredVerificationDocuments already includes PoliceReport, so
+                    // "allComplete" naturally satisfies RequirePoliceReportForTutors too -
+                    // no separate check needed here.
+                    tutor.IsVerified = true;
+                    tutor.VerificationDecidedAt = DateTime.Now;
+
+                    NotificationHelper.Create(_context,
+                        type: "Verification",
+                        title: "Tutor auto-approved",
+                        message: $"{tutor.User.FullName}'s application for {tutor.Subjects} was auto-approved (all required documents submitted)",
+                        icon: "✔️");
+                }
+                else
+                {
+                    NotificationHelper.Create(_context,
+                        type: "Verification",
+                        title: "New tutor verification submitted",
+                        message: $"{tutor.User.FullName} submitted documents for {tutor.Subjects}",
+                        icon: "🎓",
+                        actionLabel: "Review now",
+                        actionUrl: Url.Action("TutorVerification", "Admin"));
+                }
             }
         }
 
@@ -1675,7 +1929,6 @@ public class TutorController : Controller
             MaxSessionsPerDay = tutor.MaxSessionsPerDay,
             NotifyNewSessionRequests = tutor.NotifyNewSessionRequests,
             NotifyNewMessages = tutor.NotifyNewMessages,
-            NotifyWeeklyEarningsSummary = tutor.NotifyWeeklyEarningsSummary,
             IsListedInSearch = tutor.IsListedInSearch
         };
     }
@@ -1725,7 +1978,56 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
         await SetTutorSidebarContextAsync("settings", tutor);
-        return View(await BuildSettingsVmAsync(tutor));
+
+        var vm = await BuildSettingsVmAsync(tutor);
+
+        var currentToken = Request.Cookies["tbn_device"];
+        vm.Devices = await _context.UserDevices
+            .Where(d => d.UserId == tutor.UserId && !d.IsRevoked)
+            .OrderByDescending(d => d.LastActiveAt)
+            .Select(d => new DeviceViewModel
+            {
+                Id = d.Id,
+                DeviceLabel = d.DeviceLabel,
+                IpAddress = d.IpAddress,
+                CreatedAt = d.CreatedAt,
+                LastActiveAt = d.LastActiveAt,
+                IsCurrentDevice = d.SessionToken == currentToken
+            })
+            .ToListAsync();
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RevokeDevice(int id)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var device = await _context.UserDevices.FirstOrDefaultAsync(d => d.Id == id && d.UserId == tutor.UserId);
+        if (device == null)
+        {
+            TempData["SettingsError"] = "That device wasn't found.";
+            return RedirectToAction("SettingsDevices");
+        }
+
+        var isCurrentDevice = device.SessionToken == Request.Cookies["tbn_device"];
+
+        device.IsRevoked = true;
+        await _context.SaveChangesAsync();
+
+        if (isCurrentDevice)
+        {
+            await _signInManager.SignOutAsync();
+            Response.Cookies.Delete("tbn_device");
+            TempData["SettingsSuccessGlobal"] = "You've been signed out of this device.";
+            return RedirectToAction("TutorLogin", "Account");
+        }
+
+        TempData["SettingsSuccess"] = "Device signed out.";
+        return RedirectToAction("SettingsDevices");
     }
 
     public async Task<IActionResult> SettingsCalendar()
@@ -1733,7 +2035,147 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
         await SetTutorSidebarContextAsync("settings", tutor);
-        return View(await BuildSettingsVmAsync(tutor));
+
+        var vm = await BuildSettingsVmAsync(tutor);
+
+        var connection = await _context.TutorCalendarConnections.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.TutorProfileId == tutor.Id);
+        vm.GoogleCalendarConnected = connection != null;
+        vm.GoogleCalendarEmail = connection?.GoogleAccountEmail;
+
+        return View(vm);
+    }
+
+    [HttpGet]
+    public IActionResult ConnectGoogleCalendar()
+    {
+        var state = Guid.NewGuid().ToString("N");
+        TempData["GoogleOAuthState"] = state;
+
+        var redirectUri = Url.Action("GoogleCalendarCallback", "Tutor", null, Request.Scheme)!;
+
+        var query = new Dictionary<string, string?>
+        {
+            ["client_id"] = _googleOptions.ClientId,
+            ["redirect_uri"] = redirectUri,
+            ["response_type"] = "code",
+            ["scope"] = "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email",
+            ["access_type"] = "offline",
+            ["prompt"] = "consent",
+            ["state"] = state
+        };
+
+        var authorizeUrl = QueryHelpers.AddQueryString("https://accounts.google.com/o/oauth2/v2/auth", query);
+        return Redirect(authorizeUrl);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GoogleCalendarCallback(string? code, string? state, string? error)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        if (!string.IsNullOrEmpty(error) || string.IsNullOrEmpty(code))
+        {
+            TempData["SettingsError"] = "Google Calendar wasn't connected.";
+            return RedirectToAction("SettingsCalendar");
+        }
+
+        var expectedState = TempData["GoogleOAuthState"] as string;
+        if (string.IsNullOrEmpty(expectedState) || expectedState != state)
+        {
+            TempData["SettingsError"] = "That connection request expired. Please try again.";
+            return RedirectToAction("SettingsCalendar");
+        }
+
+        var redirectUri = Url.Action("GoogleCalendarCallback", "Tutor", null, Request.Scheme)!;
+        var http = _httpClientFactory.CreateClient();
+
+        var tokenResponse = await http.PostAsync("https://oauth2.googleapis.com/token", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["code"] = code,
+            ["client_id"] = _googleOptions.ClientId,
+            ["client_secret"] = _googleOptions.ClientSecret,
+            ["redirect_uri"] = redirectUri,
+            ["grant_type"] = "authorization_code"
+        }));
+
+        if (!tokenResponse.IsSuccessStatusCode)
+        {
+            TempData["SettingsError"] = "Couldn't connect to Google Calendar. Please try again.";
+            return RedirectToAction("SettingsCalendar");
+        }
+
+        using var tokenDoc = JsonDocument.Parse(await tokenResponse.Content.ReadAsStringAsync());
+        var tokenRoot = tokenDoc.RootElement;
+
+        var accessToken = tokenRoot.GetProperty("access_token").GetString()!;
+        var expiresIn = tokenRoot.GetProperty("expires_in").GetInt32();
+        var refreshToken = tokenRoot.TryGetProperty("refresh_token", out var rt) ? rt.GetString() : null;
+
+        var email = "Google account";
+        var userInfoResponse = await http.SendAsync(new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo")
+        {
+            Headers = { Authorization = new AuthenticationHeaderValue("Bearer", accessToken) }
+        });
+        if (userInfoResponse.IsSuccessStatusCode)
+        {
+            using var userDoc = JsonDocument.Parse(await userInfoResponse.Content.ReadAsStringAsync());
+            email = userDoc.RootElement.TryGetProperty("email", out var e) ? e.GetString() ?? email : email;
+        }
+
+        var connection = await _context.TutorCalendarConnections.FirstOrDefaultAsync(c => c.TutorProfileId == tutor.Id);
+        if (connection == null)
+        {
+            connection = new TutorCalendarConnection { TutorProfileId = tutor.Id };
+            _context.TutorCalendarConnections.Add(connection);
+        }
+
+        connection.GoogleAccountEmail = email;
+        connection.AccessToken = accessToken;
+        connection.AccessTokenExpiresAt = DateTime.UtcNow.AddSeconds(expiresIn);
+
+        // Google only returns a refresh token on first consent (or when we
+        // force prompt=consent, as above) - keep the old one if this call
+        // didn't send a new one, so a reconnect doesn't wipe it out.
+        if (!string.IsNullOrEmpty(refreshToken))
+        {
+            connection.RefreshToken = refreshToken;
+        }
+        connection.ConnectedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        TempData["SettingsSuccess"] = $"Google Calendar connected ({email}).";
+        return RedirectToAction("SettingsCalendar");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DisconnectGoogleCalendar()
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var connection = await _context.TutorCalendarConnections.FirstOrDefaultAsync(c => c.TutorProfileId == tutor.Id);
+        if (connection != null)
+        {
+            var http = _httpClientFactory.CreateClient();
+            try
+            {
+                // Best-effort - we're deleting the row locally regardless of
+                // whether Google's revoke call actually succeeds.
+                await http.PostAsync("https://oauth2.googleapis.com/revoke",
+                    new FormUrlEncodedContent(new Dictionary<string, string> { ["token"] = connection.AccessToken }));
+            }
+            catch { /* ignore */ }
+
+            _context.TutorCalendarConnections.Remove(connection);
+            await _context.SaveChangesAsync();
+        }
+
+        TempData["SettingsSuccess"] = "Google Calendar disconnected.";
+        return RedirectToAction("SettingsCalendar");
     }
 
     public async Task<IActionResult> SettingsDeactivate()
@@ -1816,8 +2258,15 @@ public class TutorController : Controller
         var tutor = await GetCurrentTutorProfileAsync();
         if (tutor == null) return RedirectToAction("Index", "Home");
 
+        var devices = await _context.UserDevices
+            .Where(d => d.UserId == tutor.UserId && !d.IsRevoked)
+            .ToListAsync();
+        foreach (var d in devices) d.IsRevoked = true;
+
         await _userManager.UpdateSecurityStampAsync(tutor.User);
+        await _context.SaveChangesAsync();
         await _signInManager.SignOutAsync();
+        Response.Cookies.Delete("tbn_device");
 
         TempData["SettingsSuccessGlobal"] = "You've been signed out on all devices. Please log in again.";
         return RedirectToAction("TutorLogin", "Account");
@@ -1866,9 +2315,7 @@ public class TutorController : Controller
         switch (key)
         {
             case "NewSessionRequests": tutor.NotifyNewSessionRequests = value; break;
-            case "NewMessages": tutor.NotifyNewMessages = value; break;
-            case "WeeklyEarningsSummary": tutor.NotifyWeeklyEarningsSummary = value; break;
-        }
+            case "NewMessages": tutor.NotifyNewMessages = value; break;        }
 
         await _context.SaveChangesAsync();
         return RedirectToAction("SettingsNotifications");

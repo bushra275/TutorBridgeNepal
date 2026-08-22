@@ -1073,3 +1073,33 @@
     font-size: .76rem;
     color: var(--muted);
 }
+
+.device-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.device-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--line, #deded7);
+}
+
+    .device-row:last-child {
+        border-bottom: none;
+    }
+
+.device-name {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.device-meta {
+    color: var(--muted, #8c8d87);
+    font-size: .85rem;
+    margin-top: .2rem;
+}

@@ -3296,3 +3296,264 @@ button.topbar-avatar {
         flex: 1 1 auto;
     }
 }
+
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(32, 35, 34, .5);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+    .modal-overlay.open {
+        display: flex;
+    }
+
+.modal-box {
+    background: var(--paper, #fff);
+    border-radius: 12px;
+    padding: 1.5rem;
+    max-width: 460px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+    .modal-head h3 {
+        margin: 0;
+        font-size: 1.05rem;
+    }
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--muted, #8c8d87);
+}
+
+.slot-picker {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--line, #deded7);
+    border-radius: 8px;
+    padding: .6rem;
+}
+
+.slot-picker-day {
+    font-weight: 600;
+    font-size: .85rem;
+    margin: .5rem 0 .3rem;
+}
+
+    .slot-picker-day:first-child {
+        margin-top: 0;
+    }
+
+.slot-picker-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin-bottom: .3rem;
+}
+
+.slot-option {
+    display: flex;
+    align-items: center;
+    gap: .3rem;
+    border: 1px solid var(--line, #deded7);
+    border-radius: 6px;
+    padding: .3rem .6rem;
+    font-size: .82rem;
+    cursor: pointer;
+}
+
+    .slot-option:has(input:checked) {
+        border-color: var(--green, #127a5b);
+        background: var(--mint, #dff7ef);
+    }
+
+
+.review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+.review-row {
+    padding-bottom: 1.1rem;
+    border-bottom: 1px solid var(--line);
+}
+
+    .review-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+.review-row-head {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+}
+
+.review-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--mint);
+    color: var(--green-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: .8rem;
+    flex-shrink: 0;
+}
+
+.review-student-name {
+    font-weight: 700;
+    font-size: .9rem;
+}
+
+.review-stars {
+    color: var(--orange);
+    font-size: .8rem;
+    letter-spacing: 1px;
+}
+
+.review-date {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: .8rem;
+}
+
+.review-comment {
+    margin: .6rem 0 0;
+    color: var(--ink);
+    line-height: 1.5;
+}
+
+.review-reply {
+    margin-top: .6rem;
+    padding: .7rem .9rem;
+    background: var(--soft);
+    border-radius: 8px;
+    font-size: .87rem;
+}
+
+    .review-reply p {
+        margin: .25rem 0 0;
+        color: var(--muted);
+    }
+
+/* ============================================================
+   VISUAL POLISH PASS (part 2) - panels, cards, tables, sidebar.
+   ============================================================ */
+
+/* Panels: soft elevation instead of a flat bordered box */
+.panel {
+    box-shadow: 0 1px 2px rgba(20, 30, 25, .03), 0 8px 24px rgba(20, 30, 25, .05);
+    transition: box-shadow .2s ease;
+}
+
+.panel-head h2 {
+    letter-spacing: -.01em;
+}
+
+/* KPI / stat cards get a lift on hover so the dashboard feels alive */
+.kpi-card {
+    box-shadow: 0 1px 2px rgba(20, 30, 25, .03), 0 6px 16px rgba(20, 30, 25, .04);
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+
+    .kpi-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(20, 30, 25, .06), 0 14px 28px rgba(20, 30, 25, .08);
+    }
+
+/* Pills: tiny shadow so status chips don't look flat-pasted onto the row */
+.pill {
+    box-shadow: 0 1px 2px rgba(20, 30, 25, .06);
+}
+
+/* Status banners: left accent bar instead of a plain filled box */
+.status-banner {
+    border-left: 3px solid transparent;
+    box-shadow: 0 1px 2px rgba(20, 30, 25, .04);
+}
+
+    .status-banner.success {
+        border-left-color: var(--green);
+    }
+
+    .status-banner.error {
+        border-left-color: var(--danger);
+    }
+
+/* Sidebar + topbar: gentle separation from the page instead of a hard line */
+.dash-topbar {
+    box-shadow: 0 1px 0 rgba(20, 30, 25, .06);
+}
+
+.dash-sidebar {
+    box-shadow: 1px 0 0 rgba(20, 30, 25, .04);
+}
+
+.dash-nav li a {
+    transition: background-color .15s ease, padding-left .15s ease;
+}
+
+    .dash-nav li a:hover {
+        padding-left: 4px;
+    }
+
+/* Avatar circles: subtle ring so they read as "photo/badge" rather than a flat tile */
+.avatar {
+    box-shadow: 0 0 0 3px var(--mint);
+}
+
+/* Table rows: quiet hover so scanning a long list feels responsive */
+table tr {
+    transition: background-color .12s ease;
+}
+
+table tbody tr:hover {
+    background: var(--soft);
+}
+
+/* Toggle switches: smoother travel + a touch of depth on the knob */
+.toggle-switch {
+    transition: background-color .2s ease;
+}
+
+.toggle-knob {
+    transition: transform .2s cubic-bezier(.4, 0, .2, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+}
+
+/* Modal overlays fade in instead of snapping open (Messages/Admin modals) */
+.modal-overlay.open .modal-box {
+    animation: modalPop .18s ease-out;
+}
+
+@keyframes modalPop {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}

@@ -12,8 +12,44 @@
     <div class="settings-toggle-row">
         <div>
             <div class="settings-toggle-title">Google Calendar</div>
-            <div class="settings-toggle-sub">Sync your TutorBridge sessions to an external calendar</div>
+            <div class="settings-toggle-sub">
+                @if (Model.GoogleCalendarConnected)
+                {
+                    <span>Connected as <strong>@Model.GoogleCalendarEmail</strong> - confirmed sessions sync automatically</span>
+                }
+                else
+                {
+                    <span>Sync your TutorBridge sessions to an external calendar</span>
+                }
+            </div>
         </div>
-        <button type="button" class="tb-btn-outline" disabled title="Calendar integration isn't built yet">Connect</button>
+
+        @if (Model.GoogleCalendarConnected)
+        {
+            <div style="display:flex; align-items:center; gap:.7rem;">
+                <span class="msc-badge" style="background:var(--soft); color:var(--muted);">Connected</span>
+                <form asp-controller="Tutor" asp-action="DisconnectGoogleCalendar" method="post" id="disconnectCalendarForm">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="tb-btn-danger-outline">Disconnect</button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <a asp-controller="Tutor" asp-action="ConnectGoogleCalendar" class="tb-btn-outline">Connect</a>
+        }
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        var disconnectForm = document.getElementById('disconnectCalendarForm');
+        if (disconnectForm) {
+            disconnectForm.addEventListener('submit', function(e) {
+                if (!confirm("Disconnect Google Calendar? Future confirmed sessions won't sync until you reconnect.")) {
+                    e.preventDefault();
+                }
+            });
+        }
+    </script>
+}

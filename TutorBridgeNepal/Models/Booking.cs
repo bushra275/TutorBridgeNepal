@@ -29,4 +29,9 @@ public class Booking
     // AdminController.FlagSessionDisputed. Cleared by
     // AdminController.ResolveDispute once the admin has handled it.
     public bool IsDisputed { get; set; }
+
+    // Google Calendar event id for this session, set once the tutor accepts
+    // the request and it gets pushed to their connected calendar. Null if
+    // they've never connected Google Calendar, or the push failed.
+    public string? GoogleCalendarEventId { get; set; }
 }

@@ -65,7 +65,6 @@ public class TutorProfile
     // yet, same "saved but not wired up" honesty as the student settings page)
     public bool NotifyNewSessionRequests { get; set; } = true;
     public bool NotifyNewMessages { get; set; } = true;
-    public bool NotifyWeeklyEarningsSummary { get; set; }
 
     // Privacy - whether this tutor appears in student search results
     public bool IsListedInSearch { get; set; } = true;

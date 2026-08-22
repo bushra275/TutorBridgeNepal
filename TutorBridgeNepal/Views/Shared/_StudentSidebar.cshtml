@@ -1,13 +1,21 @@
 ﻿@{
     var name = ViewData["SidebarName"] as string ?? "";
     var initials = ViewData["SidebarInitials"] as string ?? "?";
+    var photoUrl = ViewData["SidebarPhotoUrl"] as string;
     var meta = ViewData["SidebarMeta"] as string ?? "Student";
     var activeNav = ViewData["ActiveNav"] as string ?? "";
     var unreadCount = ViewData["UnreadMessageCount"] as int? ?? 0;
 }
 <aside class="dash-sidebar">
     <div class="dash-user">
-        <div class="avatar">@initials</div>
+        @if (!string.IsNullOrEmpty(photoUrl))
+        {
+            <div class="avatar" style="padding:0; overflow:hidden;"><img src="@photoUrl" alt="@name" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" /></div>
+        }
+        else
+        {
+            <div class="avatar">@initials</div>
+        }
         <div>
             <div class="name">@name</div>
             <div class="meta">@meta</div>

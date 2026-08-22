@@ -15,9 +15,9 @@
             <div class="settings-toggle-title">Show my profile in search results</div>
             <div class="settings-toggle-sub">Turn this off to hide your profile from "Find a Tutor" while still keeping existing students and bookings</div>
         </div>
-        <form asp-controller="Tutor" asp-action="UpdateSearchVisibility" method="post" class="toggle-form">
+        <form asp-controller="Tutor" asp-action="UpdateSearchVisibility" method="post" class="toggle-form ajax-toggle-form">
             @Html.AntiForgeryToken()
-            <input type="hidden" name="isListedInSearch" value="@(!Model.IsListedInSearch)" />
+            <input type="hidden" name="isListedInSearch" value="@(!Model.IsListedInSearch)" class="toggle-value-input" />
             <button type="submit" class="toggle-switch @(Model.IsListedInSearch ? "on" : "")" aria-label="Toggle search visibility"><span class="toggle-knob"></span></button>
         </form>
     </div>

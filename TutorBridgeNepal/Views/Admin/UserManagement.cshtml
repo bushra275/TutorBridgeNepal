@@ -78,7 +78,14 @@
         <div class="dash-body">
             <aside class="dash-sidebar">
                 <div class="dash-user">
-                    <div class="avatar">@Model.AdminInitials</div>
+                    @if (!string.IsNullOrEmpty(ViewData["AdminProfilePhotoUrl"] as string))
+                    {
+                        <div class="avatar" style="padding:0; overflow:hidden;"><img src="@(ViewData["AdminProfilePhotoUrl"] as string)" alt="@Model.AdminName" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" /></div>
+                    }
+                    else
+                    {
+                        <div class="avatar">@Model.AdminInitials</div>
+                    }
                     <div>
                         <div class="name">@Model.AdminName</div>
                         <div class="meta">Platform Administrator</div>
@@ -112,13 +119,21 @@
 
             <main class="dash-main">
                 <div class="dash-greeting" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                    @if (TempData["SettingsSuccess"] != null)
+                    {
+                        <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                    }
+                    @if (TempData["SettingsError"] != null)
+                    {
+                        <div class="status-banner error mb-3">@TempData["SettingsError"]</div>
+                    }
                     <div>
                         <h1>User Management</h1>
                         <p>Manage all students, tutors and their account status</p>
                     </div>
                     <div class="um-header-actions">
                         <a class="um-btn-outline" asp-action="ExportUsersCsv" asp-route-tab="@Model.ActiveTab" asp-route-search="@Model.Search" asp-route-role="@Model.RoleFilter" asp-route-district="@Model.DistrictFilter" asp-route-status="@Model.StatusFilter" asp-route-registered="@Model.RegisteredFilter">Export CSV</a>
-                        <span class="um-btn" style="opacity:.6;cursor:not-allowed;" title="Coming soon - account creation isn't built yet">+ Add user</span>
+                        <button type="button" class="um-btn" id="openAddUserModalBtn">+ Add user</button>
                     </div>
                 </div>
 
@@ -243,7 +258,7 @@
                     <div class="um-bulk-actions">
                         <button type="submit" form="bulkForm" name="bulkAction" value="activate" class="um-bulk-btn">Bulk activate</button>
                         <button type="submit" form="bulkForm" name="bulkAction" value="suspend" class="um-bulk-btn">Bulk suspend</button>
-                        <button type="button" class="um-bulk-btn danger" disabled title="Deleting users with session history isn't supported yet">Bulk delete</button>
+                        <button type="submit" form="bulkForm" name="bulkAction" value="delete" class="um-bulk-btn danger" id="bulkDeleteBtn">Bulk delete</button>
                     </div>
                 </div>
 
@@ -305,8 +320,7 @@
                                                 }
                                                 else if (u.Status == "Suspended")
                                                 {
-                                                    <span class="mini-btn" style="opacity:.6;cursor:not-allowed;" title="Coming soon">View</span>
-                                                    <form asp-controller="Admin" asp-action="ReactivateUser" method="post" style="margin:0;">
+                                                    <a asp-controller="Admin" asp-action="UserDetail" asp-route-userId="@u.UserId" asp-route-returnUrl="@returnUrl" class="mini-btn">View</a>                                                    <form asp-controller="Admin" asp-action="ReactivateUser" method="post" style="margin:0;">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="userId" value="@u.UserId" />
                                                         <input type="hidden" name="returnUrl" value="@returnUrl" />
@@ -315,8 +329,7 @@
                                                 }
                                                 else
                                                 {
-                                                    <span class="mini-btn" style="opacity:.6;cursor:not-allowed;" title="Coming soon">View</span>
-                                                    <form asp-controller="Admin" asp-action="SuspendUser" method="post" style="margin:0;" onsubmit="return confirm('Suspend this account?');">
+                                                    <a asp-controller="Admin" asp-action="UserDetail" asp-route-userId="@u.UserId" asp-route-returnUrl="@returnUrl" class="mini-btn">View</a>                                                    <form asp-controller="Admin" asp-action="SuspendUser" method="post" style="margin:0;" onsubmit="return confirm('Suspend this account?');">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="userId" value="@u.UserId" />
                                                         <input type="hidden" name="returnUrl" value="@returnUrl" />
@@ -372,6 +385,82 @@
                         </select>
                     </div>
                 </div>
+                <div class="modal-overlay" id="addUserModalOverlay">
+                    <div class="modal-box">
+                        <div class="modal-head">
+                            <h3>Add user</h3>
+                            <button type="button" class="modal-close" id="closeAddUserModalBtn">&times;</button>
+                        </div>
+
+                        <form asp-controller="Admin" asp-action="AddUser" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+
+                            <div class="field" style="margin-bottom:1rem;">
+                                <label>Role</label>
+                                <select name="Role" class="tb-select" id="addUserRoleSelect">
+                                    <option value="Student">Student</option>
+                                    <option value="Tutor">Tutor</option>
+                                </select>
+                            </div>
+
+                            <div class="field" style="margin-bottom:1rem;">
+                                <label>Full name</label>
+                                <input type="text" name="FullName" class="tb-input" required maxlength="200" />
+                            </div>
+
+                            <div class="field" style="margin-bottom:1rem;">
+                                <label>Email address</label>
+                                <input type="email" name="Email" class="tb-input" required maxlength="256" />
+                            </div>
+
+                            <div class="field" style="margin-bottom:1rem;">
+                                <label>Phone number (optional)</label>
+                                <input type="text" name="PhoneNumber" class="tb-input" placeholder="+977 98XXXXXXXX" maxlength="20" />
+                            </div>
+
+                            <div class="field" style="margin-bottom:1rem;">
+                                <label>District (optional)</label>
+                                <input type="text" name="District" class="tb-input" maxlength="100" />
+                            </div>
+
+                            <div id="addUserStudentFields">
+                                <div class="field" style="margin-bottom:1rem;">
+                                    <label>Grade level (optional)</label>
+                                    <input type="text" name="GradeLevel" class="tb-input" placeholder="e.g. Grade 10 (SEE)" maxlength="100" />
+                                </div>
+                            </div>
+
+                            <div id="addUserTutorFields" style="display:none;">
+                                <div class="field" style="margin-bottom:1rem;">
+                                    <label>Subjects (comma-separated)</label>
+                                    <input type="text" name="Subjects" class="tb-input" placeholder="e.g. Physics, Chemistry" maxlength="300" />
+                                </div>
+                                <div class="field" style="margin-bottom:1rem;">
+                                    <label>Years of experience</label>
+                                    <input type="number" name="YearsOfExperience" class="tb-input" min="0" max="60" value="0" />
+                                </div>
+                            </div>
+
+                            <div class="field" style="margin-bottom:1rem;">
+                                <label>Temporary password</label>
+                                <input type="password" name="Password" class="tb-input" required minlength="6" />
+                            </div>
+
+                            <div class="field" style="margin-bottom:1rem;">
+                                <label>Confirm password</label>
+                                <input type="password" name="ConfirmPassword" class="tb-input" required minlength="6" />
+                            </div>
+
+                            <p class="tutor-meta" style="margin:0 0 1rem;">There's no email delivery pipeline yet, so share this password with the user yourself.</p>
+
+                            <div class="settings-actions">
+                                <button type="submit" class="um-btn">Add user</button>
+                                <button type="button" class="um-btn-outline" id="cancelAddUserModalBtn">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </main>
         </div>
     </div>
@@ -396,6 +485,52 @@
                 url.searchParams.set('pageSize', value);
                 url.searchParams.set('page', '1');
                 window.location.href = url.toString();
+            }
+
+            var openAddUserBtn = document.getElementById('openAddUserModalBtn');
+            var addUserOverlay = document.getElementById('addUserModalOverlay');
+            var closeAddUserBtn = document.getElementById('closeAddUserModalBtn');
+            var cancelAddUserBtn = document.getElementById('cancelAddUserModalBtn');
+            var addUserRoleSelect = document.getElementById('addUserRoleSelect');
+            var studentFields = document.getElementById('addUserStudentFields');
+            var tutorFields = document.getElementById('addUserTutorFields');
+
+            if (openAddUserBtn && addUserOverlay) {
+                openAddUserBtn.addEventListener('click', function() {
+                    addUserOverlay.classList.add('open');
+                });
+                [closeAddUserBtn, cancelAddUserBtn].forEach(function(btn) {
+                    if (btn) btn.addEventListener('click', function() { addUserOverlay.classList.remove('open'); });
+                });
+                addUserOverlay.addEventListener('click', function(e) {
+                    if (e.target === addUserOverlay) addUserOverlay.classList.remove('open');
+                });
+            }
+
+            if (addUserRoleSelect && studentFields && tutorFields) {
+                addUserRoleSelect.addEventListener('change', function() {
+                    var isTutor = addUserRoleSelect.value === 'Tutor';
+                    studentFields.style.display = isTutor ? 'none' : '';
+                    tutorFields.style.display = isTutor ? '' : 'none';
+                });
+            }
+
+            var bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+            if (bulkDeleteBtn) {
+                bulkDeleteBtn.addEventListener('click', function (e) {
+                    var checkedCount = document.querySelectorAll('.um-row-check:checked').length;
+                    if (checkedCount === 0) {
+                        e.preventDefault();
+                        return;
+                    }
+                    var confirmed = confirm(
+                        'Permanently delete ' + checkedCount + ' user' + (checkedCount === 1 ? '' : 's') +
+                        '? This removes their account, bookings, messages, and reviews. This cannot be undone.'
+                    );
+                    if (!confirmed) {
+                        e.preventDefault();
+                    }
+                });
             }
     </script>
 </body>

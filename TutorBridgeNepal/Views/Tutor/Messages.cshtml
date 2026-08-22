@@ -26,6 +26,14 @@
 
             <main class="dash-main">
                 <div class="messages-shell">
+                        @if (TempData["SettingsSuccess"] != null)
+                        {
+                            <div class="status-banner success" style="margin:1rem 1rem 0;">@TempData["SettingsSuccess"]</div>
+                        }
+                        @if (TempData["SettingsError"] != null)
+                        {
+                            <div class="status-banner error" style="margin:1rem 1rem 0;">@TempData["SettingsError"]</div>
+                        }
                     <!-- Conversation list -->
                     <aside class="conv-list">
                         <div class="conv-list-header">
@@ -125,7 +133,8 @@
                                         <span class="badge-new-student">New student</span>
                                     }
                                 </div>
-                                <a asp-controller="Tutor" asp-action="StudentDetail" asp-route-id="@Model.ActiveStudentProfileId" class="tb-btn-outline">View profile</a>                                <span class="tb-btn" style="opacity:.6; cursor:not-allowed; margin-left:.6rem;" title="Tutor-initiated scheduling isn't built yet - accept requests from Session Requests instead">Schedule</span>
+                                <a asp-controller="Tutor" asp-action="StudentDetail" asp-route-id="@Model.ActiveStudentProfileId" class="tb-btn-outline">View profile</a>
+                                <button type="button" class="tb-btn" style="margin-left:.6rem;" id="openScheduleModalBtn">Schedule</button>
                             </div>
 
                             <div class="chat-messages" id="chatMessages">
@@ -187,6 +196,62 @@
                                 <input type="text" name="content" id="chatInput" class="chat-input" placeholder="Type a message..." autocomplete="off" required />
                                 <button type="submit" class="tb-btn">Send</button>
                             </form>
+                                                      
+
+                            <div class="modal-overlay" id="scheduleModalOverlay">
+                                <div class="modal-box">
+                                    <div class="modal-head">
+                                        <h3>Schedule a session with @Model.ActiveStudentName</h3>
+                                        <button type="button" class="modal-close" id="closeScheduleModalBtn">&times;</button>
+                                    </div>
+
+                                    @if (!Model.AvailableSlotsForSchedule.Any())
+                                    {
+                                        <p class="empty-state">You don't have any open slots in the next 30 days. <a asp-controller="Tutor" asp-action="SettingsAvailability">Set your availability</a> first.</p>
+                                    }
+                                    else
+                                    {
+                                        <form asp-controller="Tutor" asp-action="ScheduleSessionWithStudent" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="studentProfileId" value="@Model.ActiveStudentProfileId" />
+
+                                            <div class="field" style="margin-bottom:1rem;">
+                                                <label>Subject</label>
+                                                <input type="text" name="subject" class="tb-input" value="@(Model.ActiveStudentSubjects.FirstOrDefault())" placeholder="e.g. Physics" required maxlength="100" />
+                                            </div>
+
+                                            <div class="field" style="margin-bottom:1rem;">
+                                                <label>Pick a time</label>
+                                                <div class="slot-picker">
+                                                    @foreach (var group in Model.AvailableSlotsForSchedule.GroupBy(s => s.StartTime.Date).OrderBy(g => g.Key))
+                                                    {
+                                                        <div class="slot-picker-day">@group.Key.ToString("dddd, d MMM")</div>
+                                                        <div class="slot-picker-row">
+                                                            @foreach (var slot in group.OrderBy(s => s.StartTime))
+                                                            {
+                                                                <label class="slot-option">
+                                                                    <input type="radio" name="slotId" value="@slot.SlotId" required />
+                                                                    <span>@slot.StartTime.ToString("h:mm tt") · @slot.Mode</span>
+                                                                </label>
+                                                            }
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            <div class="field" style="margin-bottom:1rem;">
+                                                <label>Note (optional)</label>
+                                                <textarea name="note" class="tb-input" rows="2" maxlength="500" placeholder="Anything the student should know"></textarea>
+                                            </div>
+
+                                            <div class="settings-actions">
+                                                <button type="submit" class="tb-btn">Schedule session</button>
+                                                <button type="button" class="tb-btn-outline" id="cancelScheduleModalBtn">Cancel</button>
+                                            </div>
+                                        </form>
+                                    }
+                                </div>
+                            </div>
                         }
                     </section>
                 </div>
@@ -233,6 +298,23 @@
                         emojiPicker.classList.remove('open');
                     }
                 });
+
+                var openScheduleBtn = document.getElementById('openScheduleModalBtn');
+                var scheduleOverlay = document.getElementById('scheduleModalOverlay');
+                var closeScheduleBtn = document.getElementById('closeScheduleModalBtn');
+                var cancelScheduleBtn = document.getElementById('cancelScheduleModalBtn');
+
+                if (openScheduleBtn && scheduleOverlay) {
+                    openScheduleBtn.addEventListener('click', function() {
+                        scheduleOverlay.classList.add('open');
+                    });
+                    [closeScheduleBtn, cancelScheduleBtn].forEach(function(btn) {
+                        if (btn) btn.addEventListener('click', function() { scheduleOverlay.classList.remove('open'); });
+                    });
+                    scheduleOverlay.addEventListener('click', function(e) {
+                        if (e.target === scheduleOverlay) scheduleOverlay.classList.remove('open');
+                    });
+                }
             }
     </script>
 </body>

@@ -43,6 +43,10 @@
             <form asp-action="Login" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" asp-for="Role" />
+                @if (TempData["GoogleAuthError"] != null)
+                {
+                    <div class="text-danger small mb-2">@TempData["GoogleAuthError"]</div>
+                }
                 <div asp-validation-summary="ModelOnly"></div>
 
                 <div class="field mb-3">
@@ -69,8 +73,15 @@
             </form>
 
             <div class="divider">or continue with</div>
-            <button class="google-btn" type="button"><span class="g-dot">G</span><span>Sign in with Google</span><span></span></button>
-            <p class="auth-bottom">Don't have an account? <a class="link-green" asp-action="StudentRegister" asp-route-role="Student">Create one free</a></p>
+            <form asp-action="GoogleLogin" asp-controller="Account" method="post" style="margin:0;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="role" value="Student" />
+                <form asp-action="GoogleLogin" asp-controller="Account" method="post" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="role" value="Student" />
+                    <button class="google-btn" type="submit"><span class="g-dot">G</span><span>Sign in with Google</span><span></span></button>
+                </form>
+            </form>            <p class="auth-bottom">Don't have an account? <a class="link-green" asp-action="StudentRegister" asp-route-role="Student">Create one free</a></p>
             <p class="auth-bottom">Are you a tutor? <a class="link-green" asp-action="TutorLogin">Log in here</a></p>
         </div>
     </section>

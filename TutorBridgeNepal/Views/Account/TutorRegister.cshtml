@@ -139,8 +139,11 @@
             </form>
 
             <div class="divider">or sign up with</div>
-            <button class="google-btn" type="button"><span class="g-dot">G</span><span>Sign up with Google</span><span></span></button>
-            <p class="auth-bottom">Already have an account? <a class="link-green" asp-action="TutorLogin">Log in</a></p>
+            <form asp-action="GoogleLogin" asp-controller="Account" method="post" style="margin:0;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="role" value="Tutor" />
+                <button class="google-btn" type="submit"><span class="g-dot">G</span><span>Sign up with Google</span><span></span></button>
+            </form>            <p class="auth-bottom">Already have an account? <a class="link-green" asp-action="TutorLogin">Log in</a></p>
             <p class="auth-bottom">Looking to learn instead? <a class="link-green" asp-action="StudentRegister">Register as Student</a></p>
         </div>
     </section>

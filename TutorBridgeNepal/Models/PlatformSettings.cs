@@ -12,7 +12,7 @@ public class PlatformSettings
 {
     public int Id { get; set; }
 
-    // NOT YET ENFORCED. Saved so the value survives, but nothing currently
+    // ENFORCED: TutorController.UploadVerificationDocument auto-sets
     // reads it to skip manual tutor review - every application still goes
     // through the normal Tutor Verification queue regardless of this flag.
     public bool AutoApproveVerifiedTutors { get; set; } = false;
@@ -21,7 +21,7 @@ public class PlatformSettings
     // is missing a PoliceReport credential while this is true.
     public bool RequirePoliceReportForTutors { get; set; } = true;
 
-    // NOT YET ENFORCED. Saved so the value survives, but session booking
+    // ENFORCED: StudentController.BookSlot floors the effective minimum
     // (StudentController) does not currently check this flag - the
     // existing minimum-notice rule is still only the individual tutor's
     // own MinimumBookingNoticeHours setting.

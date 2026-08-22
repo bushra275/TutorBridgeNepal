@@ -55,3 +55,8 @@ packages/
 *.mdf
 *.ldf
 *.ndf
+
+# Application configuration / secrets
+appsettings.json
+appsettings.*.json
+!appsettings.example.json

@@ -80,7 +80,14 @@
         <div class="dash-body">
             <aside class="dash-sidebar">
                 <div class="dash-user">
-                    <div class="avatar">@Model.AdminInitials</div>
+                    @if (!string.IsNullOrEmpty(ViewData["AdminProfilePhotoUrl"] as string))
+                    {
+                        <div class="avatar" style="padding:0; overflow:hidden;"><img src="@(ViewData["AdminProfilePhotoUrl"] as string)" alt="@Model.AdminName" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" /></div>
+                    }
+                    else
+                    {
+                        <div class="avatar">@Model.AdminInitials</div>
+                    }
                     <div>
                         <div class="name">@Model.AdminName</div>
                         <div class="meta">Platform Administrator</div>

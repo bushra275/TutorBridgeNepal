@@ -63,6 +63,46 @@
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            // AJAX-submit every toggle so the page never reloads or scrolls back to
+            // top - each button flips only itself, independent of the others.
+            document.querySelectorAll('form.ajax-toggle-form').forEach(function(form) {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+
+                    var btn = form.querySelector('.toggle-switch');
+                    var valueInput = form.querySelector('.toggle-value-input');
+
+                    var willBeOn = !btn.classList.contains('on');
+                    btn.classList.toggle('on'); // optimistic UI - flips instantly
+
+                    // Keep the hidden boolean input in sync with the button's actual
+                    // new state, since the server only rendered it once on page load -
+                    // without this, a second click in a row would resend the stale value.
+                    if (valueInput) {
+                        valueInput.value = willBeOn;
+                    }
+
+                    fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        credentials: 'same-origin'
+                    }).then(function(res) {
+                        if (!res.ok) {
+                            btn.classList.toggle('on'); // revert if the save actually failed
+                            if (valueInput) {
+                                valueInput.value = !willBeOn;
+                            }
+                        }
+                    }).catch(function() {
+                        btn.classList.toggle('on');
+                        if (valueInput) {
+                            valueInput.value = !willBeOn;
+                        }
+                    });
+                });
+            });
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

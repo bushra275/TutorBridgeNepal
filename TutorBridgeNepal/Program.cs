@@ -2,11 +2,17 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using TutorBridgeNepal.Data;
 using TutorBridgeNepal.Models;
+using TutorBridgeNepal.Services;
+using Microsoft.AspNetCore.Authentication.Google;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.Configure<GoogleOAuthOptions>(builder.Configuration.GetSection("Authentication:Google"));
+builder.Services.AddHttpClient<GoogleCalendarService>();
+builder.Services.AddHttpClient(); // generic IHttpClientFactory, used by the OAuth callback itself
 
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 {
@@ -17,6 +23,14 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 })
 .AddRoles<IdentityRole>()
 .AddEntityFrameworkStores<ApplicationDbContext>();
+
+builder.Services.AddAuthentication()
+    .AddGoogle(GoogleDefaults.AuthenticationScheme, options =>
+    {
+        options.ClientId = builder.Configuration["Authentication:Google:ClientId"]!;
+        options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
+        options.CallbackPath = "/signin-google";
+    });
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -39,6 +53,47 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Per-device session enforcement (Tutor > Settings > Linked devices).
+// If the device behind this request has been revoked, sign it out
+// immediately instead of waiting for the auth cookie to expire.
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        var deviceToken = context.Request.Cookies["tbn_device"];
+        if (!string.IsNullOrEmpty(deviceToken))
+        {
+            var db = context.RequestServices.GetRequiredService<ApplicationDbContext>();
+            var device = await db.UserDevices.FirstOrDefaultAsync(d => d.SessionToken == deviceToken);
+
+            if (device == null || device.IsRevoked)
+            {
+                var signInManager = context.RequestServices.GetRequiredService<SignInManager<ApplicationUser>>();
+                await signInManager.SignOutAsync();
+                context.Response.Cookies.Delete("tbn_device");
+                context.Response.Redirect("/Account/Login");
+                return;
+            }
+
+            // Throttle the write - only bump LastActiveAt once a minute per
+            // device instead of on every single request.
+            if (DateTime.UtcNow - device.LastActiveAt > TimeSpan.FromMinutes(1))
+            {
+                device.LastActiveAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+            }
+        }
+    }
+
+    await next();
+});
+
+// Platform maintenance mode (Admin > Settings > Platform configuration).
+// ...
 
 // Platform maintenance mode (Admin > Settings > Platform configuration).
 // Admins and the Account controller (so an admin can still log in) always

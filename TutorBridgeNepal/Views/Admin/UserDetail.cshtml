@@ -1,0 +1,265 @@
+﻿@model TutorBridgeNepal.ViewModels.AdminUserDetailViewModel
+@{
+    ViewData["Title"] = "User Detail";
+    Layout = null;
+    var returnUrl = ViewData["ReturnUrl"] as string;
+
+    string StatusPillClass(string status) => status switch
+    {
+        "Active" => "pill pill-active",
+        "Pending" => "pill pill-pending2",
+        _ => "pill pill-suspended"
+    };
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Detail - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <div class="dash-search">
+                <input type="text" placeholder="Search users, sessions..." />
+            </div>
+            <span class="admin-chip">Admin</span>
+            <div class="dash-topbar-right">
+                @await Html.PartialAsync("_AdminNotifBell")
+                @await Html.PartialAsync("_AdminProfileDropdown")
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    @if (!string.IsNullOrEmpty(ViewData["AdminProfilePhotoUrl"] as string))
+                    {
+                        <div class="avatar" style="padding:0; overflow:hidden;"><img src="@(ViewData["AdminProfilePhotoUrl"] as string)" alt="@ViewData["AdminName"]" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" /></div>
+                    }
+                    else
+                    {
+                        <div class="avatar">@ViewData["AdminInitials"]</div>
+                    }
+                    <div>
+                        <div class="name">@ViewData["AdminName"]</div>
+                        <div class="meta">Platform Administrator</div>
+                        <span class="role-chip" style="background:#fff1d5;color:#a96808;">Super Admin</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
+                    <li><a asp-controller="Admin" asp-action="UserManagement" class="active"><span class="nav-icon">👥</span> User Management</a></li>
+                    <li><a asp-controller="Admin" asp-action="TutorVerification"><span class="nav-icon">✅</span> Tutor Verification</a></li>
+                    <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
+                    <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
+                    <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
+                    <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
+                    <li><a asp-controller="Admin" asp-action="Settings"><span class="nav-icon">⚙️</span> Settings</a></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <main class="dash-main">
+                <div class="dash-greeting" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                    <div>
+                        <a href="@(string.IsNullOrWhiteSpace(returnUrl) ? Url.Action("UserManagement") : returnUrl)" class="view-all-link">&larr; Back to User Management</a>
+                        <h1 style="margin-top:.5rem;">@Model.FullName</h1>
+                        <p>@Model.IdCode · @Model.Role</p>
+                    </div>
+                </div>
+
+                @if (TempData["SettingsSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                }
+                @if (TempData["SettingsError"] != null)
+                {
+                    <div class="status-banner error mb-3">@TempData["SettingsError"]</div>
+                }
+
+                <div class="panel">
+                    <div class="panel-head" style="display:flex;align-items:center;justify-content:space-between;">
+                        <div style="display:flex;align-items:center;gap:1rem;">
+                            <div class="avatar tv-avatar">@Model.Initials</div>
+                            <div>
+                                <h2 style="margin:0;">@Model.FullName</h2>
+                                <span class="@StatusPillClass(Model.Status)">@Model.Status</span>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:.6rem;">
+                            @if (Model.IsSuspended)
+                            {
+                                <form asp-controller="Admin" asp-action="ReactivateUser" method="post" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="userId" value="@Model.UserId" />
+                                    <input type="hidden" name="returnUrl" value="@Url.Action("UserDetail", new { userId = Model.UserId })" />
+                                    <button type="submit" class="mini-btn green">Reactivate</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form asp-controller="Admin" asp-action="SuspendUser" method="post" style="margin:0;" onsubmit="return confirm('Suspend this account?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="userId" value="@Model.UserId" />
+                                    <input type="hidden" name="returnUrl" value="@Url.Action("UserDetail", new { userId = Model.UserId })" />
+                                    <button type="submit" class="mini-btn">Suspend</button>
+                                </form>
+                            }
+                            @if (Model.Role == "Tutor" && Model.IsVerified == false && Model.VerificationRejected != true)
+                            {
+                                <form asp-controller="Admin" asp-action="ApproveTutor" method="post" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="tutorProfileId" value="@Model.TutorProfileId" />
+                                    <input type="hidden" name="returnUrl" value="@Url.Action("UserDetail", new { userId = Model.UserId })" />
+                                    <button type="submit" class="mini-btn green">Approve</button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="settings-form-grid" style="margin-top:1rem;">
+                        <div class="field">
+                            <label>Email</label>
+                            <div>@Model.Email</div>
+                        </div>
+                        <div class="field">
+                            <label>Phone</label>
+                            <div>@(Model.PhoneNumber ?? "—")</div>
+                        </div>
+                        <div class="field">
+                            <label>District</label>
+                            <div>@(Model.District ?? "—")</div>
+                        </div>
+                        <div class="field">
+                            <label>Joined</label>
+                            <div>@Model.JoinedAt.ToString("d MMM yyyy")</div>
+                        </div>
+
+                        @if (Model.Role == "Tutor")
+                        {
+                            <div class="field">
+                                <label>Subjects</label>
+                                <div>@Model.Subjects</div>
+                            </div>
+                            <div class="field">
+                                <label>Years of experience</label>
+                                <div>@Model.YearsOfExperience</div>
+                            </div>
+                            <div class="field">
+                                <label>Rating</label>
+                                <div>@(Model.ReviewCount > 0 ? $"{Model.AverageRating:0.0} ★ ({Model.ReviewCount} reviews)" : "No reviews yet")</div>
+                            </div>
+                            <div class="field">
+                                <label>Verification decided</label>
+                                <div>@(Model.VerificationDecidedAt?.ToString("d MMM yyyy") ?? "—")</div>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(Model.Bio))
+                            {
+                                <div class="field full">
+                                    <label>Bio</label>
+                                    <div>@Model.Bio</div>
+                                </div>
+                            }
+                            <div class="field full">
+                                <label>Credentials</label>
+                                <div>
+                                    @if (Model.CredentialTitles.Any())
+                                    {
+                                        @string.Join(" · ", Model.CredentialTitles)
+                                    }
+                                    else
+                                    {
+                                        <span>No documents on file</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="field">
+                                <label>Grade level</label>
+                                <div>@(Model.GradeLevel ?? "—")</div>
+                            </div>
+                            <div class="field">
+                                <label>School</label>
+                                <div>@(Model.SchoolName ?? "—")</div>
+                            </div>
+                            <div class="field">
+                                <label>Curriculum board</label>
+                                <div>@(Model.CurriculumBoard ?? "—")</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Total sessions</span></div>
+                        <div class="kpi-value">@Model.TotalSessions</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Completed</span></div>
+                        <div class="kpi-value">@Model.CompletedSessions</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="label">Hours logged</span></div>
+                        <div class="kpi-value">@Model.HoursLearned</div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2>Recent sessions</h2>
+                    </div>
+
+                    @if (!Model.RecentSessions.Any())
+                    {
+                        <p class="empty-row">No sessions yet.</p>
+                    }
+                    else
+                    {
+                        <div class="um-table-wrap">
+                            <table class="um-table">
+                                <thead>
+                                    <tr>
+                                        <th>@(Model.Role == "Tutor" ? "Student" : "Tutor")</th>
+                                        <th>Subject</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var s in Model.RecentSessions)
+                                    {
+                                        <tr>
+                                            <td>@s.OtherPartyName</td>
+                                            <td>@s.Subject</td>
+                                            <td>@s.Date.ToString("d MMM yyyy, h:mm tt")</td>
+                                            <td>@s.Status</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

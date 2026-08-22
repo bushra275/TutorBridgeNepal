@@ -1,12 +1,13 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TutorBridgeNepal.Data;
-using TutorBridgeNepal.Models;
-using TutorBridgeNepal.ViewModels;
 using TutorBridgeNepal.Helpers;
-using Microsoft.AspNetCore.Hosting;
+using TutorBridgeNepal.Models;
+using TutorBridgeNepal.Services;
+using TutorBridgeNepal.ViewModels;
 
 namespace TutorBridgeNepal.Controllers;
 
@@ -17,13 +18,15 @@ public class StudentController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IWebHostEnvironment _webHostEnvironment;
+    private readonly GoogleCalendarService _googleCalendarService;
 
-    public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment)
+    public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment, GoogleCalendarService googleCalendarService)
     {
         _context = context;
         _userManager = userManager;
         _signInManager = signInManager;
         _webHostEnvironment = webHostEnvironment;
+        _googleCalendarService = googleCalendarService;
     }
 
     private static string GetInitials(string fullName)
@@ -39,6 +42,18 @@ public class StudentController : Controller
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return null;
         return await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
+    }
+
+    private async Task<PlatformSettings> GetOrCreatePlatformSettingsAsync()
+    {
+        var settings = await _context.PlatformSettings.FirstOrDefaultAsync();
+        if (settings == null)
+        {
+            settings = new PlatformSettings();
+            _context.PlatformSettings.Add(settings);
+            await _context.SaveChangesAsync();
+        }
+        return settings;
     }
 
     private async Task<ApplicationUser?> SetSidebarContextAsync(string activeNav)
@@ -57,6 +72,7 @@ public class StudentController : Controller
 
         ViewData["SidebarName"] = user.FullName;
         ViewData["SidebarInitials"] = GetInitials(user.FullName);
+        ViewData["SidebarPhotoUrl"] = user.PhotoUrl;
         ViewData["SidebarMeta"] = string.IsNullOrWhiteSpace(subMeta) ? "Student" : subMeta;
         ViewData["ActiveNav"] = activeNav;
         ViewData["UnreadMessageCount"] = unreadCount;
@@ -291,9 +307,10 @@ public class StudentController : Controller
         var districtOptions = allVerified
             .Select(t => t.User.District)
             .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Select(d => d!)
             .Distinct()
             .OrderBy(d => d)
-            .ToList()!;
+            .ToList();
 
         var filtered = baseQuery.AsQueryable();
 
@@ -386,6 +403,12 @@ public class StudentController : Controller
         var completedSessionsCount = await _context.Bookings
             .CountAsync(b => b.TutorProfileId == id && b.Status == "Completed");
 
+        var reviews = await _context.Reviews
+            .Include(r => r.StudentProfile).ThenInclude(s => s.User)
+            .Where(r => r.TutorProfileId == id)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+
         var vm = new TutorProfileDetailViewModel
         {
             TutorProfileId = tutor.Id,
@@ -397,13 +420,23 @@ public class StudentController : Controller
             TeachingStyle = tutor.TeachingStyle,
             YearsOfExperience = tutor.YearsOfExperience,
             AverageRating = tutor.AverageRating,
-            IsVerified = tutor.IsVerified,
+            ReviewCount = tutor.ReviewCount,
             CompletedSessionsCount = completedSessionsCount,
             AvailableSlots = slots.Select(s => new AvailableSlotViewModel
             {
                 SlotId = s.Id,
                 StartTime = s.StartTime,
                 EndTime = s.EndTime
+            }).ToList(),
+            Reviews = reviews.Select(r => new ReviewRowViewModel
+            {
+                StudentName = r.StudentProfile.User.FullName,
+                StudentInitials = GetInitials(r.StudentProfile.User.FullName),
+                Rating = r.Rating,
+                Comment = r.Comment,
+                CreatedAt = r.CreatedAt,
+                TutorReply = r.TutorReply,
+                TutorRepliedAt = r.TutorRepliedAt
             }).ToList()
         };
 
@@ -441,9 +474,19 @@ public class StudentController : Controller
         var tutor = slot.TutorProfile;
 
         // Minimum booking notice - the tutor's own policy from Settings.
-        if (tutor.MinimumBookingNoticeHours > 0 && slot.StartTime < DateTime.Now.AddHours(tutor.MinimumBookingNoticeHours))
+        // Minimum booking notice - the tutor's own policy, floored at 24h
+        // platform-wide unless "Allow same-day booking" is on
+        // (Admin > Settings > Platform configuration).
+        var platformSettings = await GetOrCreatePlatformSettingsAsync();
+        var effectiveMinNoticeHours = platformSettings.AllowSameDayBooking
+            ? tutor.MinimumBookingNoticeHours
+            : Math.Max(tutor.MinimumBookingNoticeHours, 24);
+
+        if (effectiveMinNoticeHours > 0 && slot.StartTime < DateTime.Now.AddHours(effectiveMinNoticeHours))
         {
-            TempData["BookingError"] = $"This tutor requires at least {tutor.MinimumBookingNoticeHours} hours' notice before a session. Please choose a later slot.";
+            TempData["BookingError"] = platformSettings.AllowSameDayBooking
+                ? $"This tutor requires at least {tutor.MinimumBookingNoticeHours} hours' notice before a session. Please choose a later slot."
+                : "Same-day bookings aren't allowed right now. Please choose a slot at least 24 hours from now.";
             return RedirectToAction("TutorProfile", new { id = tutorProfileId });
         }
 
@@ -1367,16 +1410,16 @@ public class StudentController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateNotificationPreference(string key, bool value)
+    public async Task<IActionResult> UpdateNotificationPreference(string key)
     {
         var studentProfile = await GetCurrentStudentProfileAsync();
         if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
 
         switch (key)
         {
-            case "SessionReminders": studentProfile.NotifySessionReminders = value; break;
-            case "NewMessages": studentProfile.NotifyNewMessages = value; break;
-            case "ProgressUpdates": studentProfile.NotifyProgressUpdates = value; break;
+            case "SessionReminders": studentProfile.NotifySessionReminders = !studentProfile.NotifySessionReminders; break;
+            case "NewMessages": studentProfile.NotifyNewMessages = !studentProfile.NotifyNewMessages; break;
+            case "ProgressUpdates": studentProfile.NotifyProgressUpdates = !studentProfile.NotifyProgressUpdates; break;
         }
 
         await _context.SaveChangesAsync();
@@ -1385,12 +1428,12 @@ public class StudentController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdatePrivacy(bool showProfileToTutors)
+    public async Task<IActionResult> UpdatePrivacy()
     {
         var studentProfile = await GetCurrentStudentProfileAsync();
         if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
 
-        studentProfile.ShowProfileToTutors = showProfileToTutors;
+        studentProfile.ShowProfileToTutors = !studentProfile.ShowProfileToTutors;
         await _context.SaveChangesAsync();
         return RedirectToAction("Settings");
     }

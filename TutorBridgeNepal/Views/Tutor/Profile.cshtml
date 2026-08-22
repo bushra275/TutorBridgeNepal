@@ -140,8 +140,7 @@
                         <p>This is how students see you on TutorBridge Nepal</p>
                     </div>
                     <div style="display:flex; gap:.6rem;">
-                        <span class="disabled-btn" title="Preview isn't built yet">Preview as student</span>
-                        <button type="submit" form="profileForm" class="tb-btn" style="min-height:38px; padding:0 1.2rem;">Save changes</button>
+                        <a asp-controller="Tutor" asp-action="PreviewProfile" class="tb-btn-outline">Preview as student</a>                        <button type="submit" form="profileForm" class="tb-btn" style="min-height:38px; padding:0 1.2rem;">Save changes</button>
                     </div>
                 </div>
 
@@ -165,8 +164,26 @@
                 <!-- Identity card -->
                 <div class="panel mp-identity-panel">
                     <div class="mp-identity-left">
-                        <div class="avatar-circle-lg mp-avatar-xl">@Model.Initials</div>
-                        <button type="button" class="tb-btn-outline" disabled title="Photo upload isn't built yet">Change photo</button>
+                        @if (!string.IsNullOrEmpty(Model.PhotoUrl))
+                        {
+                            <img src="@Model.PhotoUrl" alt="Profile photo" class="avatar-circle-lg mp-avatar-xl" style="object-fit:cover;" />
+                        }
+                        else
+                        {
+                            <div class="avatar-circle-lg mp-avatar-xl">@Model.Initials</div>
+                        }
+                        <button type="button" class="tb-btn-outline" id="tutorPhotoUploadToggle">Change photo</button>
+                        <form asp-controller="Tutor" asp-action="UploadTutorPhoto" method="post" enctype="multipart/form-data" style="display:none;" id="tutorPhotoUploadForm">
+                            @Html.AntiForgeryToken()
+                            <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp" required onchange="this.form.requestSubmit()" />
+                        </form>
+                        @if (!string.IsNullOrEmpty(Model.PhotoUrl))
+                        {
+                            <form asp-controller="Tutor" asp-action="RemoveTutorPhoto" method="post" onsubmit="return confirm('Remove your profile photo?');" style="margin-top:.5rem;">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="tb-btn-danger-outline">Remove</button>
+                            </form>
+                        }
                     </div>
 
                     <div class="mp-identity-mid">
@@ -386,6 +403,14 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+            var tutorPhotoToggle = document.getElementById('tutorPhotoUploadToggle');
+            var tutorPhotoForm = document.getElementById('tutorPhotoUploadForm');
+            if (tutorPhotoToggle && tutorPhotoForm) {
+                tutorPhotoToggle.addEventListener('click', function() {
+                    tutorPhotoForm.querySelector('input[type="file"]').click();
+                });
+            }
+
             // Reusable comma-separated tag chip editor (same pattern as Student Settings' subject tags).
             // onChange (optional) fires after every add/remove - used to auto-submit the
             // Teaching style form, since that panel has no visible Save button of its own.

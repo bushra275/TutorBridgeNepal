@@ -1,12 +1,29 @@
 ﻿@{
     var name = ViewData["AdminProfileName"] as string ?? "Administrator";
     var initials = ViewData["AdminProfileInitials"] as string ?? "?";
+    var photoUrl = ViewData["AdminProfilePhotoUrl"] as string;
 }
 <div class="topbar-dropdown-wrap">
-    <button type="button" class="topbar-avatar" id="adminProfileAvatarBtn" title="@name">@initials</button>
+    <button type="button" class="topbar-avatar" id="adminProfileAvatarBtn" title="@name" style="@(string.IsNullOrEmpty(photoUrl) ? "" : "padding:0; overflow:hidden;")">
+        @if (!string.IsNullOrEmpty(photoUrl))
+        {
+            <img src="@photoUrl" alt="@name" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />
+        }
+        else
+        {
+            @initials
+        }
+    </button>
     <div class="topbar-dropdown profile-dropdown" id="adminProfileDropdown">
         <div class="profile-dropdown-head">
-            <div class="avatar-circle-lg" style="width:42px;height:42px;font-size:.95rem;">@initials</div>
+            @if (!string.IsNullOrEmpty(photoUrl))
+            {
+                <div class="avatar-circle-lg" style="width:42px;height:42px;padding:0;overflow:hidden;"><img src="@photoUrl" alt="@name" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" /></div>
+            }
+            else
+            {
+                <div class="avatar-circle-lg" style="width:42px;height:42px;font-size:.95rem;">@initials</div>
+            }
             <div>
                 <div class="profile-dropdown-name">@name</div>
                 <div class="profile-dropdown-meta">Platform Administrator</div>
@@ -19,24 +36,24 @@
 </div>
 
 <script>
-    (function () {
+    (function() {
         function wireDropdown(btnId, dropdownId) {
             var btn = document.getElementById(btnId);
             var dropdown = document.getElementById(dropdownId);
             if (!btn || !dropdown) return;
 
-            btn.addEventListener('click', function (e) {
+            btn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 var isOpen = dropdown.classList.contains('open');
-                document.querySelectorAll('.topbar-dropdown.open').forEach(function (d) { d.classList.remove('open'); });
+                document.querySelectorAll('.topbar-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
                 if (!isOpen) dropdown.classList.add('open');
             });
         }
 
         wireDropdown('adminProfileAvatarBtn', 'adminProfileDropdown');
 
-        document.addEventListener('click', function () {
-            document.querySelectorAll('.topbar-dropdown.open').forEach(function (d) { d.classList.remove('open'); });
+        document.addEventListener('click', function() {
+            document.querySelectorAll('.topbar-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
         });
     })();
 </script>

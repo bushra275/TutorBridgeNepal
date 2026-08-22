@@ -16,10 +16,10 @@
             <div class="settings-toggle-title">New session requests</div>
             <div class="settings-toggle-sub">Get notified when a student requests a session</div>
         </div>
-        <form asp-controller="Tutor" asp-action="UpdateNotificationPreference" method="post" class="toggle-form">
+        <form asp-controller="Tutor" asp-action="UpdateNotificationPreference" method="post" class="toggle-form ajax-toggle-form">
             @Html.AntiForgeryToken()
             <input type="hidden" name="key" value="NewSessionRequests" />
-            <input type="hidden" name="value" value="@(!Model.NotifyNewSessionRequests)" />
+            <input type="hidden" name="value" value="@(!Model.NotifyNewSessionRequests)" class="toggle-value-input" />
             <button type="submit" class="toggle-switch @(Model.NotifyNewSessionRequests ? "on" : "")" aria-label="Toggle new session request alerts"><span class="toggle-knob"></span></button>
         </form>
     </div>
@@ -29,24 +29,11 @@
             <div class="settings-toggle-title">New student messages</div>
             <div class="settings-toggle-sub">Email and push alerts when a student messages you</div>
         </div>
-        <form asp-controller="Tutor" asp-action="UpdateNotificationPreference" method="post" class="toggle-form">
+        <form asp-controller="Tutor" asp-action="UpdateNotificationPreference" method="post" class="toggle-form ajax-toggle-form">
             @Html.AntiForgeryToken()
             <input type="hidden" name="key" value="NewMessages" />
-            <input type="hidden" name="value" value="@(!Model.NotifyNewMessages)" />
+            <input type="hidden" name="value" value="@(!Model.NotifyNewMessages)" class="toggle-value-input" />
             <button type="submit" class="toggle-switch @(Model.NotifyNewMessages ? "on" : "")" aria-label="Toggle new message alerts"><span class="toggle-knob"></span></button>
         </form>
-    </div>
-
-    <div class="settings-toggle-row">
-        <div>
-            <div class="settings-toggle-title">Weekly earnings summary</div>
-            <div class="settings-toggle-sub">A weekly email of your sessions and earnings</div>
-        </div>
-        <form asp-controller="Tutor" asp-action="UpdateNotificationPreference" method="post" class="toggle-form">
-            @Html.AntiForgeryToken()
-            <input type="hidden" name="key" value="WeeklyEarningsSummary" />
-            <input type="hidden" name="value" value="@(!Model.NotifyWeeklyEarningsSummary)" />
-            <button type="submit" class="toggle-switch @(Model.NotifyWeeklyEarningsSummary ? "on" : "")" aria-label="Toggle weekly earnings summary"><span class="toggle-knob"></span></button>
-        </form>
-    </div>
+    </div>  
 </div>

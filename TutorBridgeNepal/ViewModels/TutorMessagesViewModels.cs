@@ -15,6 +15,8 @@ public class TutorMessagesPageViewModel
     public bool ActiveStudentIsActive { get; set; }
     public bool ActiveStudentIsNew { get; set; }
     public List<TutorMessageBubbleViewModel> Messages { get; set; } = new();
+    public List<ScheduleSlotOptionViewModel> AvailableSlotsForSchedule { get; set; } = new();
+
 }
 
 public class TutorConversationListItemViewModel
@@ -38,4 +40,12 @@ public class TutorMessageBubbleViewModel
     public string Content { get; set; } = string.Empty;
     public DateTime SentAt { get; set; }
     public bool IsRead { get; set; }
+}
+
+public class ScheduleSlotOptionViewModel
+{
+    public int SlotId { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public string Mode { get; set; } = string.Empty;
 }

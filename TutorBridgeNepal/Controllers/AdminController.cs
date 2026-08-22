@@ -40,6 +40,105 @@ public class AdminController : Controller
         return settings;
     }
 
+    // Hard-deletes a user account and everything that references it. Mirrors
+    // StudentController.DeleteAccount's transaction pattern (that page only
+    // has to handle the student side); this handles both roles, since an
+    // admin can delete either kind of account from User Management.
+    private async Task DeleteUserAccountAsync(ApplicationUser user, string role)
+    {
+        using var transaction = await _context.Database.BeginTransactionAsync();
+
+        if (role == "Student")
+        {
+            var student = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
+            if (student != null)
+            {
+                var activeSlotIds = await _context.Bookings
+                    .Where(b => b.StudentProfileId == student.Id
+                        && b.Status != "Cancelled" && b.Status != "Completed" && b.Status != "Missed")
+                    .Select(b => b.TutorAvailabilitySlotId)
+                    .Distinct()
+                    .ToListAsync();
+
+                if (activeSlotIds.Any())
+                {
+                    var slots = await _context.TutorAvailabilitySlots.Where(s => activeSlotIds.Contains(s.Id)).ToListAsync();
+                    foreach (var slot in slots)
+                    {
+                        var remainingActive = await _context.Bookings.CountAsync(b =>
+                            b.TutorAvailabilitySlotId == slot.Id
+                            && b.StudentProfileId != student.Id
+                            && b.Status != "Cancelled");
+                        slot.IsBooked = remainingActive >= slot.Capacity;
+                    }
+                }
+
+                _context.Reviews.RemoveRange(_context.Reviews.Where(r => r.StudentProfileId == student.Id));
+                _context.Messages.RemoveRange(_context.Messages.Where(m => m.StudentProfileId == student.Id));
+                _context.SavedTutors.RemoveRange(_context.SavedTutors.Where(s => s.StudentProfileId == student.Id));
+                _context.Bookings.RemoveRange(_context.Bookings.Where(b => b.StudentProfileId == student.Id));
+                // Goals, StudentAchievements, SupportTickets (student side) all
+                // cascade automatically once StudentProfile is removed below.
+                _context.StudentProfiles.Remove(student);
+            }
+        }
+        else if (role == "Tutor")
+        {
+            var tutor = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.UserId == user.Id);
+            if (tutor != null)
+            {
+                var activeSlotIds = await _context.Bookings
+                    .Where(b => b.TutorProfileId == tutor.Id
+                        && b.Status != "Cancelled" && b.Status != "Completed" && b.Status != "Missed")
+                    .Select(b => b.TutorAvailabilitySlotId)
+                    .Distinct()
+                    .ToListAsync();
+
+                if (activeSlotIds.Any())
+                {
+                    var slots = await _context.TutorAvailabilitySlots.Where(s => activeSlotIds.Contains(s.Id)).ToListAsync();
+                    foreach (var slot in slots)
+                    {
+                        var remainingActive = await _context.Bookings.CountAsync(b =>
+                            b.TutorAvailabilitySlotId == slot.Id
+                            && b.TutorProfileId != tutor.Id
+                            && b.Status != "Cancelled");
+                        slot.IsBooked = remainingActive >= slot.Capacity;
+                    }
+                }
+
+                // Order matters: Review -> Booking -> TutorAvailabilitySlot, since
+                // Review restricts on Booking, and Booking restricts on Slot.
+                _context.Reviews.RemoveRange(_context.Reviews.Where(r => r.TutorProfileId == tutor.Id));
+                _context.Messages.RemoveRange(_context.Messages.Where(m => m.TutorProfileId == tutor.Id));
+                _context.SavedTutors.RemoveRange(_context.SavedTutors.Where(s => s.TutorProfileId == tutor.Id));
+                _context.SupportTickets.RemoveRange(_context.SupportTickets.Where(t => t.TutorProfileId == tutor.Id));
+                _context.Bookings.RemoveRange(_context.Bookings.Where(b => b.TutorProfileId == tutor.Id));
+                _context.TutorAvailabilitySlots.RemoveRange(_context.TutorAvailabilitySlots.Where(s => s.TutorProfileId == tutor.Id));
+                _context.TutorCredentials.RemoveRange(_context.TutorCredentials.Where(c => c.TutorProfileId == tutor.Id));
+                _context.TutorSubjects.RemoveRange(_context.TutorSubjects.Where(s => s.TutorProfileId == tutor.Id));
+                // TutorWeeklyAvailabilityRules, TutorTimeOffs, TutorCalendarConnections
+                // all cascade automatically once TutorProfile is removed below.
+                _context.TutorProfiles.Remove(tutor);
+
+                // Verification documents live outside wwwroot in App_Data, keyed
+                // by tutor profile id - the whole folder goes with the account.
+                var docsFolder = Path.Combine(_webHostEnvironment.ContentRootPath, "App_Data", "tutor-documents", tutor.Id.ToString());
+                if (Directory.Exists(docsFolder))
+                {
+                    try { Directory.Delete(docsFolder, recursive: true); } catch { /* non-fatal cleanup */ }
+                }
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        FileUploadHelper.TryDelete(user.PhotoUrl, _webHostEnvironment.WebRootPath);
+        // UserDevices cascade-delete automatically via the FK to AspNetUsers.
+        await _userManager.DeleteAsync(user);
+    }
+
     // Populates ViewData with the unread-notification bell preview
     // (icon/title/subtitle for the latest few unread notifications, plus
     // the total unread count) so the shared admin layout can render the
@@ -50,6 +149,7 @@ public class AdminController : Controller
         var admin = await _userManager.GetUserAsync(User);
         ViewData["AdminProfileName"] = admin?.FullName ?? "Administrator";
         ViewData["AdminProfileInitials"] = GetInitials(admin?.FullName ?? "Administrator");
+        ViewData["AdminProfilePhotoUrl"] = admin?.PhotoUrl;
 
         var unreadCount = await _context.Notifications.CountAsync(n => !n.IsRead);
         var preview = await _context.Notifications
@@ -942,6 +1042,94 @@ public class AdminController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddUser(RegisterViewModel model, string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(model.FullName) || string.IsNullOrWhiteSpace(model.Email) || string.IsNullOrWhiteSpace(model.Password))
+        {
+            TempData["SettingsError"] = "Full name, email and password are required.";
+            return Redirect(returnUrl ?? Url.Action("UserManagement")!);
+        }
+
+        if (model.Password != model.ConfirmPassword)
+        {
+            TempData["SettingsError"] = "Password and confirmation do not match.";
+            return Redirect(returnUrl ?? Url.Action("UserManagement")!);
+        }
+
+        if (model.Role is not ("Student" or "Tutor"))
+        {
+            TempData["SettingsError"] = "Choose a role for the new user.";
+            return Redirect(returnUrl ?? Url.Action("UserManagement")!);
+        }
+
+        var existing = await _userManager.FindByEmailAsync(model.Email);
+        if (existing != null)
+        {
+            TempData["SettingsError"] = "A user with that email already exists.";
+            return Redirect(returnUrl ?? Url.Action("UserManagement")!);
+        }
+
+        var user = new ApplicationUser
+        {
+            UserName = model.Email.Trim(),
+            Email = model.Email.Trim(),
+            FullName = model.FullName.Trim(),
+            PhoneNumber = string.IsNullOrWhiteSpace(model.PhoneNumber) ? null : model.PhoneNumber.Trim(),
+            District = string.IsNullOrWhiteSpace(model.District) ? null : model.District.Trim(),
+            // Admin-created directly - there's no confirmation-email pipeline to
+            // send one through, so there's nothing to "confirm" here.
+            EmailConfirmed = true
+        };
+
+        var result = await _userManager.CreateAsync(user, model.Password);
+        if (!result.Succeeded)
+        {
+            TempData["SettingsError"] = string.Join(" ", result.Errors.Select(e => e.Description));
+            return Redirect(returnUrl ?? Url.Action("UserManagement")!);
+        }
+
+        await _userManager.AddToRoleAsync(user, model.Role);
+
+        if (model.Role == "Tutor")
+        {
+            _context.TutorProfiles.Add(new TutorProfile
+            {
+                UserId = user.Id,
+                Subjects = model.Subjects ?? "",
+                YearsOfExperience = model.YearsOfExperience,
+                // The admin is vouching for this account directly, so it skips
+                // the normal verification queue rather than sitting there
+                // "pending" with no submitted documents behind it.
+                IsVerified = true
+            });
+        }
+        else
+        {
+            _context.StudentProfiles.Add(new StudentProfile
+            {
+                UserId = user.Id,
+                GradeLevel = model.GradeLevel
+            });
+        }
+
+        await _context.SaveChangesAsync();
+
+        NotificationHelper.Create(_context,
+            type: "System",
+            title: model.Role == "Tutor" ? "Tutor added by admin" : "Student added by admin",
+            message: $"{user.FullName} was added directly by an administrator.",
+            icon: model.Role == "Tutor" ? "🧑‍🏫" : "🧑‍🎓",
+            actionLabel: "View profile",
+            actionUrl: Url.Action("UserManagement", new { search = user.Email }));
+
+        await _context.SaveChangesAsync();
+
+        TempData["SettingsSuccess"] = $"{user.FullName} was added as a {model.Role.ToLower()}.";
+        return Redirect(returnUrl ?? Url.Action("UserManagement")!);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> SuspendUser(string userId, string? returnUrl)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -972,14 +1160,37 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> BulkUserAction(List<string> selectedUserIds, string bulkAction, string? returnUrl)
     {
-        if (selectedUserIds != null && selectedUserIds.Count > 0 && (bulkAction == "activate" || bulkAction == "suspend"))
+        if (selectedUserIds != null && selectedUserIds.Count > 0)
         {
-            var users = await _context.Users.Where(u => selectedUserIds.Contains(u.Id)).ToListAsync();
-            foreach (var user in users)
+            if (bulkAction == "activate" || bulkAction == "suspend")
             {
-                user.IsSuspended = bulkAction == "suspend";
+                var users = await _context.Users.Where(u => selectedUserIds.Contains(u.Id)).ToListAsync();
+                foreach (var user in users)
+                {
+                    user.IsSuspended = bulkAction == "suspend";
+                }
+                await _context.SaveChangesAsync();
             }
-            await _context.SaveChangesAsync();
+            else if (bulkAction == "delete")
+            {
+                // Never let an admin delete their own account through this
+                // path - Settings > Danger zone is the deliberate place for that.
+                var currentAdminId = _userManager.GetUserId(User);
+                var idsToDelete = selectedUserIds.Where(id => id != currentAdminId).ToList();
+
+                var users = await _context.Users.Where(u => idsToDelete.Contains(u.Id)).ToListAsync();
+                foreach (var user in users)
+                {
+                    var roles = await _userManager.GetRolesAsync(user);
+                    var role = roles.Contains("Tutor") ? "Tutor" : roles.Contains("Student") ? "Student" : null;
+                    if (role != null)
+                    {
+                        await DeleteUserAccountAsync(user, role);
+                    }
+                }
+
+                TempData["SettingsSuccess"] = $"{users.Count} user{(users.Count == 1 ? "" : "s")} deleted.";
+            }
         }
 
         return LocalRedirect(string.IsNullOrWhiteSpace(returnUrl) ? Url.Action("UserManagement")! : returnUrl);
@@ -1142,6 +1353,113 @@ public class AdminController : Controller
         }
 
         return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("TutorVerification") : LocalRedirect(returnUrl);
+    }
+
+    public async Task<IActionResult> UserDetail(string userId, string? returnUrl)
+    {
+        await SetAdminNotificationBellAsync();
+        var admin = await _userManager.GetUserAsync(User);
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null) return NotFound();
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var role = roles.Contains("Tutor") ? "Tutor" : roles.Contains("Student") ? "Student" : (roles.FirstOrDefault() ?? "Unknown");
+
+        var vm = new AdminUserDetailViewModel
+        {
+            UserId = user.Id,
+            FullName = user.FullName,
+            Initials = GetInitials(user.FullName),
+            Email = user.Email ?? "",
+            PhoneNumber = user.PhoneNumber,
+            District = user.District,
+            Role = role,
+            JoinedAt = user.CreatedAt,
+            IsSuspended = user.IsSuspended
+        };
+
+        if (role == "Tutor")
+        {
+            var tutor = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.UserId == userId);
+            if (tutor == null) return NotFound();
+
+            var credentials = await _context.TutorCredentials
+                .Where(c => c.TutorProfileId == tutor.Id)
+                .OrderBy(c => c.SortOrder)
+                .Select(c => c.Title)
+                .ToListAsync();
+
+            var bookings = await _context.Bookings
+                .Include(b => b.TutorAvailabilitySlot)
+                .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+                .Where(b => b.TutorProfileId == tutor.Id)
+                .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+                .ToListAsync();
+
+            var nonCancelled = bookings.Where(b => b.Status != "Cancelled").ToList();
+            var completed = nonCancelled.Where(b => b.Status == "Completed").ToList();
+
+            vm.TutorProfileId = tutor.Id;
+            vm.IdCode = $"TUT-{tutor.Id:D4}";
+            vm.Subjects = tutor.Subjects;
+            vm.YearsOfExperience = tutor.YearsOfExperience;
+            vm.AverageRating = tutor.AverageRating;
+            vm.ReviewCount = tutor.ReviewCount;
+            vm.Bio = tutor.Bio;
+            vm.IsVerified = tutor.IsVerified;
+            vm.VerificationRejected = tutor.VerificationRejected;
+            vm.VerificationDecidedAt = tutor.VerificationDecidedAt;
+            vm.CredentialTitles = credentials;
+            vm.Status = user.IsSuspended ? "Suspended" : (tutor.VerificationRejected ? "Rejected" : (!tutor.IsVerified ? "Pending" : "Active"));
+            vm.TotalSessions = nonCancelled.Count;
+            vm.CompletedSessions = completed.Count;
+            vm.HoursLearned = Math.Round(completed.Sum(b => (b.TutorAvailabilitySlot.EndTime - b.TutorAvailabilitySlot.StartTime).TotalHours), 1);
+            vm.RecentSessions = nonCancelled.Take(15).Select(b => new AdminUserSessionRow
+            {
+                OtherPartyName = b.StudentProfile.User.FullName,
+                Subject = b.Subject,
+                Date = b.TutorAvailabilitySlot.StartTime,
+                Status = b.Status
+            }).ToList();
+        }
+        else
+        {
+            var student = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == userId);
+            if (student == null) return NotFound();
+
+            var bookings = await _context.Bookings
+                .Include(b => b.TutorAvailabilitySlot)
+                .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+                .Where(b => b.StudentProfileId == student.Id)
+                .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+                .ToListAsync();
+
+            var nonCancelled = bookings.Where(b => b.Status != "Cancelled").ToList();
+            var completed = nonCancelled.Where(b => b.Status == "Completed").ToList();
+
+            vm.StudentProfileId = student.Id;
+            vm.IdCode = $"STU-{student.Id:D4}";
+            vm.GradeLevel = student.GradeLevel;
+            vm.SchoolName = student.SchoolName;
+            vm.CurriculumBoard = student.CurriculumBoard;
+            vm.Status = user.IsSuspended ? "Suspended" : "Active";
+            vm.TotalSessions = nonCancelled.Count;
+            vm.CompletedSessions = completed.Count;
+            vm.HoursLearned = Math.Round(completed.Sum(b => (b.TutorAvailabilitySlot.EndTime - b.TutorAvailabilitySlot.StartTime).TotalHours), 1);
+            vm.RecentSessions = nonCancelled.Take(15).Select(b => new AdminUserSessionRow
+            {
+                OtherPartyName = b.TutorProfile.User.FullName,
+                Subject = b.Subject,
+                Date = b.TutorAvailabilitySlot.StartTime,
+                Status = b.Status
+            }).ToList();
+        }
+
+        ViewData["AdminName"] = admin?.FullName ?? "Administrator";
+        ViewData["AdminInitials"] = GetInitials(admin?.FullName ?? "Administrator");
+        ViewData["ReturnUrl"] = returnUrl;
+        return View(vm);
     }
 
     // ── Session Logs ──────────────────────────────────────────────────────
