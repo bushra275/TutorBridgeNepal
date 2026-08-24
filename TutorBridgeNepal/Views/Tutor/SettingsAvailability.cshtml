@@ -12,14 +12,14 @@
 
     <div class="settings-toggle-row">
         <div>
-            <div class="settings-toggle-title">Show "Available now" badge</div>
-            <div class="settings-toggle-sub">Let students know you can accept instant bookings</div>
+            <div class="settings-toggle-title">Show availability badge</div>
+            <div class="settings-toggle-sub">Displays a live status pill in your topbar - click it there anytime to toggle between "Available now" and "Not available"</div>
         </div>
-        <form asp-controller="Tutor" asp-action="UpdateAvailabilityPreference" method="post" class="toggle-form ajax-toggle-form">
+        <form asp-controller="Tutor" asp-action="UpdateAvailabilityPreference" method="post" class="toggle-form">
             @Html.AntiForgeryToken()
             <input type="hidden" name="key" value="ShowAvailabilityBadge" />
-            <input type="hidden" name="value" value="@(!Model.ShowAvailabilityBadge)" class="toggle-value-input" />
-            <button type="submit" class="toggle-switch @(Model.ShowAvailabilityBadge ? "on" : "")" aria-label="Toggle available now badge"><span class="toggle-knob"></span></button>
+            <input type="hidden" name="value" value="@((!Model.ShowAvailabilityBadge).ToString())" />
+            <button type="submit" class="toggle-switch @(Model.ShowAvailabilityBadge ? "on" : "")" aria-label="Toggle availability badge"><span class="toggle-knob"></span></button>
         </form>
     </div>
 
@@ -31,8 +31,7 @@
         <form asp-controller="Tutor" asp-action="UpdateAvailabilityPreference" method="post" class="toggle-form ajax-toggle-form">
             @Html.AntiForgeryToken()
             <input type="hidden" name="key" value="AutoAcceptReturningStudents" />
-            <input type="hidden" name="value" value="@(!Model.AutoAcceptReturningStudents)" class="toggle-value-input" />
-            <button type="submit" class="toggle-switch @(Model.AutoAcceptReturningStudents ? "on" : "")" aria-label="Toggle auto-accept returning students"><span class="toggle-knob"></span></button>
+            <input type="hidden" name="value" value="@((!Model.AutoAcceptReturningStudents).ToString())" class="toggle-value-input" />            <button type="submit" class="toggle-switch @(Model.AutoAcceptReturningStudents ? "on" : "")" aria-label="Toggle auto-accept returning students"><span class="toggle-knob"></span></button>
         </form>
     </div>
 </div>

@@ -109,7 +109,7 @@
                                 @Html.AntiForgeryToken()
                                 <div class="field">
                                     <label>Category</label>
-                                    <select name="category" class="tb-select">
+                                    <select name="category" class="tb-select" id="supportCategorySelect">
                                         <option>Booking</option>
                                         <option>Messaging</option>
                                         <option>Account</option>
@@ -119,6 +119,23 @@
                                 <div class="field">
                                     <label>Subject</label>
                                     <input type="text" name="subject" class="tb-input" required maxlength="150" />
+                                </div>
+                                <div class="field full" id="bookingLinkField" style="display:none;">
+                                    <label>Which session is this about?</label>
+                                    @if (Model.RecentBookings.Any())
+                                    {
+                                        <select name="bookingId" class="tb-select">
+                                            <option value="">— Not tied to a specific session —</option>
+                                            @foreach (var b in Model.RecentBookings)
+                                            {
+                                                <option value="@b.BookingId">@b.Label</option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <p class="tutor-meta" style="margin:0;">You don't have any sessions yet to link this to.</p>
+                                    }
                                 </div>
                                 <div class="field full">
                                     <label>Message</label>
@@ -171,6 +188,19 @@
                     if (!wasOpen) item.classList.add('open');
                 });
             });
+    </script>
+    <script>
+            var categorySelect = document.getElementById('supportCategorySelect');
+            var bookingField = document.getElementById('bookingLinkField');
+
+            function toggleBookingField() {
+                bookingField.style.display = categorySelect.value === 'Booking' ? '' : 'none';
+            }
+
+            if (categorySelect && bookingField) {
+                categorySelect.addEventListener('change', toggleBookingField);
+                toggleBookingField(); // set correct state on page load too
+            }
     </script>
 </body>
 </html>

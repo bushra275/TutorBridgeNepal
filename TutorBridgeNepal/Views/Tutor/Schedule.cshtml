@@ -189,16 +189,16 @@
                             @foreach (var d in Model.WeeklyAvailability)
                             {
                                 <input type="hidden" name="dayOfWeek" value="@d.DayOfWeek" />
-                                <div class="weekly-avail-row">
-                                    <strong>@d.DayLabel</strong>
-                                    <div style="display:flex; gap:.5rem; align-items:center;">
-                                        <input type="time" name="startTime" value="@(d.StartTime.HasValue ? d.StartTime.Value.ToString(@"hh\:mm") : "09:00")" class="tb-input" style="min-height:38px; padding:.3rem .6rem; width:120px;" />
-                                        <span>–</span>
-                                        <input type="time" name="endTime" value="@(d.EndTime.HasValue ? d.EndTime.Value.ToString(@"hh\:mm") : "17:00")" class="tb-input" style="min-height:38px; padding:.3rem .6rem; width:120px;" />
+                                <div class="weekly-avail-row @(d.IsDayOff ? "is-dayoff" : "")" id="availRow_@d.DayOfWeek">
+                                    <span class="day-badge">@d.DayLabel</span>
+                                    <div class="time-range">
+                                        <input type="time" name="startTime" value="@(d.StartTime.HasValue ? d.StartTime.Value.ToString(@"hh\:mm") : "09:00")" class="tb-input time-input" />
+                                        <span class="time-sep">–</span>
+                                        <input type="time" name="endTime" value="@(d.EndTime.HasValue ? d.EndTime.Value.ToString(@"hh\:mm") : "17:00")" class="tb-input time-input" />
                                     </div>
-                                    <label style="display:flex; align-items:center; gap:.4rem; font-size:.8rem;">
-                                        <input type="checkbox" name="__dayoff_@d.DayOfWeek" onchange="document.getElementById('isDayOff_@d.DayOfWeek').value = this.checked ? 'true' : 'false';" checked="@d.IsDayOff" />
-                                        Day off
+                                    <label class="dayoff-toggle">
+                                        <input type="checkbox" name="__dayoff_@d.DayOfWeek" onchange="document.getElementById('isDayOff_@d.DayOfWeek').value = this.checked ? 'true' : 'false'; document.getElementById('availRow_@d.DayOfWeek').classList.toggle('is-dayoff', this.checked);" checked="@d.IsDayOff" />
+                                        <span>Day off</span>
                                     </label>
                                     <input type="hidden" name="isDayOff" id="isDayOff_@d.DayOfWeek" value="@(d.IsDayOff ? "true" : "false")" />
                                 </div>
@@ -288,7 +288,7 @@
                                         <span style="color:var(--muted);"> · @t.Reason</span>
                                     }
                                 </div>
-                                <form asp-controller="Tutor" asp-action="RemoveTimeOff" method="post" style="margin:0;" onsubmit="return confirm('Remove this blocked period?');">
+                                <form asp-controller="Tutor" asp-action="RemoveTimeOff" method="post" style="margin:0;" data-tb-confirm="Remove this blocked period?">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@t.Id" />
                                     <button type="submit" class="mini-btn danger">Remove</button>

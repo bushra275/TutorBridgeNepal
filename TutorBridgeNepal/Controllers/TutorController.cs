@@ -133,6 +133,7 @@ public class TutorController : Controller
         ViewData["PendingRequestCount"] = pendingCount;
         ViewData["UnreadMessageCount"] = unreadMessageCount;
         ViewData["ShowAvailabilityBadge"] = tutor.ShowAvailabilityBadge;
+        ViewData["IsAvailableNow"] = tutor.IsAvailableNow;
     }
 
     // ── VerificationPending ───────────────────────────────────────────────
@@ -2276,16 +2277,40 @@ public class TutorController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateAvailabilityPreference(string key, bool value)
     {
+        // AJAX callers (the ajax-toggle-form JS in _SettingsLayout) mark
+        // themselves with this header so we can hand back a real JSON
+        // success/failure signal instead of a redirect. Without this, fetch()
+        // silently follows a 302 (e.g. to the login page if the session
+        // expired) and sees a 200 OK from the redirect target, so a failed
+        // save looks identical to a successful one until the next real page
+        // load reveals the value never actually changed.
+        bool isAjax = Request.Headers["X-Requested-With"] == "fetch";
+
         var tutor = await GetCurrentTutorProfileAsync();
-        if (tutor == null) return RedirectToAction("Index", "Home");
+        if (tutor == null)
+        {
+            if (isAjax) return Json(new { success = false, reason = "not-authenticated" });
+            return RedirectToAction("Index", "Home");
+        }
 
         switch (key)
         {
-            case "ShowAvailabilityBadge": tutor.ShowAvailabilityBadge = value; break;
+            case "ShowAvailabilityBadge":
+                tutor.ShowAvailabilityBadge = value;
+                // Turning the badge on/off from Settings also sets the live
+                // status to match, so the tutor doesn't have to separately click
+                // the topbar pill after enabling it here.
+                tutor.IsAvailableNow = value;
+                break;
             case "AutoAcceptReturningStudents": tutor.AutoAcceptReturningStudents = value; break;
+            default:
+                if (isAjax) return Json(new { success = false, reason = "unknown-key" });
+                break;
         }
 
         await _context.SaveChangesAsync();
+
+        if (isAjax) return Json(new { success = true, key, value });
         return RedirectToAction("SettingsAvailability");
     }
 
@@ -2367,6 +2392,14 @@ public class TutorController : Controller
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
 
+        var recentBookings = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.TutorProfileId == tutor.Id)
+            .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+            .Take(30)
+            .ToListAsync();
+
         var vm = new HelpSupportPageViewModel
         {
             MyTickets = tickets.Select(t => new SupportTicketRowViewModel
@@ -2377,6 +2410,11 @@ public class TutorController : Controller
                 Message = t.Message,
                 Status = t.Status,
                 CreatedAt = t.CreatedAt
+            }).ToList(),
+            RecentBookings = recentBookings.Select(b => new BookingOptionViewModel
+            {
+                BookingId = b.Id,
+                Label = $"{b.Subject} with {b.StudentProfile.User.FullName} · {b.TutorAvailabilitySlot.StartTime:d MMM yyyy} ({b.Status})"
             }).ToList()
         };
 
@@ -2396,7 +2434,7 @@ public class TutorController : Controller
             return RedirectToAction("HelpSupport");
         }
 
-        var validCategories = new[] { "Booking", "Schedule", "Payments", "Account", "Other" };
+        var validCategories = new[] { "Booking", "Schedule", "Account", "Other" };
         var resolvedCategory = validCategories.Contains(category) ? category : "Other";
 
         // Only accept the booking link if it's a real "Booking" complaint

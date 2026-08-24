@@ -99,15 +99,23 @@
                     <li>
                         <a asp-controller="Admin" asp-action="TutorVerification">
                             <span class="nav-icon">✅</span> Tutor Verification
-                            @if (Model.PendingApprovalCount > 0)
+                            @if ((int)(ViewData["SidebarPendingVerificationsCount"] ?? 0) > 0)
                             {
-                                <span class="badge-count">@Model.PendingApprovalCount</span>
+                                <span class="badge-count">@ViewData["SidebarPendingVerificationsCount"]</span>
                             }
                         </a>
                     </li>
                     <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
                     <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
-                    <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="Complaints">
+                            <span class="nav-icon">⚠️</span> Complaints
+                            @if ((int)(ViewData["SidebarOpenComplaintsCount"] ?? 0) > 0)
+                            {
+                                <span class="badge-count">@ViewData["SidebarOpenComplaintsCount"]</span>
+                            }
+                        </a>
+                    </li>
                     <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
                     <li><a asp-controller="Admin" asp-action="Settings"><span class="nav-icon">⚙️</span> Settings</a></li>
                 </ul>
@@ -311,7 +319,7 @@
                                                         <input type="hidden" name="returnUrl" value="@returnUrl" />
                                                         <button type="submit" class="mini-btn green">Approve</button>
                                                     </form>
-                                                    <form asp-controller="Admin" asp-action="RejectTutor" method="post" style="margin:0;" onsubmit="return confirm('Reject this tutor application?');">
+                                                    <form asp-controller="Admin" asp-action="RejectTutor" method="post" style="margin:0;" data-tb-confirm="Reject this tutor application?" data-tb-confirm-label="Reject" data-tb-confirm-danger="true">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="tutorProfileId" value="@u.TutorProfileId" />
                                                         <input type="hidden" name="returnUrl" value="@returnUrl" />
@@ -321,217 +329,223 @@
                                                 else if (u.Status == "Suspended")
                                                 {
                                                     <a asp-controller="Admin" asp-action="UserDetail" asp-route-userId="@u.UserId" asp-route-returnUrl="@returnUrl" class="mini-btn">View</a>                                                    <form asp-controller="Admin" asp-action="ReactivateUser" method="post" style="margin:0;">
-                                                        @Html.AntiForgeryToken()
-                                                        <input type="hidden" name="userId" value="@u.UserId" />
-                                                        <input type="hidden" name="returnUrl" value="@returnUrl" />
-                                                        <button type="submit" class="mini-btn green">Reactivate</button>
-                                                    </form>
-                                                }
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="userId" value="@u.UserId" />
+                                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                    <button type="submit" class="mini-btn green">Reactivate</button>
+                                                </form>
+                                            }
                                                 else
-                                                {
-                                                    <a asp-controller="Admin" asp-action="UserDetail" asp-route-userId="@u.UserId" asp-route-returnUrl="@returnUrl" class="mini-btn">View</a>                                                    <form asp-controller="Admin" asp-action="SuspendUser" method="post" style="margin:0;" onsubmit="return confirm('Suspend this account?');">
-                                                        @Html.AntiForgeryToken()
-                                                        <input type="hidden" name="userId" value="@u.UserId" />
-                                                        <input type="hidden" name="returnUrl" value="@returnUrl" />
-                                                        <button type="submit" class="mini-btn">Suspend</button>
-                                                    </form>
-                                                }
-                                                <button type="button" class="um-kebab" title="More">⋮</button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
+                                            {
+                                                <a asp-controller="Admin" asp-action="UserDetail" asp-route-userId="@u.UserId" asp-route-returnUrl="@returnUrl" class="mini-btn">View</a>                                                    <form asp-controller="Admin" asp-action="SuspendUser" method="post" style="margin:0;" data-tb-confirm="Suspend this account?" data-tb-confirm-label="Suspend" data-tb-confirm-danger="true">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="userId" value="@u.UserId" />
+                                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                <button type="submit" class="mini-btn">Suspend</button>
+                                            </form>
+                                        }
+                                        <button type="button" class="um-kebab" title="More">⋮</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+                    else
+            {
+                <p class="um-empty">No users match these filters.</p>
+            }
+
+            <div class="um-pagination-bar">
+                <span class="um-pagination-info">
+                    @if (Model.TotalMatching == 0)
+                    {
+                        <text>No users found</text>
                     }
                     else
                     {
-                        <p class="um-empty">No users match these filters.</p>
+                        <text>Showing @rangeStart–@rangeEnd of @Model.TotalMatching.ToString("N0") users</text>
                     }
+                </span>
 
-                    <div class="um-pagination-bar">
-                        <span class="um-pagination-info">
-                            @if (Model.TotalMatching == 0)
-                            {
-                                <text>No users found</text>
-                            }
-                            else
-                            {
-                                <text>Showing @rangeStart–@rangeEnd of @Model.TotalMatching.ToString("N0") users</text>
-                            }
-                        </span>
+                <div class="um-pagination">
+                    <a class="um-page-btn @(Model.Page <= 1 ? "disabled" : "")" href="@PageUrl(Model.Page - 1)">‹</a>
+                    @foreach (var p in Model.PageWindow)
+                    {
+                        if (p == null)
+                        {
+                            <span class="um-page-ellipsis">…</span>
+                        }
+                        else
+                        {
+                            <a class="um-page-btn @(p == Model.Page ? "active" : "")" href="@PageUrl(p.Value)">@p</a>
+                        }
+                    }
+                    <a class="um-page-btn @(Model.Page >= Model.TotalPages ? "disabled" : "")" href="@PageUrl(Model.Page + 1)">›</a>
+                </div>
 
-                        <div class="um-pagination">
-                            <a class="um-page-btn @(Model.Page <= 1 ? "disabled" : "")" href="@PageUrl(Model.Page - 1)">‹</a>
-                            @foreach (var p in Model.PageWindow)
-                            {
-                                if (p == null)
-                                {
-                                    <span class="um-page-ellipsis">…</span>
-                                }
-                                else
-                                {
-                                    <a class="um-page-btn @(p == Model.Page ? "active" : "")" href="@PageUrl(p.Value)">@p</a>
-                                }
-                            }
-                            <a class="um-page-btn @(Model.Page >= Model.TotalPages ? "disabled" : "")" href="@PageUrl(Model.Page + 1)">›</a>
-                        </div>
+                <select class="um-pagesize-select" onchange="umChangePageSize(this.value)">
+                    <option value="8" selected="@(Model.PageSize == 8)">8 per page</option>
+                    <option value="20" selected="@(Model.PageSize == 20)">20 per page</option>
+                    <option value="50" selected="@(Model.PageSize == 50)">50 per page</option>
+                    <option value="100" selected="@(Model.PageSize == 100)">100 per page</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-overlay" id="addUserModalOverlay">
+            <div class="modal-box">
+                <div class="modal-head">
+                    <h3>Add user</h3>
+                    <button type="button" class="modal-close" id="closeAddUserModalBtn">&times;</button>
+                </div>
 
-                        <select class="um-pagesize-select" onchange="umChangePageSize(this.value)">
-                            <option value="8" selected="@(Model.PageSize == 8)">8 per page</option>
-                            <option value="20" selected="@(Model.PageSize == 20)">20 per page</option>
-                            <option value="50" selected="@(Model.PageSize == 50)">50 per page</option>
-                            <option value="100" selected="@(Model.PageSize == 100)">100 per page</option>
+                <form asp-controller="Admin" asp-action="AddUser" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+
+                    <div class="field" style="margin-bottom:1rem;">
+                        <label>Role</label>
+                        <select name="Role" class="tb-select" id="addUserRoleSelect">
+                            <option value="Student">Student</option>
+                            <option value="Tutor">Tutor</option>
                         </select>
                     </div>
-                </div>
-                <div class="modal-overlay" id="addUserModalOverlay">
-                    <div class="modal-box">
-                        <div class="modal-head">
-                            <h3>Add user</h3>
-                            <button type="button" class="modal-close" id="closeAddUserModalBtn">&times;</button>
-                        </div>
 
-                        <form asp-controller="Admin" asp-action="AddUser" method="post">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="returnUrl" value="@returnUrl" />
-
-                            <div class="field" style="margin-bottom:1rem;">
-                                <label>Role</label>
-                                <select name="Role" class="tb-select" id="addUserRoleSelect">
-                                    <option value="Student">Student</option>
-                                    <option value="Tutor">Tutor</option>
-                                </select>
-                            </div>
-
-                            <div class="field" style="margin-bottom:1rem;">
-                                <label>Full name</label>
-                                <input type="text" name="FullName" class="tb-input" required maxlength="200" />
-                            </div>
-
-                            <div class="field" style="margin-bottom:1rem;">
-                                <label>Email address</label>
-                                <input type="email" name="Email" class="tb-input" required maxlength="256" />
-                            </div>
-
-                            <div class="field" style="margin-bottom:1rem;">
-                                <label>Phone number (optional)</label>
-                                <input type="text" name="PhoneNumber" class="tb-input" placeholder="+977 98XXXXXXXX" maxlength="20" />
-                            </div>
-
-                            <div class="field" style="margin-bottom:1rem;">
-                                <label>District (optional)</label>
-                                <input type="text" name="District" class="tb-input" maxlength="100" />
-                            </div>
-
-                            <div id="addUserStudentFields">
-                                <div class="field" style="margin-bottom:1rem;">
-                                    <label>Grade level (optional)</label>
-                                    <input type="text" name="GradeLevel" class="tb-input" placeholder="e.g. Grade 10 (SEE)" maxlength="100" />
-                                </div>
-                            </div>
-
-                            <div id="addUserTutorFields" style="display:none;">
-                                <div class="field" style="margin-bottom:1rem;">
-                                    <label>Subjects (comma-separated)</label>
-                                    <input type="text" name="Subjects" class="tb-input" placeholder="e.g. Physics, Chemistry" maxlength="300" />
-                                </div>
-                                <div class="field" style="margin-bottom:1rem;">
-                                    <label>Years of experience</label>
-                                    <input type="number" name="YearsOfExperience" class="tb-input" min="0" max="60" value="0" />
-                                </div>
-                            </div>
-
-                            <div class="field" style="margin-bottom:1rem;">
-                                <label>Temporary password</label>
-                                <input type="password" name="Password" class="tb-input" required minlength="6" />
-                            </div>
-
-                            <div class="field" style="margin-bottom:1rem;">
-                                <label>Confirm password</label>
-                                <input type="password" name="ConfirmPassword" class="tb-input" required minlength="6" />
-                            </div>
-
-                            <p class="tutor-meta" style="margin:0 0 1rem;">There's no email delivery pipeline yet, so share this password with the user yourself.</p>
-
-                            <div class="settings-actions">
-                                <button type="submit" class="um-btn">Add user</button>
-                                <button type="button" class="um-btn-outline" id="cancelAddUserModalBtn">Cancel</button>
-                            </div>
-                        </form>
+                    <div class="field" style="margin-bottom:1rem;">
+                        <label>Full name</label>
+                        <input type="text" name="FullName" class="tb-input" required maxlength="200" />
                     </div>
-                </div>
-            </main>
+
+                    <div class="field" style="margin-bottom:1rem;">
+                        <label>Email address</label>
+                        <input type="email" name="Email" class="tb-input" required maxlength="256" />
+                    </div>
+
+                    <div class="field" style="margin-bottom:1rem;">
+                        <label>Phone number (optional)</label>
+                        <input type="text" name="PhoneNumber" class="tb-input" placeholder="+977 98XXXXXXXX" maxlength="20" />
+                    </div>
+
+                    <div class="field" style="margin-bottom:1rem;">
+                        <label>District (optional)</label>
+                        <input type="text" name="District" class="tb-input" maxlength="100" />
+                    </div>
+
+                    <div id="addUserStudentFields">
+                        <div class="field" style="margin-bottom:1rem;">
+                            <label>Grade level (optional)</label>
+                            <input type="text" name="GradeLevel" class="tb-input" placeholder="e.g. Grade 10 (SEE)" maxlength="100" />
+                        </div>
+                    </div>
+
+                    <div id="addUserTutorFields" style="display:none;">
+                        <div class="field" style="margin-bottom:1rem;">
+                            <label>Subjects (comma-separated)</label>
+                            <input type="text" name="Subjects" class="tb-input" placeholder="e.g. Physics, Chemistry" maxlength="300" />
+                        </div>
+                        <div class="field" style="margin-bottom:1rem;">
+                            <label>Years of experience</label>
+                            <input type="number" name="YearsOfExperience" class="tb-input" min="0" max="60" value="0" />
+                        </div>
+                    </div>
+
+                    <div class="field" style="margin-bottom:1rem;">
+                        <label>Temporary password</label>
+                        <input type="password" name="Password" class="tb-input" required minlength="6" />
+                    </div>
+
+                    <div class="field" style="margin-bottom:1rem;">
+                        <label>Confirm password</label>
+                        <input type="password" name="ConfirmPassword" class="tb-input" required minlength="6" />
+                    </div>
+
+                    <p class="tutor-meta" style="margin:0 0 1rem;">There's no email delivery pipeline yet, so share this password with the user yourself.</p>
+
+                    <div class="settings-actions">
+                        <button type="submit" class="um-btn">Add user</button>
+                        <button type="button" class="um-btn-outline" id="cancelAddUserModalBtn">Cancel</button>
+                    </div>
+                </form>
+            </div>
         </div>
-    </div>
+    </main>
+</div>
+</div>
 
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-            function umUpdateCount() {
-                var checked = document.querySelectorAll('.um-row-check:checked').length;
-                document.getElementById('selectedCount').textContent = checked + ' selected';
-                var all = document.querySelectorAll('.um-row-check').length;
-                document.getElementById('selectAllBox').checked = all > 0 && checked === all;
-            }
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+        function umUpdateCount() {
+            var checked = document.querySelectorAll('.um-row-check:checked').length;
+            document.getElementById('selectedCount').textContent = checked + ' selected';
+            var all = document.querySelectorAll('.um-row-check').length;
+            document.getElementById('selectAllBox').checked = all > 0 && checked === all;
+        }
 
-            function umToggleAll(box) {
-                document.querySelectorAll('.um-row-check').forEach(function(cb) { cb.checked = box.checked; });
-                umUpdateCount();
-            }
+        function umToggleAll(box) {
+            document.querySelectorAll('.um-row-check').forEach(function (cb) { cb.checked = box.checked; });
+            umUpdateCount();
+        }
 
-            function umChangePageSize(value) {
-                var url = new URL(window.location.href);
-                url.searchParams.set('pageSize', value);
-                url.searchParams.set('page', '1');
-                window.location.href = url.toString();
-            }
+        function umChangePageSize(value) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('pageSize', value);
+            url.searchParams.set('page', '1');
+            window.location.href = url.toString();
+        }
 
-            var openAddUserBtn = document.getElementById('openAddUserModalBtn');
-            var addUserOverlay = document.getElementById('addUserModalOverlay');
-            var closeAddUserBtn = document.getElementById('closeAddUserModalBtn');
-            var cancelAddUserBtn = document.getElementById('cancelAddUserModalBtn');
-            var addUserRoleSelect = document.getElementById('addUserRoleSelect');
-            var studentFields = document.getElementById('addUserStudentFields');
-            var tutorFields = document.getElementById('addUserTutorFields');
+        var openAddUserBtn = document.getElementById('openAddUserModalBtn');
+        var addUserOverlay = document.getElementById('addUserModalOverlay');
+        var closeAddUserBtn = document.getElementById('closeAddUserModalBtn');
+        var cancelAddUserBtn = document.getElementById('cancelAddUserModalBtn');
+        var addUserRoleSelect = document.getElementById('addUserRoleSelect');
+        var studentFields = document.getElementById('addUserStudentFields');
+        var tutorFields = document.getElementById('addUserTutorFields');
 
-            if (openAddUserBtn && addUserOverlay) {
-                openAddUserBtn.addEventListener('click', function() {
-                    addUserOverlay.classList.add('open');
+        if (openAddUserBtn && addUserOverlay) {
+            openAddUserBtn.addEventListener('click', function () {
+                addUserOverlay.classList.add('open');
+            });
+            [closeAddUserBtn, cancelAddUserBtn].forEach(function (btn) {
+                if (btn) btn.addEventListener('click', function () { addUserOverlay.classList.remove('open'); });
+            });
+            addUserOverlay.addEventListener('click', function (e) {
+                if (e.target === addUserOverlay) addUserOverlay.classList.remove('open');
+            });
+        }
+
+        if (addUserRoleSelect && studentFields && tutorFields) {
+            addUserRoleSelect.addEventListener('change', function () {
+                var isTutor = addUserRoleSelect.value === 'Tutor';
+                studentFields.style.display = isTutor ? 'none' : '';
+                tutorFields.style.display = isTutor ? '' : 'none';
+            });
+        }
+
+        var bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.addEventListener('click', async function (e) {
+                var checkedCount = document.querySelectorAll('.um-row-check:checked').length;
+                if (checkedCount === 0) {
+                    e.preventDefault();
+                    return;
+                }
+
+                e.preventDefault();
+                var ok = await tbConfirm({
+                    title: 'Permanently delete ' + checkedCount + ' user' + (checkedCount === 1 ? '' : 's') + '?',
+                    message: 'This removes their account, bookings, messages, and reviews. This cannot be undone.',
+                    confirmLabel: 'Delete',
+                    danger: true
                 });
-                [closeAddUserBtn, cancelAddUserBtn].forEach(function(btn) {
-                    if (btn) btn.addEventListener('click', function() { addUserOverlay.classList.remove('open'); });
-                });
-                addUserOverlay.addEventListener('click', function(e) {
-                    if (e.target === addUserOverlay) addUserOverlay.classList.remove('open');
-                });
-            }
-
-            if (addUserRoleSelect && studentFields && tutorFields) {
-                addUserRoleSelect.addEventListener('change', function() {
-                    var isTutor = addUserRoleSelect.value === 'Tutor';
-                    studentFields.style.display = isTutor ? 'none' : '';
-                    tutorFields.style.display = isTutor ? '' : 'none';
-                });
-            }
-
-            var bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-            if (bulkDeleteBtn) {
-                bulkDeleteBtn.addEventListener('click', function (e) {
-                    var checkedCount = document.querySelectorAll('.um-row-check:checked').length;
-                    if (checkedCount === 0) {
-                        e.preventDefault();
-                        return;
-                    }
-                    var confirmed = confirm(
-                        'Permanently delete ' + checkedCount + ' user' + (checkedCount === 1 ? '' : 's') +
-                        '? This removes their account, bookings, messages, and reviews. This cannot be undone.'
-                    );
-                    if (!confirmed) {
-                        e.preventDefault();
-                    }
-                });
-            }
-    </script>
+                if (ok) {
+                    bulkDeleteBtn.dataset.tbConfirmed = 'true';
+                    bulkDeleteBtn.closest('form').submit();
+                }
+            });
+        }
+</script>
+<script src="~/js/tb-confirm.js" asp-append-version="true"></script>
 </body>
 </html>

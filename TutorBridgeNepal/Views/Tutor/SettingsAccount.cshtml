@@ -87,9 +87,14 @@
         });
 
         document.getElementById('signOutAllForm').addEventListener('submit', function(e) {
-            if (!confirm("This will sign you out on every device, including this one. Continue?")) {
-                e.preventDefault();
-            }
+            e.preventDefault();
+            var ok = await tbConfirm({
+                title: 'Sign out everywhere?',
+                message: 'This will sign you out on every device, including this one.',
+                confirmLabel: 'Sign out all',
+                danger: true
+            });
+            if (ok) { e.target.submit(); }
         });
     </script>
 }

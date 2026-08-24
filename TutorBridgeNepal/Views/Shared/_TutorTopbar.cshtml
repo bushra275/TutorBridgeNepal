@@ -16,16 +16,13 @@
         <input type="text" placeholder="Search students, sessions..." disabled title="Search isn't built yet" />
     </div>
 
-    @if (showAvailabilityBadge)
-    {
-        <form asp-controller="Tutor" asp-action="ToggleAvailability" method="post" style="margin:0;">
-            @Html.AntiForgeryToken()
-            <button type="submit" class="badge-soft availability-pill" style="border:none; cursor:pointer;" title="Click to toggle">
-                <span class="avail-dot" style="background:@(isAvailable ? "var(--green-2)" : "var(--muted)");"></span>
-                @(isAvailable ? "Available now" : "Not available")
-            </button>
-        </form>
-    }
+    <form asp-controller="Tutor" asp-action="ToggleAvailability" method="post" style="margin:0;">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="availability-pill @(isAvailable ? "avail-on" : "avail-off")" title="Click to toggle">
+            <span class="avail-dot"></span>
+            @(isAvailable ? "Available now" : "Not available")
+        </button>
+    </form>
 
     <div class="dash-topbar-right">
         <div class="topbar-dropdown-wrap">

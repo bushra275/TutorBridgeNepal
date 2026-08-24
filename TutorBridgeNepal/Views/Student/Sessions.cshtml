@@ -112,7 +112,8 @@
                                                 <span class="mini-btn" title="Your tutor will share the meeting link closer to the session time">Join session</span>
                                             }
                                             <span class="disabled-btn" title="Rescheduling isn't available yet — message your tutor directly">Reschedule</span>
-                                            <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@s.TutorProfileId" class="mini-btn">Message tutor</a>                                            <form asp-action="CancelBooking" asp-controller="Student" method="post" onsubmit="return confirm('Cancel this session?');">
+                                            <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@s.TutorProfileId" class="mini-btn">Message tutor</a>
+                                        <form asp-action="CancelBooking" asp-controller="Student" method="post" data-tb-confirm="Cancel this session?" data-tb-confirm-label="Cancel session" data-tb-confirm-danger="true">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="id" value="@s.BookingId" />
                                                 <input type="hidden" name="returnTo" value="Sessions" />

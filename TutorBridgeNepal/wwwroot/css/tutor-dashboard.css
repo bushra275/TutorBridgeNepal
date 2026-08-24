@@ -483,15 +483,88 @@
 /* Weekly availability panel */
 .weekly-avail-row {
     display: grid;
-    grid-template-columns: 60px 1fr auto auto;
+    grid-template-columns: 84px 1fr auto;
     align-items: center;
-    gap: .6rem;
-    padding: .5rem 0;
-    border-bottom: 1px solid var(--line, #deded7);
+    gap: 1rem;
+    padding: .75rem 1rem;
+    margin-bottom: .5rem;
+    border-radius: 10px;
+    background: #fafaf8;
+    border: 1px solid transparent;
+    transition: background-color .15s ease, border-color .15s ease, opacity .15s ease;
 }
 
     .weekly-avail-row:last-child {
-        border-bottom: none;
+        margin-bottom: 0;
+    }
+
+    .weekly-avail-row:hover {
+        background: #f2f7f4;
+        border-color: #dcebe2;
+    }
+
+    .weekly-avail-row.is-dayoff {
+        opacity: .55;
+    }
+
+.day-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    font-size: .74rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    color: var(--green-2, #1e8a5f);
+    background: #e6f6ee;
+    border-radius: 999px;
+    padding: .35rem .65rem;
+}
+
+.time-range {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+}
+
+.time-input {
+    min-height: 40px;
+    padding: .35rem .4rem .35rem .6rem;
+    width: 11ch;
+    min-width: 128px;
+    border-radius: 8px;
+    font-variant-numeric: tabular-nums;
+    box-sizing: content-box;
+}
+
+    .time-input:focus {
+        border-color: var(--green-2, #1e8a5f);
+        box-shadow: 0 0 0 3px rgba(30, 138, 95, .12);
+        outline: none;
+    }
+
+.time-sep {
+    color: var(--muted, #8a8a80);
+    font-weight: 600;
+}
+
+.dayoff-toggle {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .8rem;
+    color: var(--muted, #6b6b62);
+    cursor: pointer;
+    white-space: nowrap;
+    justify-self: end;
+}
+
+    .dayoff-toggle input[type="checkbox"] {
+        width: 17px;
+        height: 17px;
+        accent-color: var(--green-2, #1e8a5f);
+        cursor: pointer;
     }
 
 .timeoff-row {

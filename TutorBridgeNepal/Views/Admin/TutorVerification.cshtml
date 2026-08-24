@@ -77,15 +77,23 @@
                     <li>
                         <a asp-controller="Admin" asp-action="TutorVerification" class="active">
                             <span class="nav-icon">✅</span> Tutor Verification
-                            @if (Model.PendingCount > 0)
+                            @if ((int)(ViewData["SidebarPendingVerificationsCount"] ?? 0) > 0)
                             {
-                                <span class="badge-count">@Model.PendingCount</span>
+                                <span class="badge-count">@ViewData["SidebarPendingVerificationsCount"]</span>
                             }
                         </a>
                     </li>
                     <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
                     <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
-                    <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="Complaints">
+                            <span class="nav-icon">⚠️</span> Complaints
+                            @if ((int)(ViewData["SidebarOpenComplaintsCount"] ?? 0) > 0)
+                            {
+                                <span class="badge-count">@ViewData["SidebarOpenComplaintsCount"]</span>
+                            }
+                        </a>
+                    </li>
                     <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
                     <li><a asp-controller="Admin" asp-action="Settings"><span class="nav-icon">⚙️</span> Settings</a></li>
                 </ul>
@@ -226,7 +234,7 @@
                                     {
                                         <div class="tv-line">Experience: @a.ExperienceSummary</div>
                                     }
-                                    <a asp-action="UserManagement" asp-route-search="@a.Email" class="tv-view-link">View full profile</a>
+                                    <a asp-action="UserDetail" asp-route-userId="@a.UserId" asp-route-returnUrl="@Context.Request.Path@Context.Request.QueryString" class="tv-view-link">View full profile</a>
                                 </div>
                                 <div class="tv-docs">
                                     <div class="tv-docs-label">SUBMITTED DOCUMENTS</div>
@@ -314,8 +322,8 @@
     </div>
 
     <script>
-            document.querySelectorAll('[data-note-toggle]').forEach(function(btn) {
-                btn.addEventListener('click', function() {
+            document.querySelectorAll('[data-note-toggle]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
                     var form = document.getElementById(btn.dataset.noteToggle);
                     if (form) form.classList.toggle('open');
                 });

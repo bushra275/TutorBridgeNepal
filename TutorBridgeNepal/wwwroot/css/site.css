@@ -30,6 +30,10 @@ html, body {
     font-family: Inter, Arial, sans-serif;
 }
 
+.avatar {
+    flex-shrink: 0;
+}
+
 a {
     color: inherit;
 }
@@ -1451,6 +1455,86 @@ a {
         color: var(--green, #1D9E75);
         font-weight: 700;
         text-decoration: none;
+    }
+
+
+.tb-confirm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 30, 25, .55);
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 1rem;
+}
+
+    .tb-confirm-overlay.open {
+        display: flex;
+    }
+
+.tb-confirm-box {
+    background: #fff;
+    border-radius: 16px;
+    padding: 2rem 1.75rem 1.75rem;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+    animation: tbConfirmPop .18s ease-out;
+}
+
+@keyframes tbConfirmPop {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(.96);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.tb-confirm-icon {
+    width: 52px;
+    height: 52px;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    font-weight: 800;
+    background: var(--mint);
+    color: var(--green);
+}
+
+.tb-confirm-box.tb-confirm-danger .tb-confirm-icon {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+.tb-confirm-title {
+    margin: 0 0 .5rem;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.tb-confirm-message {
+    color: var(--muted);
+    font-size: .9rem;
+    line-height: 1.5;
+    margin: 0 0 1.5rem;
+}
+
+.tb-confirm-actions {
+    display: flex;
+    gap: .7rem;
+}
+
+    .tb-confirm-actions button {
+        flex: 1;
     }
 
 

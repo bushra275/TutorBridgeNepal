@@ -83,23 +83,36 @@
                         valueInput.value = willBeOn;
                     }
 
-                    fetch(form.action, {
-                        method: 'POST',
-                        body: new FormData(form),
-                        credentials: 'same-origin'
-                    }).then(function(res) {
-                        if (!res.ok) {
-                            btn.classList.toggle('on'); // revert if the save actually failed
-                            if (valueInput) {
-                                valueInput.value = !willBeOn;
-                            }
-                        }
-                    }).catch(function() {
+                    function revert() {
                         btn.classList.toggle('on');
                         if (valueInput) {
                             valueInput.value = !willBeOn;
                         }
-                    });
+                    }
+
+                    fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        credentials: 'same-origin',
+                        // Lets the server tell AJAX calls apart from a normal
+                        // form post, so it can send back real JSON instead of
+                        // a redirect. Without this, a redirect to the login
+                        // page (e.g. after the session expires) gets silently
+                        // followed by fetch and looks like a 200 OK success.
+                        headers: { 'X-Requested-With': 'fetch' }
+                    }).then(function(res) {
+                        // A redirected response here means the server sent us
+                        // somewhere else entirely (most likely the login
+                        // page) instead of handling the save - treat that as
+                        // a failure even though the final status is 200.
+                        if (!res.ok || res.redirected) {
+                            revert();
+                            return;
+                        }
+                        return res.json().then(function(data) {
+                            if (!data || !data.success) revert();
+                        });
+                    }).catch(revert);
                 });
             });
     </script>

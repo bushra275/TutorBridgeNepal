@@ -256,7 +256,7 @@
                             @if (doc.IsUploaded)
                             {
                                 <a class="mp-doc-btn" asp-action="DownloadOwnVerificationDocument" asp-route-credentialId="@doc.CredentialId" target="_blank">View</a>
-                                <form asp-action="RemoveVerificationDocument" method="post" style="margin:0;" onsubmit="return confirm('Remove this document? You will need to re-upload it before an admin can approve your application.');">
+                                <form asp-action="RemoveVerificationDocument" method="post" style="margin:0;" data-tb-confirm="Remove this document? You will need to re-upload it before an admin can approve your application." data-tb-confirm-danger="true">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="credentialId" value="@doc.CredentialId" />
                                     <button type="submit" class="mp-doc-btn mp-doc-btn-danger">Remove</button>

@@ -51,13 +51,19 @@
                 }
 
                 <div class="profile-head-card" style="display:flex; gap:1.2rem; align-items:center; flex-wrap:wrap;">
-                    <div class="profile-head-avatar">@Model.Initials</div>
+                    <div class="profile-head-avatar-wrap">
+                        <div class="profile-head-avatar">@Model.Initials</div>
+                        @if (Model.IsVerified)
+                        {
+                            <span class="avatar-verified-badge" title="Verified tutor">✓</span>
+                        }
+                    </div>
                     <div style="flex:1; min-width:220px;">
-                        <h1 style="margin:0; font-size:1.3rem;">@Model.FullName</h1>
-                        <div class="badge-row" style="margin-top:.35rem;">
+                        <h1 style="margin:0; font-size:1.5rem;">@Model.FullName</h1>
+                        <div class="badge-row" style="margin-top:.5rem;">
                             @if (Model.IsVerified)
                             {
-                                <span class="verified-inline">✓ Verified</span>
+                                <span class="verified-pill">✓ Verified</span>
                             }
                         </div>
                         <p class="tutor-meta mb-1" style="margin-top:.4rem;">@string.Join(" · ", Model.SubjectTags)@(string.IsNullOrWhiteSpace(Model.District) ? "" : " · " + Model.District)</p>
@@ -77,23 +83,37 @@
                         </div>
                         <div class="session-count-text">@Model.CompletedSessionsCount session@(Model.CompletedSessionsCount == 1 ? "" : "s") completed</div>
                     </div>
-                    <div class="action-row" style="flex-direction:column; align-items:stretch;">
+                    <div class="action-row">
                         <a href="#booking-panel" class="tb-btn">Book a session</a>
-                        <div class="action-row" style="margin-top:.6rem;">
-                            <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@Model.TutorProfileId" class="tb-btn-outline">Message</a>
-                            <form asp-controller="Student" asp-action="SaveTutor" method="post" style="display:inline;">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="tutorProfileId" value="@Model.TutorProfileId" />
-                                <input type="hidden" name="returnTo" value="TutorProfile" />
-                                <button type="submit" class="save-tutor-btn">Save tutor</button>
-                            </form>
-                        </div>
+                        <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@Model.TutorProfileId" class="tb-btn-outline">Message</a>
+                        <form asp-controller="Student" asp-action="SaveTutor" method="post" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="tutorProfileId" value="@Model.TutorProfileId" />
+                            <input type="hidden" name="returnTo" value="TutorProfile" />
+                            <button type="submit" class="tb-btn-outline">Save tutor</button>
+                        </form>
                     </div>
                 </div>
 
                 <div class="profile-layout">
                     <!-- Left column -->
                     <div>
+                        <div class="info-panel">
+                            <h2>About</h2>
+                            @if (!string.IsNullOrWhiteSpace(Model.Bio))
+                            {
+                                <p class="bio-text @(Model.Bio.Length > 160 ? "bio-clamped" : "")" id="bioText">@Model.Bio</p>
+                                if (Model.Bio.Length > 160)
+                                {
+                                    <a href="#" class="read-more-link" id="bioReadMoreBtn">Read more</a>
+                                }
+                            }
+                            else
+                            {
+                                <p class="bio-text" style="color:var(--muted);">This tutor hasn't added an about section yet.</p>
+                            }
+                        </div>
+
                         <div class="info-panel">
                             <h2>Subjects</h2>
                             @foreach (var tag in Model.SubjectTags)
@@ -120,7 +140,13 @@
                         </div>
 
                         <div class="info-panel">
-                            <h2>Student reviews</h2>
+                            <div class="panel-title-row">
+                                <h2>Student reviews</h2>
+                                @if (Model.Reviews.Count > 3)
+                                {
+                                    <a asp-controller="Student" asp-action="TutorAllReviews" asp-route-id="@Model.TutorProfileId" class="see-all-link">See all @Model.Reviews.Count</a>
+                                }
+                            </div>
 
                             @if (!Model.Reviews.Any())
                             {
@@ -129,10 +155,11 @@
                             else
                             {
                                 <div class="review-list">
-                                    @foreach (var review in Model.Reviews)
+                                    @for (int i = 0; i < Model.Reviews.Count; i++)
                                     {
+                                        var review = Model.Reviews[i];
                                         var filled = review.Rating;
-                                        <div class="review-row">
+                                        <div class="review-row @(i >= 3 ? "extra-review" : "")">
                                             <div class="review-row-head">
                                                 <div class="review-avatar">@review.StudentInitials</div>
                                                 <div>
@@ -203,7 +230,7 @@
                                             var isAvailable = availableDateSet.Contains(thisDate);
                                             <div class="cal-day @(isAvailable ? "cal-day-available" : "cal-day-unavailable")"
                                                  data-date="@thisDate.ToString("yyyy-MM-dd")">
-                                                @day
+                                                <span class="cal-day-num">@day</span>
                                             </div>
                                         }
                                     </div>
@@ -337,6 +364,15 @@
             if (savedToast) {
                 setTimeout(function() { savedToast.classList.add('hide'); }, 2500);
                 setTimeout(function() { savedToast.remove(); }, 3000);
+            }
+
+            var bioReadMoreBtn = document.getElementById('bioReadMoreBtn');
+            if (bioReadMoreBtn) {
+                bioReadMoreBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    document.getElementById('bioText').classList.remove('bio-clamped');
+                    bioReadMoreBtn.remove();
+                });
             }
     </script>
 </body>

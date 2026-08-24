@@ -74,7 +74,7 @@
                                 </form>
                                 @if (!string.IsNullOrEmpty(Model.PhotoUrl))
                                 {
-                                    <form asp-controller="Student" asp-action="RemovePhoto" method="post" onsubmit="return confirm('Remove your profile photo?');">
+                                    <form asp-controller="Student" asp-action="RemovePhoto" method="post" data-tb-confirm="Remove your profile photo?">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" class="tb-btn-danger-outline">Remove</button>
                                     </form>
@@ -349,10 +349,15 @@
             })();
 
             // Confirm before submitting account deletion
-            document.getElementById('deleteAccountForm').addEventListener('submit', function(e) {
-                if (!confirm('This will permanently delete your account and all your data. Are you absolutely sure?')) {
-                    e.preventDefault();
-                }
+            document.getElementById('deleteAccountForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                var ok = await tbConfirm({
+                    title: 'Delete your account?',
+                    message: 'This will permanently delete your account and all your data. This cannot be undone.',
+                    confirmLabel: 'Delete account',
+                    danger: true
+                });
+                if (ok) { e.target.submit(); }
             });
 
             // AJAX-submit every toggle so the page never reloads or scrolls back to
@@ -378,5 +383,8 @@
                 });
             });
     </script>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/tb-confirm.js" asp-append-version="true"></script>
 </body>
 </html>

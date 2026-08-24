@@ -86,23 +86,23 @@
                     <li>
                         <a asp-controller="Admin" asp-action="TutorVerification">
                             <span class="nav-icon">✅</span> Tutor Verification
-                            @if (Model.PendingVerificationsCount > 0)
+                            @if ((int)(ViewData["SidebarPendingVerificationsCount"] ?? 0) > 0)
                             {
-                                <span class="badge-count">@Model.PendingVerificationsCount</span>
+                                <span class="badge-count">@ViewData["SidebarPendingVerificationsCount"]</span>
                             }
                         </a>
                     </li>
                     <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
-                    <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>                    <li>
-                        <li>
-                            <a asp-controller="Admin" asp-action="Complaints">
-                                <span class="nav-icon">⚠️</span> Complaints
-                                @if (Model.OpenComplaintsCount > 0)
-                                {
-                                    <span class="badge-count">@Model.OpenComplaintsCount</span>
-                                }
-                            </a>
-                        </li>
+                    <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="Complaints">
+                            <span class="nav-icon">⚠️</span> Complaints
+                            @if ((int)(ViewData["SidebarOpenComplaintsCount"] ?? 0) > 0)
+                            {
+                                <span class="badge-count">@ViewData["SidebarOpenComplaintsCount"]</span>
+                            }
+                        </a>
+                    </li>
                     <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
                     <li><a asp-controller="Admin" asp-action="Settings"><span class="nav-icon">⚙️</span> Settings</a></li>
                 </ul>
@@ -118,8 +118,8 @@
                         <h1>Admin Dashboard</h1>
                         <p>@Model.TodayLabel · TutorBridge Nepal platform overview</p>
                     </div>
-                        <a asp-controller="Admin" asp-action="ExportDashboardReportCsv" class="tb-btn-outline" style="text-decoration:none;">Export report</a>
-                    </div>
+                    <a asp-controller="Admin" asp-action="ExportDashboardReportCsv" class="tb-btn-outline" style="text-decoration:none;">Export report</a>
+                </div>
 
                 <!-- KPI row -->
                 <div class="kpi-row">
@@ -174,7 +174,7 @@
                     </div>
                 </div>
 
-                <div class="dash-columns">
+                <div class="dash-columns dash-columns-stretch">
                     <!-- Left -->
                     <div>
                         <div class="panel chart-panel">
@@ -248,7 +248,7 @@
                             {
                                 <p class="empty-row">No sessions recorded yet.</p>
                             }
-                            <a href="#" class="view-all-link">View all sessions →</a>
+                            <a asp-controller="Admin" asp-action="SessionLogs" class="view-all-link">View all sessions →</a>
                         </div>
 
                         <div class="panel">
@@ -272,7 +272,11 @@
                             }
                             else
                             {
-                                <p class="empty-row">No open complaints right now.</p>
+                                <div class="empty-state-fill">
+                                    <div class="empty-state-icon">✔</div>
+                                    <p>No open complaints right now.</p>
+                                    <span class="empty-state-sub">You're all caught up — nice work.</span>
+                                </div>
                             }
                         </div>
                     </div>
@@ -301,7 +305,7 @@
                                                 <input type="hidden" name="tutorProfileId" value="@v.TutorProfileId" />
                                                 <button type="submit" class="mini-btn green">Approve</button>
                                             </form>
-                                            <form asp-controller="Admin" asp-action="RejectTutor" method="post" style="margin:0;" onsubmit="return confirm('Reject this tutor application?');">
+                                            <form asp-controller="Admin" asp-action="RejectTutor" method="post" style="margin:0;" data-tb-confirm="Reject this tutor application?" data-tb-confirm-label="Reject" data-tb-confirm-danger="true">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="tutorProfileId" value="@v.TutorProfileId" />
                                                 <button type="submit" class="mini-btn danger">Reject</button>
@@ -351,7 +355,7 @@
                             {
                                 <p class="empty-row">No registrations yet.</p>
                             }
-                            <a href="#" class="view-all-link">View all users →</a>
+                            <a asp-controller="Admin" asp-action="UserManagement" class="view-all-link">View all users →</a>
                         </div>
 
                         <div class="panel">

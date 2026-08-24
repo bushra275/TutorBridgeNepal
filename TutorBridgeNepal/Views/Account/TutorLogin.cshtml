@@ -76,12 +76,10 @@
             <form asp-action="GoogleLogin" asp-controller="Account" method="post" style="margin:0;">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="role" value="Tutor" />
-                <form asp-action="GoogleLogin" asp-controller="Account" method="post" style="margin:0;">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="role" value="Tutor" />
-                    <button class="google-btn" type="submit"><span class="g-dot">G</span><span>Sign in with Google</span><span></span></button>
-                </form>
-            </form>            <p class="auth-bottom">Are you a student? <a class="link-green" asp-action="StudentLogin">Log in here</a></p>
+                <button class="google-btn" type="submit"><span class="g-dot">G</span><span>Sign in with Google</span><span></span></button>
+            </form>
+            <p class="auth-bottom">Don't have a tutor account? <a class="link-green" asp-action="TutorRegister" asp-route-role="Tutor">Register as Tutor</a></p>
+            <p class="auth-bottom">Are you a student? <a class="link-green" asp-action="StudentLogin">Log in here</a></p>
         </div>
     </section>
 </main>

@@ -26,9 +26,14 @@
 @section Scripts {
     <script>
         document.getElementById('deactivateAccountForm').addEventListener('submit', function(e) {
-            if (!confirm('This will deactivate your tutor account and sign you out. Are you sure?')) {
-                e.preventDefault();
-            }
+            e.preventDefault();
+            var ok = await tbConfirm({
+                title: 'Deactivate your account?',
+                message: 'This will deactivate your tutor account and sign you out.',
+                confirmLabel: 'Deactivate',
+                danger: true
+            });
+            if (ok) { e.target.submit(); }
         });
     </script>
 }

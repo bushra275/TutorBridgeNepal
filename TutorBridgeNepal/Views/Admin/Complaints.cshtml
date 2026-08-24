@@ -82,15 +82,23 @@
                 <ul class="dash-nav">
                     <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
                     <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
-                    <li><a asp-controller="Admin" asp-action="TutorVerification"><span class="nav-icon">✅</span> Tutor Verification</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="TutorVerification">
+                            <span class="nav-icon">✅</span> Tutor Verification
+                            @if ((int)(ViewData["SidebarPendingVerificationsCount"] ?? 0) > 0)
+                            {
+                                <span class="badge-count">@ViewData["SidebarPendingVerificationsCount"]</span>
+                            }
+                        </a>
+                    </li>
                     <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
                     <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
                     <li>
                         <a asp-controller="Admin" asp-action="Complaints" class="active">
                             <span class="nav-icon">⚠️</span> Complaints
-                            @if (Model.OpenCount + Model.UnderReviewCount > 0)
+                            @if ((int)(ViewData["SidebarOpenComplaintsCount"] ?? 0) > 0)
                             {
-                                <span class="badge-count">@(Model.OpenCount + Model.UnderReviewCount)</span>
+                                <span class="badge-count">@ViewData["SidebarOpenComplaintsCount"]</span>
                             }
                         </a>
                     </li>
@@ -265,14 +273,17 @@
                                     {
                                         <a class="mini-btn" href="mailto:@c.AgainstEmail">Contact @c.AgainstRole?.ToLower()</a>
                                     }
-                                    <select class="um-select cp-severity-select" onchange="cpSetSeverity(@c.Id, this.value, '@Context.Request.Path@Context.Request.QueryString')">
-                                        <option value="">Set severity…</option>
-                                        <option value="High" selected="@(c.Severity == "High")">High</option>
-                                        <option value="Medium" selected="@(c.Severity == "Medium")">Medium</option>
-                                        <option value="Low" selected="@(c.Severity == "Low")">Low</option>
-                                    </select>
+                                    <div class="cp-severity-menu-wrap">
+                                        <button type="button" class="mini-btn" data-cp-severity-toggle="cp-severity-menu-@c.Id">Set severity ▾</button>
+                                        <div class="cp-severity-menu" id="cp-severity-menu-@c.Id">
+                                            <div class="cp-severity-menu-current">Currently: <strong>@c.Severity</strong></div>
+                                            <button type="button" class="cp-severity-option" data-severity="High" data-complaint-id="@c.Id">High</button>
+                                            <button type="button" class="cp-severity-option" data-severity="Medium" data-complaint-id="@c.Id">Medium</button>
+                                            <button type="button" class="cp-severity-option" data-severity="Low" data-complaint-id="@c.Id">Low</button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <span class="tv-view-link disabled-nav-link" title="Coming soon">View full case</span>
+                                <a asp-controller="Admin" asp-action="ComplaintDetail" asp-route-id="@c.Id" class="tv-view-link">View full case</a>
                             </div>
 
                             @if (c.Status == "UnderReview")
@@ -379,6 +390,30 @@
             btn.addEventListener('click', function () {
                 var form = document.getElementById(btn.dataset.cpToggle);
                 if (form) form.classList.toggle('open');
+            });
+        });
+
+        // Severity menu: a plain action menu, not a bound <select> - picking an
+        // option fires the update immediately and the menu just closes again,
+        // it never sits "selected" at a value the way a form field would.
+        document.querySelectorAll('[data-cp-severity-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var menu = document.getElementById(btn.dataset.cpSeverityToggle);
+                document.querySelectorAll('.cp-severity-menu.open').forEach(function (m) {
+                    if (m !== menu) m.classList.remove('open');
+                });
+                if (menu) menu.classList.toggle('open');
+            });
+        });
+
+        document.addEventListener('click', function () {
+            document.querySelectorAll('.cp-severity-menu.open').forEach(function (m) { m.classList.remove('open'); });
+        });
+
+        document.querySelectorAll('.cp-severity-option').forEach(function (opt) {
+            opt.addEventListener('click', function () {
+                cpSetSeverity(opt.dataset.complaintId, opt.dataset.severity, '@Context.Request.Path@Context.Request.QueryString');
             });
         });
 

@@ -69,10 +69,26 @@
                 <ul class="dash-nav">
                     <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
                     <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
-                    <li><a asp-controller="Admin" asp-action="TutorVerification"><span class="nav-icon">✅</span> Tutor Verification</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="TutorVerification">
+                            <span class="nav-icon">✅</span> Tutor Verification
+                            @if ((int)(ViewData["SidebarPendingVerificationsCount"] ?? 0) > 0)
+                            {
+                                <span class="badge-count">@ViewData["SidebarPendingVerificationsCount"]</span>
+                            }
+                        </a>
+                    </li>
                     <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
                     <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
-                    <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="Complaints">
+                            <span class="nav-icon">⚠️</span> Complaints
+                            @if ((int)(ViewData["SidebarOpenComplaintsCount"] ?? 0) > 0)
+                            {
+                                <span class="badge-count">@ViewData["SidebarOpenComplaintsCount"]</span>
+                            }
+                        </a>
+                    </li>
                     <li>
                         <a asp-controller="Admin" asp-action="Notifications" class="active">
                             <span class="nav-icon">🔔</span> Notifications

@@ -1,0 +1,156 @@
+﻿@model TutorBridgeNepal.ViewModels.AdminComplaintCardViewModel
+@{
+    ViewData["Title"] = "Complaint Detail";
+    Layout = null;
+    var returnUrl = ViewData["ReturnUrl"] as string;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Complaint @Model.ComplaintCode - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        <header class="dash-topbar">
+            <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
+            <div class="dash-search"><input type="text" placeholder="Search users, sessions..." /></div>
+            <span class="admin-chip">Admin</span>
+            <div class="dash-topbar-right">
+                @await Html.PartialAsync("_AdminNotifBell")
+                @await Html.PartialAsync("_AdminProfileDropdown")
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar">
+                <div class="dash-user">
+                    @if (!string.IsNullOrEmpty(ViewData["AdminProfilePhotoUrl"] as string))
+                    {
+                        <div class="avatar" style="padding:0; overflow:hidden;"><img src="@(ViewData["AdminProfilePhotoUrl"] as string)" alt="@ViewData["AdminProfileName"]" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" /></div>
+                    }
+                    else
+                    {
+                        <div class="avatar">@ViewData["AdminProfileInitials"]</div>
+                    }
+                    <div>
+                        <div class="name">@ViewData["AdminProfileName"]</div>
+                        <div class="meta">Platform Administrator</div>
+                        <span class="role-chip" style="background:#fff1d5;color:#a96808;">Super Admin</span>
+                    </div>
+                </div>
+
+                <ul class="dash-nav">
+                    <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
+                    <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
+                    <li><a asp-controller="Admin" asp-action="TutorVerification"><span class="nav-icon">✅</span> Tutor Verification</a></li>
+                    <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
+                    <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
+                    <li><a asp-controller="Admin" asp-action="Complaints" class="active"><span class="nav-icon">⚠️</span> Complaints</a></li>
+                    <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
+                    <li><a asp-controller="Admin" asp-action="Settings"><span class="nav-icon">⚙️</span> Settings</a></li>
+                </ul>
+
+                <ul class="dash-nav-secondary">
+                    <li><a asp-controller="Account" asp-action="Logout"><span class="nav-icon">↩️</span> Log out</a></li>
+                </ul>
+            </aside>
+
+            <main class="dash-main">
+                <div class="dash-greeting" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                    <div>
+                        <a href="@(string.IsNullOrWhiteSpace(returnUrl) ? Url.Action("Complaints") : returnUrl)" class="view-all-link">&larr; Back to Complaints</a>
+                        <h1 style="margin-top:.5rem;">@Model.Title</h1>
+                        <p>Complaint #@Model.ComplaintCode · Filed @Model.FiledAt.ToString("d MMM yyyy, h:mm tt")</p>
+                    </div>
+                    <div style="display:flex; gap:.5rem;">
+                        <span class="pill @(Model.Severity == "High" ? "pill-suspended" : Model.Severity == "Low" ? "pill-active" : "pill-pending2")">@Model.Severity</span>
+                        <span class="pill @(Model.Status == "Resolved" ? "pill-active" : "pill-pending2")">@Model.Status</span>
+                    </div>
+                </div>
+
+                @if (TempData["SettingsSuccess"] != null)
+                {
+                    <div class="status-banner success mb-3">@TempData["SettingsSuccess"]</div>
+                }
+
+                <div class="panel">
+                    <div class="panel-head"><h2>Parties involved</h2></div>
+                    <div class="settings-form-grid">
+                        <div class="field">
+                            <label>Filed by</label>
+                            <div>@Model.FilerName (@Model.FilerRole)</div>
+                        </div>
+                        <div class="field">
+                            <label>Against</label>
+                            <div>@(Model.AgainstName != null ? $"{Model.AgainstName} ({Model.AgainstRole})" : "—")</div>
+                        </div>
+                        @if (Model.SessionCode != null)
+                        {
+                            <div class="field">
+                                <label>Related session</label>
+                                <div>#@Model.SessionCode · @Model.SessionSubject @(Model.SessionDate.HasValue ? $"· {Model.SessionDate.Value:d MMM yyyy, h:mm tt}" : "")</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head"><h2>Complaint</h2></div>
+                    <p style="font-style:italic;">"@Model.Message"</p>
+
+                    @if (Model.Status == "Resolved" && !string.IsNullOrEmpty(Model.ResolutionNote))
+                    {
+                        <div class="cp-resolution">✓ Resolved @(Model.ResolvedAt?.ToString("d MMM yyyy")): @Model.ResolutionNote</div>
+                    }
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head"><h2>Actions</h2></div>
+                    <div style="display:flex; gap:.6rem; flex-wrap:wrap;">
+                        @if (Model.Status == "Open")
+                        {
+                            <form asp-controller="Admin" asp-action="InvestigateComplaint" method="post" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="complaintId" value="@Model.Id" />
+                                <input type="hidden" name="returnUrl" value="@Url.Action("ComplaintDetail", new { id = Model.Id })" />
+                                <button type="submit" class="mini-btn green">Start review</button>
+                            </form>
+                        }
+                        @if (!string.IsNullOrEmpty(Model.FilerEmail))
+                        {
+                            <a class="mini-btn" href="mailto:@Model.FilerEmail">Contact @Model.FilerRole.ToLower()</a>
+                        }
+                        @if (!string.IsNullOrEmpty(Model.AgainstEmail))
+                        {
+                            <a class="mini-btn" href="mailto:@Model.AgainstEmail">Contact @Model.AgainstRole?.ToLower()</a>
+                        }
+                    </div>
+
+                    @if (Model.Status == "UnderReview")
+                    {
+                        <form asp-controller="Admin" asp-action="ResolveComplaint" method="post" class="tv-note-form" style="margin-top:1rem;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="complaintId" value="@Model.Id" />
+                            <input type="hidden" name="returnUrl" value="@Url.Action("ComplaintDetail", new { id = Model.Id })" />
+                            <div class="field">
+                                <label>Resolution note</label>
+                                <textarea name="resolutionNote" class="tb-input" style="min-height:90px;" required></textarea>
+                            </div>
+                            <button type="submit" class="mini-btn green" style="margin-top:.6rem;">Mark resolved</button>
+                        </form>
+                    }
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

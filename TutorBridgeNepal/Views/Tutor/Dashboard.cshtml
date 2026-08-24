@@ -148,7 +148,7 @@
                                                 <input type="hidden" name="id" value="@r.BookingId" />
                                                 <button type="submit" class="mini-btn green" style="width:100%;">Accept</button>
                                             </form>
-                                            <form asp-controller="Tutor" asp-action="DeclineBooking" method="post" style="margin:0;" onsubmit="return confirm('Decline this request?');">
+                                            <form asp-controller="Tutor" asp-action="DeclineBooking" method="post" style="margin:0;" data-tb-confirm="Decline this request?" data-tb-confirm-label="Decline" data-tb-confirm-danger="true">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="id" value="@r.BookingId" />
                                                 <button type="submit" class="mini-btn danger" style="width:100%;">Decline</button>

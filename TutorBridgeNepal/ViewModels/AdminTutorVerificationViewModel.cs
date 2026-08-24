@@ -2,6 +2,9 @@
 
 public class AdminTutorVerificationViewModel
 {
+    public int TutorProfileId { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
     public string AdminName { get; set; } = string.Empty;
     public string AdminInitials { get; set; } = string.Empty;
 
@@ -39,6 +42,7 @@ public class AdminTutorVerificationViewModel
 public class AdminTutorVerificationRowViewModel
 {
     public int TutorProfileId { get; set; }
+    public string UserId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Initials { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;

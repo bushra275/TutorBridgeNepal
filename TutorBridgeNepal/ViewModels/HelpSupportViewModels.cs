@@ -3,6 +3,13 @@
 public class HelpSupportPageViewModel
 {
     public List<SupportTicketRowViewModel> MyTickets { get; set; } = new();
+    public List<BookingOptionViewModel> RecentBookings { get; set; } = new();
+}
+
+public class BookingOptionViewModel
+{
+    public int BookingId { get; set; }
+    public string Label { get; set; } = string.Empty;
 }
 
 public class SupportTicketRowViewModel

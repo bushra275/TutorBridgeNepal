@@ -98,14 +98,30 @@
                 <ul class="dash-nav">
                     <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
                     <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
-                    <li><a asp-controller="Admin" asp-action="TutorVerification"><span class="nav-icon">✅</span> Tutor Verification</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="TutorVerification">
+                            <span class="nav-icon">✅</span> Tutor Verification
+                            @if ((int)(ViewData["SidebarPendingVerificationsCount"] ?? 0) > 0)
+                            {
+                                <span class="badge-count">@ViewData["SidebarPendingVerificationsCount"]</span>
+                            }
+                        </a>
+                    </li>
                     <li>
                         <a asp-controller="Admin" asp-action="SessionLogs" class="active">
                             <span class="nav-icon">🗒️</span> Session Logs
                         </a>
                     </li>
                     <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
-                    <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="Complaints">
+                            <span class="nav-icon">⚠️</span> Complaints
+                            @if ((int)(ViewData["SidebarOpenComplaintsCount"] ?? 0) > 0)
+                            {
+                                <span class="badge-count">@ViewData["SidebarOpenComplaintsCount"]</span>
+                            }
+                        </a>
+                    </li>
                     <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
                     <li><a asp-controller="Admin" asp-action="Settings"><span class="nav-icon">⚙️</span> Settings</a></li>
                 </ul>
@@ -279,7 +295,7 @@
                                                 }
                                                 else
                                                 {
-                                                    <form asp-controller="Admin" asp-action="FlagSessionDisputed" method="post" style="margin:0;" onsubmit="return confirm('Flag this session as disputed?');">
+                                                    <form asp-controller="Admin" asp-action="FlagSessionDisputed" method="post" style="margin:0;" data-tb-confirm="Flag this session as disputed?" data-tb-confirm-label="Flag session" data-tb-confirm-danger="true">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="bookingId" value="@s.BookingId" />
                                                         <input type="hidden" name="returnUrl" value="@returnUrl" />

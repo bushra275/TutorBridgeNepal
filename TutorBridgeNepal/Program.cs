@@ -54,9 +54,6 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseAuthentication();
-app.UseAuthorization();
-
 // Per-device session enforcement (Tutor > Settings > Linked devices).
 // If the device behind this request has been revoked, sign it out
 // immediately instead of waiting for the auth cookie to expire.
@@ -91,9 +88,6 @@ app.Use(async (context, next) =>
 
     await next();
 });
-
-// Platform maintenance mode (Admin > Settings > Platform configuration).
-// ...
 
 // Platform maintenance mode (Admin > Settings > Platform configuration).
 // Admins and the Account controller (so an admin can still log in) always

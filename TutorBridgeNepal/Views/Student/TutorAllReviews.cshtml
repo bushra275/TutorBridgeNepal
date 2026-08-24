@@ -1,0 +1,103 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorProfileDetailViewModel
+@{
+    ViewData["Title"] = Model.FullName + " - All reviews";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@Model.FullName - Reviews - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_StudentTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_StudentSidebar")
+
+            <main class="dash-main">
+                <p class="tutor-meta mb-3">
+                    <a asp-controller="Student" asp-action="FindTutors" style="color:var(--muted); text-decoration:none;">Find Tutors</a>
+                    / <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@Model.TutorProfileId" style="color:var(--muted); text-decoration:none;">@Model.FullName</a>
+                    / <span style="color:var(--ink); font-weight:600;">All reviews</span>
+                </p>
+
+                <div class="profile-head-card" style="display:flex; gap:1.2rem; align-items:center; flex-wrap:wrap;">
+                    <div class="profile-head-avatar-wrap">
+                        <div class="profile-head-avatar">@Model.Initials</div>
+                    </div>
+                    <div style="flex:1; min-width:220px;">
+                        <h1 style="margin:0; font-size:1.5rem;">@Model.FullName</h1>
+                        <div class="stars" style="margin-top:.4rem;">
+                            @if (Model.AverageRating > 0)
+                            {
+                                var filled = (int)Math.Round(Model.AverageRating);
+                                @(new string('★', filled))
+                                @(new string('☆', 5 - filled))
+                                <span class="tutor-meta">@Model.AverageRating.ToString("0.0") (@Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s"))</span>
+                            }
+                            else
+                            {
+                                <span class="tutor-meta">New tutor</span>
+                            }
+                        </div>
+                    </div>
+                    <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@Model.TutorProfileId" class="tb-btn-outline">Back to profile</a>
+                </div>
+
+                <div class="info-panel">
+                    <h2>All reviews (@Model.Reviews.Count)</h2>
+
+                    @if (!Model.Reviews.Any())
+                    {
+                        <p class="review-empty">No reviews yet. Once a student rates a completed session with @Model.FullName.Split(' ')[0], it'll appear here.</p>
+                    }
+                    else
+                    {
+                        <div class="review-list">
+                            @foreach (var review in Model.Reviews)
+                            {
+                                var filled = review.Rating;
+                                <div class="review-row">
+                                    <div class="review-row-head">
+                                        <div class="review-avatar">@review.StudentInitials</div>
+                                        <div>
+                                            <div class="review-student-name">@review.StudentName</div>
+                                            <div class="review-stars">@(new string('★', filled))@(new string('☆', 5 - filled))</div>
+                                        </div>
+                                        <div class="review-date">@review.CreatedAt.ToString("d MMM yyyy")</div>
+                                    </div>
+
+                                    @if (!string.IsNullOrWhiteSpace(review.Comment))
+                                    {
+                                        <p class="review-comment">@review.Comment</p>
+                                    }
+
+                                    @if (!string.IsNullOrWhiteSpace(review.TutorReply))
+                                    {
+                                        <div class="review-reply">
+                                            <strong>@Model.FullName.Split(' ')[0]'s reply:</strong>
+                                            <p>@review.TutorReply</p>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

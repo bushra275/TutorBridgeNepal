@@ -383,6 +383,44 @@ public class StudentController : Controller
         return View(vm);
     }
 
+    public async Task<IActionResult> TutorAllReviews(int id)
+    {
+        await SetSidebarContextAsync("findtutors");
+
+        var tutor = await _context.TutorProfiles
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.Id == id && t.IsVerified);
+
+        if (tutor == null) return NotFound();
+
+        var reviews = await _context.Reviews
+            .Include(r => r.StudentProfile).ThenInclude(s => s.User)
+            .Where(r => r.TutorProfileId == id)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+
+        var vm = new TutorProfileDetailViewModel
+        {
+            TutorProfileId = tutor.Id,
+            FullName = tutor.User.FullName,
+            Initials = GetInitials(tutor.User.FullName),
+            AverageRating = tutor.AverageRating,
+            ReviewCount = tutor.ReviewCount,
+            Reviews = reviews.Select(r => new ReviewRowViewModel
+            {
+                StudentName = r.StudentProfile.User.FullName,
+                StudentInitials = GetInitials(r.StudentProfile.User.FullName),
+                Rating = r.Rating,
+                Comment = r.Comment,
+                CreatedAt = r.CreatedAt,
+                TutorReply = r.TutorReply,
+                TutorRepliedAt = r.TutorRepliedAt
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
     public async Task<IActionResult> TutorProfile(int id)
     {
         await SetSidebarContextAsync("findtutors");
@@ -1535,6 +1573,14 @@ public class StudentController : Controller
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
 
+        var recentBookings = await _context.Bookings
+            .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .Where(b => b.StudentProfileId == studentProfile.Id)
+            .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+            .Take(30)
+            .ToListAsync();
+
         var vm = new HelpSupportPageViewModel
         {
             MyTickets = tickets.Select(t => new SupportTicketRowViewModel
@@ -1545,6 +1591,11 @@ public class StudentController : Controller
                 Message = t.Message,
                 Status = t.Status,
                 CreatedAt = t.CreatedAt
+            }).ToList(),
+            RecentBookings = recentBookings.Select(b => new BookingOptionViewModel
+            {
+                BookingId = b.Id,
+                Label = $"{b.Subject} with {b.TutorProfile.User.FullName} · {b.TutorAvailabilitySlot.StartTime:d MMM yyyy} ({b.Status})"
             }).ToList()
         };
 

@@ -53,10 +53,26 @@
                 <ul class="dash-nav">
                     <li><a asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
                     <li><a asp-controller="Admin" asp-action="UserManagement"><span class="nav-icon">👥</span> User Management</a></li>
-                    <li><a asp-controller="Admin" asp-action="TutorVerification"><span class="nav-icon">✅</span> Tutor Verification</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="TutorVerification">
+                            <span class="nav-icon">✅</span> Tutor Verification
+                            @if ((int)(ViewData["SidebarPendingVerificationsCount"] ?? 0) > 0)
+                            {
+                                <span class="badge-count">@ViewData["SidebarPendingVerificationsCount"]</span>
+                            }
+                        </a>
+                    </li>
                     <li><a asp-controller="Admin" asp-action="SessionLogs"><span class="nav-icon">🗒️</span> Session Logs</a></li>
                     <li><a asp-controller="Admin" asp-action="Reports"><span class="nav-icon">📈</span> Reports</a></li>
-                    <li><a asp-controller="Admin" asp-action="Complaints"><span class="nav-icon">⚠️</span> Complaints</a></li>
+                    <li>
+                        <a asp-controller="Admin" asp-action="Complaints">
+                            <span class="nav-icon">⚠️</span> Complaints
+                            @if ((int)(ViewData["SidebarOpenComplaintsCount"] ?? 0) > 0)
+                            {
+                                <span class="badge-count">@ViewData["SidebarOpenComplaintsCount"]</span>
+                            }
+                        </a>
+                    </li>
                     <li><a asp-controller="Admin" asp-action="Notifications"><span class="nav-icon">🔔</span> Notifications</a></li>
                     <li><a asp-controller="Admin" asp-action="Settings" class="active"><span class="nav-icon">⚙️</span> Settings</a></li>
                 </ul>
@@ -115,7 +131,7 @@
                                 </form>
                                 @if (!string.IsNullOrEmpty(Model.PhotoUrl))
                                 {
-                                    <form asp-controller="Admin" asp-action="RemoveAdminPhoto" method="post" onsubmit="return confirm('Remove your profile photo?');">
+                                    <form asp-controller="Admin" asp-action="RemoveAdminPhoto" method="post" data-tb-confirm="Remove your profile photo?">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" class="tb-btn-danger-outline">Remove</button>
                                     </form>
@@ -244,156 +260,168 @@
                                     <button type="submit" class="toggle-switch @(Model.PlatformConfig.PlatformMaintenanceMode ? "on" : "")" aria-label="Toggle platform maintenance mode"><span class="toggle-knob"></span></button>
                                 </form>
                             </div>
+                        </div>
 
-                            <div class="panel danger-panel" id="danger-section">
-                                <div class="panel-head">
-                                    <h2>Danger zone</h2>
+                        <div class="panel danger-panel" id="danger-section">
+                            <div class="panel-head">
+                                <h2>Danger zone</h2>
+                            </div>
+                            <p class="tutor-meta mb-3">These actions are irreversible. Please proceed with caution.</p>
+
+                            @if (Model.IsSoleAdmin)
+                            {
+                                <div class="status-banner warn mb-3">
+                                    You're the only admin account on TutorBridge Nepal. Deactivation and deletion are disabled here until a second admin exists, so the platform never loses its only administrator.
                                 </div>
-                                <p class="tutor-meta mb-3">These actions are irreversible. Please proceed with caution.</p>
+                            }
 
-                                @if (Model.IsSoleAdmin)
-                                {
-                                    <div class="status-banner warn mb-3">
-                                        You're the only admin account on TutorBridge Nepal. Deactivation and deletion are disabled here until a second admin exists, so the platform never loses its only administrator.
-                                    </div>
-                                }
-
-                                <div class="settings-toggle-row">
-                                    <div>
-                                        <div class="settings-toggle-title">Deactivate account</div>
-                                        <div class="settings-toggle-sub">Signs you out and blocks logging back in until another admin reactivates it</div>
-                                    </div>
-                                    <form asp-controller="Admin" asp-action="DeactivateAdminAccount" method="post" id="deactivateAdminForm">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="confirmText" value="DEACTIVATE" />
-                                        <button type="submit" class="tb-btn-danger-outline" @(Model.IsSoleAdmin ? "disabled" : "")>Deactivate account</button>
-                                    </form>
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Deactivate account</div>
+                                    <div class="settings-toggle-sub">Signs you out and blocks logging back in until another admin reactivates it</div>
                                 </div>
-
-                                <div class="settings-toggle-row">
-                                    <div>
-                                        <div class="settings-toggle-title">Delete account</div>
-                                        <div class="settings-toggle-sub">Permanently removes this admin login. This cannot be undone</div>
-                                    </div>
-                                    <button type="button" class="tb-btn-danger" id="openDeleteAdminModal" @(Model.IsSoleAdmin ? "disabled" : "")>Delete account</button>
-                                </div>
-
-                                <form asp-controller="Admin" asp-action="DeleteAdminAccount" method="post" id="deleteAdminForm" class="settings-form-grid" style="@(Model.IsSoleAdmin ? "display:none;" : "margin-top:1rem;")">
+                                <form asp-controller="Admin" asp-action="DeactivateAdminAccount" method="post" id="deactivateAdminForm">
                                     @Html.AntiForgeryToken()
-                                    <div class="field full">
-                                        <label>Type <strong>DELETE</strong> to confirm</label>
-                                        <input type="text" name="confirmText" class="tb-input" placeholder="DELETE" autocomplete="off" id="deleteAdminConfirmInput" />
-                                    </div>
-                                    <div class="field full settings-actions" id="deleteAdminSubmitRow" style="display:none;">
-                                        <button type="submit" class="tb-btn-danger">Permanently delete my account</button>
-                                    </div>
+                                    <input type="hidden" name="confirmText" value="DEACTIVATE" />
+                                    <button type="submit" class="tb-btn-danger-outline" @(Model.IsSoleAdmin ? "disabled" : "")>Deactivate account</button>
                                 </form>
                             </div>
+
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <div class="settings-toggle-title">Delete account</div>
+                                    <div class="settings-toggle-sub">Permanently removes this admin login. This cannot be undone</div>
+                                </div>
+                                <button type="button" class="tb-btn-danger" id="openDeleteAdminModal" @(Model.IsSoleAdmin ? "disabled" : "")>Delete account</button>
+                            </div>
+
+                            <form asp-controller="Admin" asp-action="DeleteAdminAccount" method="post" id="deleteAdminForm" class="settings-form-grid" style="@(Model.IsSoleAdmin ? "display:none;" : "margin-top:1rem;")">
+                                @Html.AntiForgeryToken()
+                                <div class="field full">
+                                    <label>Type <strong>DELETE</strong> to confirm</label>
+                                    <input type="text" name="confirmText" class="tb-input" placeholder="DELETE" autocomplete="off" id="deleteAdminConfirmInput" />
+                                </div>
+                                <div class="field full settings-actions" id="deleteAdminSubmitRow" style="display:none;">
+                                    <button type="submit" class="tb-btn-danger">Permanently delete my account</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                </main>
-            </div>
+                </div>
+            </main>
         </div>
+    </div>
 
-        <script src="~/lib/jquery/dist/jquery.min.js"></script>
-        <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-        <script>
-                var adminPhotoToggle = document.getElementById('adminPhotoUploadToggle');
-                var adminPhotoForm = document.getElementById('adminPhotoUploadForm');
-                if (adminPhotoToggle && adminPhotoForm) {
-                    adminPhotoToggle.addEventListener('click', function() {
-                        adminPhotoForm.querySelector('input[type="file"]').click();
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            var adminPhotoToggle = document.getElementById('adminPhotoUploadToggle');
+            var adminPhotoForm = document.getElementById('adminPhotoUploadForm');
+            if (adminPhotoToggle && adminPhotoForm) {
+                adminPhotoToggle.addEventListener('click', function () {
+                    adminPhotoForm.querySelector('input[type="file"]').click();
+                });
+            }
+
+            // Scroll-spy: highlight the settings-nav item for whichever section is in view
+            (function () {
+                var navLinks = document.querySelectorAll('#settingsNav a[data-target]');
+                var sections = Array.prototype.slice.call(navLinks)
+                    .map(function (a) { return document.getElementById(a.dataset.target); })
+                    .filter(Boolean);
+
+                function setActive(id) {
+                    navLinks.forEach(function (a) {
+                        a.classList.toggle('active', a.dataset.target === id);
                     });
                 }
 
-                // Scroll-spy: highlight the settings-nav item for whichever section is in view
-                (function() {
-                    var navLinks = document.querySelectorAll('#settingsNav a[data-target]');
-                    var sections = Array.prototype.slice.call(navLinks)
-                        .map(function(a) { return document.getElementById(a.dataset.target); })
-                        .filter(Boolean);
+                var observer = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (entry) {
+                        if (entry.isIntersecting) setActive(entry.target.id);
+                    });
+                }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
 
-                    function setActive(id) {
-                        navLinks.forEach(function(a) {
-                            a.classList.toggle('active', a.dataset.target === id);
-                        });
+                sections.forEach(function (s) { observer.observe(s); });
+            })();
+
+            // Confirm before deactivating
+            var deactivateForm = document.getElementById('deactivateAdminForm');
+            if (deactivateForm) {
+                deactivateForm.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+                    var ok = await tbConfirm({
+                        title: 'Deactivate your account?',
+                        message: 'This will deactivate your admin account and sign you out.',
+                        confirmLabel: 'Deactivate',
+                        danger: true
+                    });
+                    if (ok) { e.target.submit(); }
+                });
+            }
+
+            // Reveal the "type DELETE" confirmation row instead of a bare confirm(),
+            // since deleting the only other admin account is high-stakes.
+            var openDeleteBtn = document.getElementById('openDeleteAdminModal');
+            var deleteForm = document.getElementById('deleteAdminForm');
+            var deleteSubmitRow = document.getElementById('deleteAdminSubmitRow');
+            var deleteConfirmInput = document.getElementById('deleteAdminConfirmInput');
+            if (openDeleteBtn && deleteForm) {
+                openDeleteBtn.addEventListener('click', function () {
+                    deleteForm.style.display = 'grid';
+                    deleteSubmitRow.style.display = 'flex';
+                    deleteConfirmInput.focus();
+                });
+            }
+            if (deleteForm) {
+                deleteForm.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+                    var ok = await tbConfirm({
+                        title: 'Delete your account?',
+                        message: 'This will permanently delete your admin account. This cannot be undone.',
+                        confirmLabel: 'Delete account',
+                        danger: true
+                    });
+                    if (ok) { e.target.submit(); }
+                });
+            }
+
+            // AJAX-submit every toggle so the page never reloads or scrolls back to
+            // top - each button flips only itself, independent of the others.
+            document.querySelectorAll('form.ajax-toggle-form').forEach(function (form) {
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+
+                    var btn = form.querySelector('.toggle-switch');
+                    var valueInput = form.querySelector('.toggle-value-input');
+
+                    var willBeOn = !btn.classList.contains('on');
+                    btn.classList.toggle('on'); // optimistic UI - flips instantly
+
+                    if (valueInput) {
+                        valueInput.value = willBeOn;
                     }
 
-                    var observer = new IntersectionObserver(function(entries) {
-                        entries.forEach(function(entry) {
-                            if (entry.isIntersecting) setActive(entry.target.id);
-                        });
-                    }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
-
-                    sections.forEach(function(s) { observer.observe(s); });
-                })();
-
-                // Confirm before deactivating
-                var deactivateForm = document.getElementById('deactivateAdminForm');
-                if (deactivateForm) {
-                    deactivateForm.addEventListener('submit', function(e) {
-                        if (!confirm('This will deactivate your admin account and sign you out. Are you sure?')) {
-                            e.preventDefault();
-                        }
-                    });
-                }
-
-                // Reveal the "type DELETE" confirmation row instead of a bare confirm(),
-                // since deleting the only other admin account is high-stakes.
-                var openDeleteBtn = document.getElementById('openDeleteAdminModal');
-                var deleteForm = document.getElementById('deleteAdminForm');
-                var deleteSubmitRow = document.getElementById('deleteAdminSubmitRow');
-                var deleteConfirmInput = document.getElementById('deleteAdminConfirmInput');
-                if (openDeleteBtn && deleteForm) {
-                    openDeleteBtn.addEventListener('click', function() {
-                        deleteForm.style.display = 'grid';
-                        deleteSubmitRow.style.display = 'flex';
-                        deleteConfirmInput.focus();
-                    });
-                }
-                if (deleteForm) {
-                    deleteForm.addEventListener('submit', function(e) {
-                        if (!confirm('This will permanently delete your admin account. Are you absolutely sure?')) {
-                            e.preventDefault();
-                        }
-                    });
-                }
-
-                // AJAX-submit every toggle so the page never reloads or scrolls back to
-                // top - each button flips only itself, independent of the others.
-                document.querySelectorAll('form.ajax-toggle-form').forEach(function(form) {
-                    form.addEventListener('submit', function(e) {
-                        e.preventDefault();
-
-                        var btn = form.querySelector('.toggle-switch');
-                        var valueInput = form.querySelector('.toggle-value-input');
-
-                        var willBeOn = !btn.classList.contains('on');
-                        btn.classList.toggle('on'); // optimistic UI - flips instantly
-
-                        if (valueInput) {
-                            valueInput.value = willBeOn;
-                        }
-
-                        fetch(form.action, {
-                            method: 'POST',
-                            body: new FormData(form),
-                            credentials: 'same-origin'
-                        }).then(function(res) {
-                            if (!res.ok) {
-                                btn.classList.toggle('on'); // revert if the save actually failed
-                                if (valueInput) {
-                                    valueInput.value = !willBeOn;
-                                }
-                            }
-                        }).catch(function() {
-                            btn.classList.toggle('on');
+                    fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        credentials: 'same-origin'
+                    }).then(function (res) {
+                        if (!res.ok) {
+                            btn.classList.toggle('on'); // revert if the save actually failed
                             if (valueInput) {
                                 valueInput.value = !willBeOn;
                             }
-                        });
+                        }
+                    }).catch(function () {
+                        btn.classList.toggle('on');
+                        if (valueInput) {
+                            valueInput.value = !willBeOn;
+                        }
                     });
                 });
-        </script>
-    </body>
+            });
+    </script>
+    <script src="~/js/tb-confirm.js" asp-append-version="true"></script>
+</body>
 </html>

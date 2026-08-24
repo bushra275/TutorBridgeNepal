@@ -166,6 +166,12 @@ public class AdminController : Controller
 
         ViewData["AdminNotifications"] = preview;
         ViewData["AdminNotificationCount"] = unreadCount;
+
+        ViewData["SidebarPendingVerificationsCount"] = await _context.TutorProfiles
+            .CountAsync(t => !t.IsVerified && !t.VerificationRejected);
+
+        ViewData["SidebarOpenComplaintsCount"] = await _context.SupportTickets
+            .CountAsync(t => t.Status != "Resolved");
     }
 
     // ── 5a: Helper methods ────────────────────────────────────────────────
@@ -347,7 +353,7 @@ public class AdminController : Controller
         var sessionCompletionRate = totalDecidedSessions == 0 ? 0 : (int)Math.Round(100.0 * completedSessions / totalDecidedSessions);
 
         var allRatings = await _context.Reviews.Select(r => r.Rating).ToListAsync();
-        var studentSatisfaction = allRatings.Count == 0 ? 0 : (int)Math.Round(20.0 * allRatings.Average());
+        var studentSatisfaction = allRatings.Count == 0 ? 0 : (int)Math.Round(100.0 * allRatings.Count(r => r >= 4) / allRatings.Count);    
 
         var totalTickets = await _context.SupportTickets.CountAsync();
         var resolvedTickets = await _context.SupportTickets.CountAsync(t => t.Status == "Resolved");
@@ -494,7 +500,7 @@ public class AdminController : Controller
         var sessionCompletionRate = totalDecidedSessions == 0 ? 0 : (int)Math.Round(100.0 * completedSessions / totalDecidedSessions);
 
         var allRatings = await _context.Reviews.Select(r => r.Rating).ToListAsync();
-        var studentSatisfaction = allRatings.Count == 0 ? 0 : (int)Math.Round(20.0 * allRatings.Average());
+        var studentSatisfaction = allRatings.Count == 0 ? 0 : (int)Math.Round(100.0 * allRatings.Count(r => r >= 4) / allRatings.Count);
 
         var totalTickets = await _context.SupportTickets.CountAsync();
         var resolvedTickets = await _context.SupportTickets.CountAsync(t => t.Status == "Resolved");
@@ -892,6 +898,7 @@ public class AdminController : Controller
             return new AdminTutorVerificationRowViewModel
             {
                 TutorProfileId = t.Id,
+                UserId = t.UserId,
                 Name = t.User.FullName,
                 Initials = GetInitials(t.User.FullName),
                 Email = t.User.Email ?? "",
@@ -2331,6 +2338,24 @@ public class AdminController : Controller
         }
 
         return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Complaints") : LocalRedirect(returnUrl);
+    }
+
+    public async Task<IActionResult> ComplaintDetail(int id, string? returnUrl)
+    {
+        await SetAdminNotificationBellAsync();
+
+        var ticket = await _context.SupportTickets
+            .Include(t => t.StudentProfile).ThenInclude(s => s!.User)
+            .Include(t => t.TutorProfile).ThenInclude(tp => tp!.User)
+            .Include(t => t.Booking).ThenInclude(b => b!.StudentProfile).ThenInclude(s => s.User)
+            .Include(t => t.Booking).ThenInclude(b => b!.TutorProfile).ThenInclude(tp => tp.User)
+            .Include(t => t.Booking).ThenInclude(b => b!.TutorAvailabilitySlot)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        if (ticket == null) return NotFound();
+
+        ViewData["ReturnUrl"] = returnUrl;
+        return View(BuildComplaintCard(ticket));
     }
 
     public async Task<IActionResult> ExportComplaintsCsv(
