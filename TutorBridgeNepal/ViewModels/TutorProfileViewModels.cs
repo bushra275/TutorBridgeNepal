@@ -61,6 +61,10 @@ public class TutorVerificationPendingViewModel
     // Set by an admin's "Request more info" action - shown as a banner
     // above the checklist so the tutor knows exactly what to fix.
     public string? AdminNote { get; set; }
+
+    public DateTime? InterviewScheduledAt { get; set; }
+    public string? InterviewMeetingLink { get; set; }
+    public bool InterviewIsUpcoming => InterviewScheduledAt.HasValue && InterviewScheduledAt.Value > DateTime.Now;
 }
 
 public class TutorSubjectRowViewModel

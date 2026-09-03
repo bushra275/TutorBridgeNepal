@@ -16,13 +16,35 @@ public class AdminController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IWebHostEnvironment _webHostEnvironment;
+    private readonly TutorBridgeNepal.Services.IEmailSender _emailSender;
 
-    public AdminController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment)
+    public AdminController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment, TutorBridgeNepal.Services.IEmailSender emailSender)
     {
         _context = context;
         _userManager = userManager;
         _signInManager = signInManager;
         _webHostEnvironment = webHostEnvironment;
+        _emailSender = emailSender;
+    }
+
+    // Best-effort - a failed email should never block an approve/reject/
+    // request-info/schedule-interview action, which has already been saved
+    // to the database by the time this runs.
+    private async Task SendTutorVerificationEmailAsync(ApplicationUser user, string subject, string bodyHtml)
+    {
+        if (string.IsNullOrWhiteSpace(user.Email)) return;
+
+        var sender = _emailSender as TutorBridgeNepal.Services.SmtpEmailSender;
+        if (sender == null || !sender.IsConfigured) return;
+
+        try
+        {
+            await _emailSender.SendEmailAsync(user.Email, subject, bodyHtml);
+        }
+        catch
+        {
+            // Logged inside SmtpEmailSender already - nothing more to do here.
+        }
     }
 
     // Returns the single PlatformSettings row, creating it with defaults
@@ -353,7 +375,7 @@ public class AdminController : Controller
         var sessionCompletionRate = totalDecidedSessions == 0 ? 0 : (int)Math.Round(100.0 * completedSessions / totalDecidedSessions);
 
         var allRatings = await _context.Reviews.Select(r => r.Rating).ToListAsync();
-        var studentSatisfaction = allRatings.Count == 0 ? 0 : (int)Math.Round(100.0 * allRatings.Count(r => r >= 4) / allRatings.Count);    
+        var studentSatisfaction = allRatings.Count == 0 ? 0 : (int)Math.Round(100.0 * allRatings.Count(r => r >= 4) / allRatings.Count);
 
         var totalTickets = await _context.SupportTickets.CountAsync();
         var resolvedTickets = await _context.SupportTickets.CountAsync(t => t.Status == "Resolved");
@@ -913,7 +935,10 @@ public class AdminController : Controller
                 UrgencyClass = daysAgo >= 2 ? "red" : "orange",
                 Documents = documents,
                 Status = t.IsVerified ? "Approved" : t.VerificationRejected ? "Rejected" : "Pending",
-                VerificationNote = t.VerificationNote
+                VerificationNote = t.VerificationNote,
+                AllDocumentsUploaded = documents.All(d => !d.IsMissing),
+                InterviewScheduledAt = t.InterviewScheduledAt,
+                InterviewMeetingLink = t.InterviewMeetingLink
             };
         }).ToList();
 
@@ -1288,6 +1313,13 @@ public class AdminController : Controller
     public async Task<IActionResult> ApproveTutor(int tutorProfileId, string? returnUrl)
     {
         var tutor = await _context.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorProfileId);
+
+        if (tutor != null && (!tutor.InterviewScheduledAt.HasValue || tutor.InterviewScheduledAt.Value > DateTime.Now))
+        {
+            TempData["SettingsError"] = "Schedule and complete the interview before approving this application.";
+            return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Dashboard") : LocalRedirect(returnUrl);
+        }
+
         if (tutor != null)
         {
             var platformSettings = await GetOrCreatePlatformSettingsAsync();
@@ -1323,6 +1355,13 @@ public class AdminController : Controller
     public async Task<IActionResult> RejectTutor(int tutorProfileId, string reason, string? returnUrl)
     {
         var tutor = await _context.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorProfileId);
+
+        if (tutor != null && (!tutor.InterviewScheduledAt.HasValue || tutor.InterviewScheduledAt.Value > DateTime.Now))
+        {
+            TempData["SettingsError"] = "Schedule and complete the interview before rejecting this application.";
+            return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Dashboard") : LocalRedirect(returnUrl);
+        }
+
         if (tutor != null)
         {
             tutor.IsVerified = false;
@@ -1684,6 +1723,41 @@ public class AdminController : Controller
         return View(vm);
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ScheduleTutorInterview(int tutorProfileId, DateTime interviewAt, string meetingLink, string? returnUrl)
+    {
+        var tutor = await _context.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorProfileId);
+
+        if (tutor == null || string.IsNullOrWhiteSpace(meetingLink) || interviewAt <= DateTime.Now)
+        {
+            TempData["SettingsError"] = "Please provide a valid meeting link and a future date/time.";
+            return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("TutorVerification") : LocalRedirect(returnUrl);
+        }
+
+        tutor.InterviewScheduledAt = interviewAt;
+        tutor.InterviewMeetingLink = meetingLink.Trim();
+
+        NotificationHelper.Create(_context,
+            type: "Verification",
+            title: "Interview scheduled",
+            message: $"Interview scheduled with {tutor.User.FullName} for {interviewAt:d MMM yyyy, h:mm tt}",
+            icon: "📅");
+
+        await _context.SaveChangesAsync();
+
+        await SendTutorVerificationEmailAsync(tutor.User, "Your TutorBridge Nepal interview is scheduled", $@"
+            <p>Hi {System.Net.WebUtility.HtmlEncode(tutor.User.FullName)},</p>
+            <p>Your documents have been reviewed and an interview has been scheduled to complete your tutor application:</p>
+            <p><strong>When:</strong> {interviewAt:dddd, d MMMM yyyy 'at' h:mm tt}</p>
+            <p><strong>Meeting link:</strong> <a href=""{System.Net.WebUtility.HtmlEncode(meetingLink.Trim())}"">{System.Net.WebUtility.HtmlEncode(meetingLink.Trim())}</a></p>
+            <p>Please join a few minutes early. We'll confirm your application status after the interview.</p>
+            <p>— TutorBridge Nepal</p>");
+
+        TempData["SettingsSuccess"] = "Interview scheduled and the tutor has been notified.";
+        return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("TutorVerification") : LocalRedirect(returnUrl);
+    }
+
     // Admin-initiated flag - lets an admin mark a session as disputed
     // directly (e.g. after a phone/email complaint) without requiring the
     // student or tutor to have filed a ticket through the app first.
@@ -1725,6 +1799,54 @@ public class AdminController : Controller
         }
 
         return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("SessionLogs") : LocalRedirect(returnUrl);
+    }
+
+    // Read-only lookup for the Session Logs "View" action - returns the
+    // details of one session as JSON so the front end can render them in a
+    // modal without navigating away from the Session Logs list (no
+    // dedicated details view exists, and this keeps "View" from mutating
+    // anything, unlike FlagSessionDisputed/ResolveDispute).
+    [HttpGet]
+    public async Task<IActionResult> SessionDetailsJson(int id)
+    {
+        var b = await _context.Bookings
+            .Include(x => x.StudentProfile).ThenInclude(s => s.User)
+            .Include(x => x.TutorProfile).ThenInclude(t => t.User)
+            .Include(x => x.TutorAvailabilitySlot)
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (b == null) return NotFound();
+
+        var ticket = await _context.SupportTickets
+            .Where(t => t.BookingId == id)
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        return Json(new
+        {
+            sessionId = $"SES-{b.Id:D4}",
+            studentName = b.StudentProfile.User.FullName,
+            studentEmail = b.StudentProfile.User.Email,
+            studentDistrict = b.StudentProfile.User.District,
+            tutorName = b.TutorProfile.User.FullName,
+            tutorEmail = b.TutorProfile.User.Email,
+            tutorDistrict = b.TutorProfile.User.District,
+            subject = b.Subject,
+            date = b.TutorAvailabilitySlot.StartTime.ToString("d MMM yyyy"),
+            time = $"{b.TutorAvailabilitySlot.StartTime:h:mm tt} - {b.TutorAvailabilitySlot.EndTime:h:mm tt}",
+            mode = b.TutorAvailabilitySlot.Mode,
+            status = ComputeSessionDisplayStatus(b, DateTime.Now),
+            createdAt = b.CreatedAt.ToString("d MMM yyyy, h:mm tt"),
+            decidedAt = b.DecidedAt?.ToString("d MMM yyyy, h:mm tt"),
+            declinedByTutor = b.DeclinedByTutor,
+            note = b.Note,
+            calendarSynced = b.GoogleCalendarEventId != null,
+            isDisputed = b.IsDisputed,
+            ticketSubject = ticket?.Subject,
+            ticketMessage = ticket?.Message,
+            ticketStatus = ticket?.Status,
+            ticketFiledAt = ticket?.CreatedAt.ToString("d MMM yyyy, h:mm tt")
+        });
     }
 
     public async Task<IActionResult> ExportSessionLogsCsv(

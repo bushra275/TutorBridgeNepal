@@ -4,6 +4,7 @@ using TutorBridgeNepal.Data;
 using TutorBridgeNepal.Models;
 using TutorBridgeNepal.Services;
 using Microsoft.AspNetCore.Authentication.Google;
+using TutorBridgeNepal.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.Configure<GoogleOAuthOptions>(builder.Configuration.GetSection("Authentication:Google"));
 builder.Services.AddHttpClient<GoogleCalendarService>();
 builder.Services.AddHttpClient(); // generic IHttpClientFactory, used by the OAuth callback itself
+builder.Services.AddScoped<TutorBridgeNepal.Services.IEmailSender, TutorBridgeNepal.Services.SmtpEmailSender>();
 
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 {
@@ -39,7 +41,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 builder.Services.AddControllersWithViews();
-
+builder.Services.AddSignalR();
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -125,6 +127,7 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 app.MapRazorPages();
+app.MapHub<ChatHub>("/hubs/chat");
 
 using (var scope = app.Services.CreateScope())
 {

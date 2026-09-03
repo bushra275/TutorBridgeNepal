@@ -1010,6 +1010,7 @@ a {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.15rem 2.05rem;
+    align-items: start;
 }
 
 .field {
@@ -1294,7 +1295,7 @@ a {
 
 .input-error {
     border-color: #d9534f !important;
-    box-shadow: 0 0 0 3px rgba(217, 83, 79, .12);
+    box-shadow: none !important;
 }
 
 .confirm-box {

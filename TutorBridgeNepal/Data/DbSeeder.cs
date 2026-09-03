@@ -21,7 +21,7 @@ public static class DbSeeder
             }
         }
 
-        var adminEmail = "admin@tutorbridge.com";
+        var adminEmail = "info.bushrashefi@gmail.com";
         var admin = await userManager.FindByEmailAsync(adminEmail);
 
         if (admin == null)

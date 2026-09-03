@@ -1,0 +1,194 @@
+﻿@model TutorBridgeNepal.ViewModels.TutorProfileDetailViewModel
+@{
+    ViewData["Title"] = "Reschedule session";
+    Layout = null;
+
+    var dateGroups = Model.SlotsByDate;
+    var displayMonth = Model.DisplayMonth;
+    var isCurrentOrPastMonth = displayMonth.Year == DateTime.Today.Year && displayMonth.Month == DateTime.Today.Month;
+    var prevMonthDate = displayMonth.AddMonths(-1);
+    var nextMonthDate = displayMonth.AddMonths(1);
+    var daysInMonth = DateTime.DaysInMonth(displayMonth.Year, displayMonth.Month);
+    var leadingBlanks = (int)displayMonth.DayOfWeek;
+    var availableDateSet = dateGroups.Select(g => g.Date).ToHashSet();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reschedule session - TutorBridge Nepal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="dash-shell">
+        @await Html.PartialAsync("_StudentTopbar")
+
+        <div class="dash-body">
+            @await Html.PartialAsync("_StudentSidebar")
+
+            <main class="dash-main">
+                <p class="tutor-meta mb-3">
+                    <a asp-controller="Student" asp-action="Sessions" style="color:var(--muted); text-decoration:none;">My Sessions</a>
+                    / <span style="color:var(--ink); font-weight:600;">Reschedule</span>
+                </p>
+
+                @if (TempData["BookingError"] != null)
+                {
+                    <div class="status-banner warn mb-3">@TempData["BookingError"]</div>
+                }
+
+                <div class="profile-head-card" style="display:flex; gap:1.2rem; align-items:center; flex-wrap:wrap;">
+                    <div class="profile-head-avatar">@Model.Initials</div>
+                    <div style="flex:1; min-width:220px;">
+                        <h1 style="margin:0; font-size:1.5rem;">Reschedule with @Model.FullName</h1>
+                        <p class="tutor-meta mb-1" style="margin-top:.4rem;">
+                            Currently booked for @Model.CurrentSlotStartTime?.ToString("dddd, d MMM yyyy") ·
+                            @Model.CurrentSlotStartTime?.ToString("h:mm tt") – @Model.CurrentSlotEndTime?.ToString("h:mm tt")
+                        </p>
+                    </div>
+                    <a asp-controller="Student" asp-action="Sessions" class="tb-btn-outline">Cancel, keep current time</a>
+                </div>
+
+                <div class="booking-panel" style="max-width:640px;">
+                    <h2>Pick a new time</h2>
+                    <p class="tutor-meta">Subject: @Model.RescheduleSubject</p>
+
+                    @if (!dateGroups.Any())
+                    {
+                        <p class="empty-state">This tutor has no other open slots right now. Try again later, or message them directly.</p>
+                    }
+                    else
+                    {
+                        <form asp-controller="Student" asp-action="ConfirmReschedule" method="post" id="rescheduleForm">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="bookingId" value="@Model.RescheduleBookingId" />
+                            <input type="hidden" name="newSlotId" id="selectedSlotId" required />
+
+                            <div class="step-label">Select date</div>
+                            <div class="calendar-box">
+                                <div class="calendar-title">
+                                    @if (isCurrentOrPastMonth)
+                                    {
+                                        <span class="cal-nav-arrow disabled" aria-hidden="true">‹</span>
+                                    }
+                                    else
+                                    {
+                                        <a class="cal-nav-arrow" asp-action="RescheduleBooking" asp-route-id="@Model.RescheduleBookingId" asp-route-month="@prevMonthDate.Month" asp-route-year="@prevMonthDate.Year">‹</a>
+                                    }
+                                    <span>@displayMonth.ToString("MMMM yyyy")</span>
+                                    <a class="cal-nav-arrow" asp-action="RescheduleBooking" asp-route-id="@Model.RescheduleBookingId" asp-route-month="@nextMonthDate.Month" asp-route-year="@nextMonthDate.Year">›</a>
+                                </div>
+                                <div class="calendar-grid">
+                                    <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
+
+                                    @for (int i = 0; i < leadingBlanks; i++)
+                                    {
+                                        <div class="cal-day cal-day-empty"></div>
+                                    }
+
+                                    @for (int day = 1; day <= daysInMonth; day++)
+                                    {
+                                        var thisDate = new DateTime(displayMonth.Year, displayMonth.Month, day);
+                                        var isAvailable = availableDateSet.Contains(thisDate);
+                                        <div class="cal-day @(isAvailable ? "cal-day-available" : "cal-day-unavailable")"
+                                             data-date="@thisDate.ToString("yyyy-MM-dd")">
+                                            <span class="cal-day-num">@day</span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="step-label">Select time slot</div>
+                            <div id="noDateMessage" class="no-date-selected">Pick an available date above to see open time slots.</div>
+
+                            @foreach (var group in dateGroups)
+                            {
+                                var morning = group.Slots.Where(s => s.StartTime.Hour < 17).ToList();
+                                var evening = group.Slots.Where(s => s.StartTime.Hour >= 17).ToList();
+                                <div class="slot-date-group" data-date="@group.Date.ToString("yyyy-MM-dd")" style="display:none;">
+                                    @if (morning.Any())
+                                    {
+                                        <div class="slot-section-label">Morning</div>
+                                        <div class="slot-pill-row">
+                                            @foreach (var slot in morning)
+                                            {
+                                                <div class="slot-pill" data-slot-id="@slot.SlotId" data-start="@slot.StartTime.ToString("h:mm tt")" data-date-label="@slot.StartTime.ToString("ddd, d MMM yyyy")">@slot.StartTime.ToString("h:mm tt")</div>
+                                            }
+                                        </div>
+                                    }
+                                    @if (evening.Any())
+                                    {
+                                        <div class="slot-section-label">Evening</div>
+                                        <div class="slot-pill-row">
+                                            @foreach (var slot in evening)
+                                            {
+                                                <div class="slot-pill" data-slot-id="@slot.SlotId" data-start="@slot.StartTime.ToString("h:mm tt")" data-date-label="@slot.StartTime.ToString("ddd, d MMM yyyy")">@slot.StartTime.ToString("h:mm tt")</div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <div class="booking-summary-box">
+                                <dl>
+                                    <dt>New time</dt>
+                                    <dd id="summaryDateTime">—</dd>
+                                </dl>
+                                <button type="submit" class="tb-btn" id="confirmBtn" disabled>Confirm new time</button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            (function() {
+                var dayCells = document.querySelectorAll('.cal-day-available');
+                var slotGroups = document.querySelectorAll('.slot-date-group');
+                var noDateMessage = document.getElementById('noDateMessage');
+                var confirmBtn = document.getElementById('confirmBtn');
+                var selectedSlotIdInput = document.getElementById('selectedSlotId');
+                var summaryDateTime = document.getElementById('summaryDateTime');
+
+                dayCells.forEach(function(cell) {
+                    cell.addEventListener('click', function() {
+                        dayCells.forEach(function(c) { c.classList.remove('cal-day-selected'); });
+                        cell.classList.add('cal-day-selected');
+
+                        var date = cell.getAttribute('data-date');
+                        slotGroups.forEach(function(g) {
+                            g.style.display = (g.getAttribute('data-date') === date) ? 'block' : 'none';
+                        });
+                        noDateMessage.style.display = 'none';
+                        selectedSlotIdInput.value = '';
+                        summaryDateTime.textContent = '—';
+                        confirmBtn.disabled = true;
+                    });
+                });
+
+                slotGroups.forEach(function(group) {
+                    group.querySelectorAll('.slot-pill').forEach(function(pill) {
+                        pill.addEventListener('click', function() {
+                            document.querySelectorAll('.slot-pill').forEach(function(p) { p.classList.remove('selected'); });
+                            pill.classList.add('selected');
+
+                            selectedSlotIdInput.value = pill.getAttribute('data-slot-id');
+                            summaryDateTime.textContent = pill.getAttribute('data-date-label') + ' · ' + pill.getAttribute('data-start');
+                            confirmBtn.disabled = false;
+                        });
+                    });
+                });
+            })();
+    </script>
+</body>
+</html>

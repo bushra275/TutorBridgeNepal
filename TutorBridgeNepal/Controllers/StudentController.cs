@@ -2,7 +2,10 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
+using System.Data;
 using TutorBridgeNepal.Data;
 using TutorBridgeNepal.Helpers;
 using TutorBridgeNepal.Models;
@@ -19,14 +22,16 @@ public class StudentController : Controller
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly GoogleCalendarService _googleCalendarService;
+    private readonly IHubContext<TutorBridgeNepal.Hubs.ChatHub> _chatHub;
 
-    public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment, GoogleCalendarService googleCalendarService)
+    public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment, GoogleCalendarService googleCalendarService, IHubContext<TutorBridgeNepal.Hubs.ChatHub> chatHub)
     {
         _context = context;
         _userManager = userManager;
         _signInManager = signInManager;
         _webHostEnvironment = webHostEnvironment;
         _googleCalendarService = googleCalendarService;
+        _chatHub = chatHub;
     }
 
     private static string GetInitials(string fullName)
@@ -253,6 +258,7 @@ public class StudentController : Controller
             UpcomingSessions = upcoming.Take(5).Select(b => new BookingRowViewModel
             {
                 BookingId = b.Id,
+                TutorProfileId = b.TutorProfileId,
                 TutorName = b.TutorProfile.User.FullName,
                 TutorInitials = GetInitials(b.TutorProfile.User.FullName),
                 Subject = b.Subject,
@@ -263,6 +269,7 @@ public class StudentController : Controller
             RecentSessions = recent.Take(5).Select(b => new BookingRowViewModel
             {
                 BookingId = b.Id,
+                TutorProfileId = b.TutorProfileId,
                 TutorName = b.TutorProfile.User.FullName,
                 TutorInitials = GetInitials(b.TutorProfile.User.FullName),
                 Subject = b.Subject,
@@ -383,6 +390,234 @@ public class StudentController : Controller
         return View(vm);
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AcceptProposedTime(int bookingId)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        var booking = await _context.Bookings
+            .FirstOrDefaultAsync(b => b.Id == bookingId && b.StudentProfileId == studentProfile.Id && b.Status == "AwaitingStudentConfirmation");
+
+        if (booking != null)
+        {
+            booking.Status = "Confirmed";
+            booking.DecidedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+            TempData["BookingSuccess"] = "New time confirmed!";
+        }
+
+        return RedirectToAction("Sessions");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeclineProposedTime(int bookingId)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        var booking = await _context.Bookings
+            .Include(b => b.TutorAvailabilitySlot)
+            .FirstOrDefaultAsync(b => b.Id == bookingId && b.StudentProfileId == studentProfile.Id && b.Status == "AwaitingStudentConfirmation");
+
+        if (booking != null)
+        {
+            booking.Status = "Cancelled";
+            booking.DecidedAt = DateTime.Now;
+
+            var slotId = booking.TutorAvailabilitySlotId;
+            var remaining = await _context.Bookings
+                .CountAsync(b => b.TutorAvailabilitySlotId == slotId && b.Status != "Cancelled" && b.Id != booking.Id);
+            booking.TutorAvailabilitySlot.IsBooked = remaining >= booking.TutorAvailabilitySlot.Capacity;
+
+            await _context.SaveChangesAsync();
+            TempData["BookingSuccess"] = "Proposed time declined.";
+        }
+
+        return RedirectToAction("Sessions");
+    }
+
+    public async Task<IActionResult> RescheduleBooking(int id, int? month, int? year)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        var booking = await _context.Bookings
+            .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .FirstOrDefaultAsync(b => b.Id == id && b.StudentProfileId == studentProfile.Id);
+
+        if (booking == null
+            || (booking.Status != "Pending" && booking.Status != "Confirmed")
+            || booking.TutorAvailabilitySlot.StartTime <= DateTime.Now)
+        {
+            TempData["BookingError"] = "This session can't be rescheduled.";
+            return RedirectToAction("Sessions");
+        }
+
+        await SetSidebarContextAsync("sessions");
+
+        var now = DateTime.Now;
+        var earliestMonth = new DateTime(now.Year, now.Month, 1);
+        var displayMonth = earliestMonth;
+        if (month.HasValue && year.HasValue && month.Value >= 1 && month.Value <= 12 && year.Value >= 1)
+        {
+            try
+            {
+                var requested = new DateTime(year.Value, month.Value, 1);
+                if (requested > earliestMonth) displayMonth = requested;
+            }
+            catch (ArgumentOutOfRangeException) { /* keep the default */ }
+        }
+
+        // Same tutor's other open slots, excluding the one this booking is
+        // already on (rescheduling onto the same slot is a no-op).
+        var slots = await _context.TutorAvailabilitySlots
+            .Where(s => s.TutorProfileId == booking.TutorProfileId
+                && !s.IsBooked
+                && s.StartTime >= now
+                && s.Id != booking.TutorAvailabilitySlotId)
+            .OrderBy(s => s.StartTime)
+            .Take(60)
+            .ToListAsync();
+
+        var vm = new TutorProfileDetailViewModel
+        {
+            TutorProfileId = booking.TutorProfileId,
+            FullName = booking.TutorProfile.User.FullName,
+            Initials = GetInitials(booking.TutorProfile.User.FullName),
+            RescheduleBookingId = booking.Id,
+            RescheduleSubject = booking.Subject,
+            CurrentSlotStartTime = booking.TutorAvailabilitySlot.StartTime,
+            CurrentSlotEndTime = booking.TutorAvailabilitySlot.EndTime,
+            DisplayMonth = displayMonth,
+            AvailableSlots = slots.Select(s => new AvailableSlotViewModel
+            {
+                SlotId = s.Id,
+                StartTime = s.StartTime,
+                EndTime = s.EndTime
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ConfirmReschedule(int bookingId, int newSlotId)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        var booking = await _context.Bookings
+            .Include(b => b.TutorProfile)
+            .Include(b => b.TutorAvailabilitySlot)
+            .FirstOrDefaultAsync(b => b.Id == bookingId && b.StudentProfileId == studentProfile.Id);
+
+        if (booking == null
+            || (booking.Status != "Pending" && booking.Status != "Confirmed")
+            || booking.TutorAvailabilitySlot.StartTime <= DateTime.Now)
+        {
+            TempData["BookingError"] = "This session can't be rescheduled.";
+            return RedirectToAction("Sessions");
+        }
+
+        var tutor = booking.TutorProfile;
+        var platformSettings = await GetOrCreatePlatformSettingsAsync();
+        var oldSlotId = booking.TutorAvailabilitySlotId;
+
+        // Serializable-transaction pattern as BookSlot, for the same
+        // reason: the capacity re-check and the update both need to happen
+        // atomically so two people can't both grab the last seat on the
+        // target slot at once.
+        using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
+        {
+            var newSlot = await _context.TutorAvailabilitySlots
+                .FirstOrDefaultAsync(s => s.Id == newSlotId && s.TutorProfileId == booking.TutorProfileId);
+
+            if (newSlot == null)
+            {
+                await transaction.RollbackAsync();
+                TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
+                return RedirectToAction("RescheduleBooking", new { id = bookingId });
+            }
+
+            var effectiveMinNoticeHours = platformSettings.AllowSameDayBooking
+                ? tutor.MinimumBookingNoticeHours
+                : Math.Max(tutor.MinimumBookingNoticeHours, 24);
+
+            if (effectiveMinNoticeHours > 0 && newSlot.StartTime < DateTime.Now.AddHours(effectiveMinNoticeHours))
+            {
+                await transaction.RollbackAsync();
+                TempData["BookingError"] = platformSettings.AllowSameDayBooking
+                    ? $"This tutor requires at least {tutor.MinimumBookingNoticeHours} hours' notice before a session. Please choose a later slot."
+                    : "Same-day bookings aren't allowed right now. Please choose a slot at least 24 hours from now.";
+                return RedirectToAction("RescheduleBooking", new { id = bookingId });
+            }
+
+            var activeCount = await _context.Bookings
+                .CountAsync(b => b.TutorAvailabilitySlotId == newSlotId && b.Status != "Cancelled");
+
+            if (activeCount >= newSlot.Capacity)
+            {
+                await transaction.RollbackAsync();
+                TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
+                return RedirectToAction("RescheduleBooking", new { id = bookingId });
+            }
+
+            if (tutor.MaxSessionsPerDay > 0)
+            {
+                var sameDaySessionCount = await _context.Bookings
+                    .Include(b => b.TutorAvailabilitySlot)
+                    .CountAsync(b => b.TutorProfileId == tutor.Id
+                        && b.Status != "Cancelled"
+                        && b.Id != booking.Id
+                        && b.TutorAvailabilitySlot.StartTime.Date == newSlot.StartTime.Date);
+
+                if (sameDaySessionCount >= tutor.MaxSessionsPerDay)
+                {
+                    await transaction.RollbackAsync();
+                    TempData["BookingError"] = "This tutor has reached their maximum sessions for that day. Please choose another date.";
+                    return RedirectToAction("RescheduleBooking", new { id = bookingId });
+                }
+            }
+
+            // Moving to a new time needs the tutor to reconfirm, unless
+            // they've opted in to auto-accepting this returning student -
+            // the same rule normal booking uses.
+            var isReturningStudent = tutor.AutoAcceptReturningStudents;
+
+            booking.TutorAvailabilitySlotId = newSlot.Id;
+            booking.Status = isReturningStudent ? "Confirmed" : "Pending";
+            booking.DecidedAt = isReturningStudent ? DateTime.Now : null;
+
+            newSlot.IsBooked = (activeCount + 1) >= newSlot.Capacity;
+
+            var oldSlot = await _context.TutorAvailabilitySlots.FirstOrDefaultAsync(s => s.Id == oldSlotId);
+            if (oldSlot != null)
+            {
+                var remainingOnOldSlot = await _context.Bookings
+                    .CountAsync(b => b.TutorAvailabilitySlotId == oldSlotId && b.Status != "Cancelled" && b.Id != booking.Id);
+                oldSlot.IsBooked = remainingOnOldSlot >= oldSlot.Capacity;
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch (SqlException ex) when (ex.Number == 1205) // SQL Server deadlock victim
+        {
+            await transaction.RollbackAsync();
+            TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
+            return RedirectToAction("RescheduleBooking", new { id = bookingId });
+        }
+
+        TempData["BookingSuccess"] = "Session rescheduled! Your tutor will confirm the new time shortly.";
+        return RedirectToAction("Sessions");
+    }
+
     public async Task<IActionResult> TutorAllReviews(int id)
     {
         await SetSidebarContextAsync("findtutors");
@@ -421,7 +656,7 @@ public class StudentController : Controller
         return View(vm);
     }
 
-    public async Task<IActionResult> TutorProfile(int id)
+    public async Task<IActionResult> TutorProfile(int id, int? month, int? year)
     {
         await SetSidebarContextAsync("findtutors");
 
@@ -432,6 +667,22 @@ public class StudentController : Controller
         if (tutor == null) return NotFound();
 
         var now = DateTime.Now;
+
+        // Which calendar month to display - defaults to the current month,
+        // but never earlier than that (no point browsing past months to
+        // book a session). Clamped to a valid month/year even if garbage
+        // query-string values are passed in directly.
+        var earliestMonth = new DateTime(now.Year, now.Month, 1);
+        var displayMonth = earliestMonth;
+        if (month.HasValue && year.HasValue && month.Value >= 1 && month.Value <= 12 && year.Value >= 1)
+        {
+            try
+            {
+                var requested = new DateTime(year.Value, month.Value, 1);
+                if (requested > earliestMonth) displayMonth = requested;
+            }
+            catch (ArgumentOutOfRangeException) { /* keep the default */ }
+        }
         var slots = await _context.TutorAvailabilitySlots
             .Where(s => s.TutorProfileId == id && !s.IsBooked && s.StartTime >= now)
             .OrderBy(s => s.StartTime)
@@ -460,6 +711,7 @@ public class StudentController : Controller
             AverageRating = tutor.AverageRating,
             ReviewCount = tutor.ReviewCount,
             CompletedSessionsCount = completedSessionsCount,
+            DisplayMonth = displayMonth,
             AvailableSlots = slots.Select(s => new AvailableSlotViewModel
             {
                 SlotId = s.Id,
@@ -498,23 +750,14 @@ public class StudentController : Controller
             return RedirectToAction("TutorProfile", new { id = tutorProfileId });
         }
 
-        // Capacity check (supports group sessions where Capacity > 1) instead
-        // of a plain booked/not-booked flag.
-        var activeCount = await _context.Bookings
-            .CountAsync(b => b.TutorAvailabilitySlotId == slotId && b.Status != "Cancelled");
-
-        if (activeCount >= slot.Capacity)
-        {
-            TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
-            return RedirectToAction("TutorProfile", new { id = tutorProfileId });
-        }
-
         var tutor = slot.TutorProfile;
 
         // Minimum booking notice - the tutor's own policy from Settings.
         // Minimum booking notice - the tutor's own policy, floored at 24h
         // platform-wide unless "Allow same-day booking" is on
         // (Admin > Settings > Platform configuration).
+        // This check doesn't depend on concurrent bookings from other
+        // students, so it's safe to evaluate before opening the transaction.
         var platformSettings = await GetOrCreatePlatformSettingsAsync();
         var effectiveMinNoticeHours = platformSettings.AllowSameDayBooking
             ? tutor.MinimumBookingNoticeHours
@@ -528,48 +771,76 @@ public class StudentController : Controller
             return RedirectToAction("TutorProfile", new { id = tutorProfileId });
         }
 
-        // Max sessions per day - counts this tutor's other non-cancelled
-        // bookings that fall on the same calendar day as the requested slot.
-        if (tutor.MaxSessionsPerDay > 0)
-        {
-            var sameDaySessionCount = await _context.Bookings
-                .Include(b => b.TutorAvailabilitySlot)
-                .CountAsync(b => b.TutorProfileId == tutor.Id
-                    && b.Status != "Cancelled"
-                    && b.TutorAvailabilitySlot.StartTime.Date == slot.StartTime.Date);
-
-            if (sameDaySessionCount >= tutor.MaxSessionsPerDay)
-            {
-                TempData["BookingError"] = "This tutor has reached their maximum sessions for that day. Please choose another date.";
-                return RedirectToAction("TutorProfile", new { id = tutorProfileId });
-            }
-        }
-
         // Auto-accept returning students - if this student has a prior
         // non-cancelled booking with this tutor and the tutor has opted in,
         // skip the manual approval step.
         var isReturningStudent = tutor.AutoAcceptReturningStudents && await _context.Bookings
             .AnyAsync(b => b.StudentProfileId == studentProfile.Id && b.TutorProfileId == tutor.Id && b.Status != "Cancelled");
 
-        var booking = new Booking
+        // Slot capacity AND the daily-session cap are both re-checked inside
+        // this Serializable transaction, right before the insert. Both are
+        // counts of other Bookings rows that another concurrent request could
+        // just as easily be racing against - e.g. two requests both narrowly
+        // passing "sessions today < cap" at once. Serializable isolation
+        // range-locks the matching Bookings rows so a second concurrent
+        // request blocks until the first commits, then re-evaluates against
+        // the now-current data instead of a stale snapshot.
+        using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
         {
-            StudentProfileId = studentProfile.Id,
-            TutorProfileId = slot.TutorProfileId,
-            TutorAvailabilitySlotId = slot.Id,
-            Subject = string.IsNullOrWhiteSpace(subject) ? "General" : subject,
-            Status = isReturningStudent ? "Confirmed" : "Pending",
-            Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
-        };
+            var activeCount = await _context.Bookings
+                .CountAsync(b => b.TutorAvailabilitySlotId == slotId && b.Status != "Cancelled");
 
-        if (isReturningStudent)
-        {
-            booking.DecidedAt = DateTime.Now;
+            if (activeCount >= slot.Capacity)
+            {
+                await transaction.RollbackAsync();
+                TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
+                return RedirectToAction("TutorProfile", new { id = tutorProfileId });
+            }
+
+            if (tutor.MaxSessionsPerDay > 0)
+            {
+                var sameDaySessionCount = await _context.Bookings
+                    .Include(b => b.TutorAvailabilitySlot)
+                    .CountAsync(b => b.TutorProfileId == tutor.Id
+                        && b.Status != "Cancelled"
+                        && b.TutorAvailabilitySlot.StartTime.Date == slot.StartTime.Date);
+
+                if (sameDaySessionCount >= tutor.MaxSessionsPerDay)
+                {
+                    await transaction.RollbackAsync();
+                    TempData["BookingError"] = "This tutor has reached their maximum sessions for that day. Please choose another date.";
+                    return RedirectToAction("TutorProfile", new { id = tutorProfileId });
+                }
+            }
+
+            var booking = new Booking
+            {
+                StudentProfileId = studentProfile.Id,
+                TutorProfileId = slot.TutorProfileId,
+                TutorAvailabilitySlotId = slot.Id,
+                Subject = string.IsNullOrWhiteSpace(subject) ? "General" : subject,
+                Status = isReturningStudent ? "Confirmed" : "Pending",
+                Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
+            };
+
+            if (isReturningStudent)
+            {
+                booking.DecidedAt = DateTime.Now;
+            }
+
+            _context.Bookings.Add(booking);
+
+            slot.IsBooked = (activeCount + 1) >= slot.Capacity;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
-
-        _context.Bookings.Add(booking);
-
-        slot.IsBooked = (activeCount + 1) >= slot.Capacity;
-        await _context.SaveChangesAsync();
+        catch (SqlException ex) when (ex.Number == 1205) // SQL Server deadlock victim
+        {
+            await transaction.RollbackAsync();
+            TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
+            return RedirectToAction("TutorProfile", new { id = tutorProfileId });
+        }
 
         TempData["BookingSuccess"] = isReturningStudent
             ? "Session booked and automatically confirmed!"
@@ -853,6 +1124,7 @@ public class StudentController : Controller
             }
         }
 
+        ViewBag.StudentProfileId = studentProfile.Id;
         return View(vm);
     }
 
@@ -888,6 +1160,50 @@ public class StudentController : Controller
 
         return RedirectToAction("Messages", new { tutorProfileId });
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendMessageLive(int tutorProfileId, string content, string? connectionId)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(content)) return BadRequest();
+
+        var hasRelationship = await _context.Bookings
+            .AnyAsync(b => b.StudentProfileId == studentProfile.Id && b.TutorProfileId == tutorProfileId);
+        if (!hasRelationship) return Forbid();
+
+        var message = new Message
+        {
+            StudentProfileId = studentProfile.Id,
+            TutorProfileId = tutorProfileId,
+            SenderRole = "Student",
+            Content = content.Trim(),
+            SentAt = DateTime.Now,
+            IsRead = false
+        };
+        _context.Messages.Add(message);
+        await _context.SaveChangesAsync();
+
+        var groupName = TutorBridgeNepal.Hubs.ChatHub.GroupName(studentProfile.Id, tutorProfileId);
+        var payload = new
+        {
+            senderRole = "Student",
+            content = message.Content,
+            sentAt = message.SentAt.ToString("h:mm tt"),
+            studentProfileId = studentProfile.Id,
+            tutorProfileId
+        };
+
+        if (!string.IsNullOrEmpty(connectionId))
+            await _chatHub.Clients.GroupExcept(groupName, connectionId).SendAsync("ReceiveMessage", payload);
+        else
+            await _chatHub.Clients.Group(groupName).SendAsync("ReceiveMessage", payload);
+
+        return Ok(new { sentAt = message.SentAt.ToString("h:mm tt") });
+    }
+
     public async Task<IActionResult> MyTutors(string tab = "active", string? subject = null, string sort = "recent")
     {
         var studentProfile = await GetCurrentStudentProfileAsync();

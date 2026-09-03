@@ -153,8 +153,8 @@
                                                 <input type="hidden" name="id" value="@r.BookingId" />
                                                 <button type="submit" class="mini-btn danger" style="width:100%;">Decline</button>
                                             </form>
-                                            <span class="disabled-btn" title="Proposing a new time isn't built yet">Propose new time</span>
-                                        </div>
+                                            <a asp-controller="Tutor" asp-action="ProposeNewTime" asp-route-bookingId="@r.BookingId" class="mini-btn" style="width:100%; text-align:center;">Propose new time</a>
+                                            </div>
                                     </div>
                                 }
                             }

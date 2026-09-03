@@ -33,6 +33,7 @@ public class RecentMessageViewModel
 public class BookingRowViewModel
 {
     public int BookingId { get; set; }
+    public int TutorProfileId { get; set; }
     public string TutorName { get; set; } = string.Empty;
     public string TutorInitials { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;

@@ -57,11 +57,13 @@
                         </div>
                         <div class="field">
                             <label asp-for="Email">Email Address</label>
-                            <input asp-for="Email" class="tb-input step-required" placeholder="name@example.com" />
+                            <input asp-for="Email" class="tb-input step-required" placeholder="name@example.com" id="emailInput" />
+                            <span class="field-error" id="emailError" style="display:none; color:#bf3030; font-size:.78rem;">Enter a valid email address.</span>
                         </div>
                         <div class="field">
                             <label asp-for="PhoneNumber">Phone Number</label>
-                            <input asp-for="PhoneNumber" class="tb-input" placeholder="+977 98XXXXXXXX" />
+                            <input asp-for="PhoneNumber" class="tb-input step-required" placeholder="98XXXXXXXX" id="phoneInput" maxlength="10" />
+                            <span class="field-error" id="phoneError" style="display:none; color:#bf3030; font-size:.78rem;">Enter a valid 10-digit Nepali mobile number (e.g. 98XXXXXXXX).</span>
                         </div>
                         <div class="field">
                             <label asp-for="District">District</label>
@@ -176,6 +178,17 @@
                 return document.querySelectorAll(`.register-step[data-step="${step}"] .step-required`);
             }
 
+            const emailInput = document.getElementById("emailInput");
+            const emailError = document.getElementById("emailError");
+            const phoneInput = document.getElementById("phoneInput");
+            const phoneError = document.getElementById("phoneError");
+
+            // Deliberately not a fully RFC-5322-compliant email pattern -
+            // this only needs to catch obviously malformed input before it
+            // reaches the server, which still re-validates with
+            // [EmailAddress] regardless of what the browser lets through.
+            const emailPattern = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/; const phonePattern = /^9[678]\d{8}$/;
+
             function validateCurrentStep() {
                 let isValid = true;
                 getStepFields(currentStep).forEach(field => {
@@ -183,6 +196,18 @@
                     field.classList.toggle("input-error", empty);
                     if (empty) isValid = false;
                 });
+
+                if (currentStep === 1) {
+                    const emailValid = emailPattern.test(emailInput.value.trim());
+                    emailInput.classList.toggle("input-error", !emailValid);
+                    emailError.style.display = emailValid ? "none" : "block";
+                    if (!emailValid) isValid = false;
+
+                    const phoneValid = phonePattern.test(phoneInput.value.trim());
+                    phoneInput.classList.toggle("input-error", !phoneValid);
+                    phoneError.style.display = phoneValid ? "none" : "block";
+                    if (!phoneValid) isValid = false;
+                }
 
                 if (currentStep === 2) {
                     const password = passwordInput.value;
@@ -250,8 +275,97 @@
                     password && password === confirmPassword ? "Password matched" : "Password not matched";
             }
 
-            nextButton.addEventListener("click", () => {
+            // Catches "fat finger" typos of well-known providers - e.g.
+            // gmial.com, gamil.com, yaho.com - even when the typo happens to
+            // be a real, mail-receiving domain (some typo domains are
+            // deliberately squatted for exactly this confusion, so MX alone
+            // can't catch them). Levenshtein distance of 1-2 against a short
+            // list of major providers is enough to catch genuine typos
+            // without false-positiving on unrelated real domains.
+            const commonDomains = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com", "live.com"];
+
+            function levenshtein(a, b) {
+                const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+                for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+                for (let i = 1; i <= a.length; i++) {
+                    for (let j = 1; j <= b.length; j++) {
+                        dp[i][j] = a[i - 1] === b[j - 1]
+                            ? dp[i - 1][j - 1]
+                            : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+                    }
+                }
+                return dp[a.length][b.length];
+            }
+
+            function suggestDomainFix(email) {
+                const atIndex = email.lastIndexOf("@@");
+                if (atIndex === -1) return null;
+                const domain = email.slice(atIndex + 1).toLowerCase();
+                if (commonDomains.includes(domain)) return null;
+
+                for (const known of commonDomains) {
+                    if (levenshtein(domain, known) <= 2) {
+                        return email.slice(0, atIndex + 1) + known;
+                    }
+                }
+                return null;
+            }
+
+            async function checkEmailDomain(email) {                try {
+                    const res = await fetch(`/Account/CheckEmailDomain?email=${encodeURIComponent(email)}`);
+                    const data = await res.json();
+                    return data.valid;
+                } catch {
+                    return true; // don't block registration over a network hiccup
+                }
+            }
+
+            let typoSuggestion = null;
+
+            nextButton.addEventListener("click", async () => {
                 if (!validateCurrentStep()) return;
+
+                if (currentStep === 1) {
+                    const email = emailInput.value.trim();
+
+                    // If they just accepted a suggested fix (clicked "Use
+                    // this instead" below), skip straight past the typo
+                    // check this time and go on to the domain check.
+                    const suggestion = (email !== typoSuggestion) ? suggestDomainFix(email) : null;
+                    if (suggestion) {
+                        emailInput.classList.add("input-error");
+                        emailError.innerHTML = `Did you mean <a href="#" id="applySuggestion" style="font-weight:700;">${suggestion}</a>?`;
+                        emailError.style.display = "block";
+                        typoSuggestion = suggestion;
+
+                        document.getElementById("applySuggestion").addEventListener("click", (e) => {
+                            e.preventDefault();
+                            emailInput.value = suggestion;
+                            emailInput.classList.remove("input-error");
+                            emailError.style.display = "none";
+                        });
+                        return;
+                    }
+
+                    nextButton.disabled = true;
+                    const originalLabel = nextButton.textContent;
+                    nextButton.textContent = "Checking email...";
+
+                    const domainOk = await checkEmailDomain(email);
+
+                    nextButton.disabled = false;
+                    nextButton.textContent = originalLabel;
+
+                    if (!domainOk) {
+                        emailInput.classList.add("input-error");
+                        emailError.textContent = "This email domain doesn't appear to be able to receive mail.";
+                        emailError.style.display = "block";
+                        return;
+                    }
+
+                    emailError.textContent = "Enter a valid email address.";
+                }
+
                 showStep(Math.min(currentStep + 1, totalSteps));
             });
 

@@ -1,33 +1,63 @@
 ﻿@model TutorBridgeNepal.ViewModels.TwoFactorViewModel
 @{
-    ViewData["Title"] = "Admin Verification";
+    ViewData["Title"] = $"{Model.Role} Verification";
+    var isTutor = Model.Role == "Tutor";
+    var isAdmin = Model.Role == "Admin";
+    var isStudent = Model.Role == "Student";
 }
 
 <main class="auth-page">
-    <aside class="auth-side admin">
+    <aside class="auth-side @(isTutor ? "tutor" : isAdmin ? "admin" : "")">
         <div class="auth-side-content">
-            <h2 class="auth-logo">TutorBridge Nepal</h2>
-            <p class="auth-small">🛠 Admin Portal</p>
+            <h2 class="auth-logo @(isAdmin ? "" : "serif")">TutorBridge Nepal</h2>
+            <p class="auth-small">
+                @(isAdmin ? "🛠 Admin Portal" : isTutor ? "For Tutors" : "For Students")
+            </p>
 
-            <h1 class="auth-side-title">One more step<br /><span>to confirm</span><br />it's really you.</h1>
-            <p class="auth-side-copy">Two-factor authentication protects the admin portal from unauthorized access.</p>
-
-            <div class="quote-card">
-                <strong>🔒 Restricted access</strong>
-                <p class="mb-0 mt-2">This portal is only for authorized platform administrators.</p>
-            </div>
+            @if (isAdmin)
+            {
+                <h1 class="auth-side-title">One more step<br /><span>to confirm</span><br />it's really you.</h1>
+                <p class="auth-side-copy">Two-factor authentication protects the admin portal from unauthorized access.</p>
+                <div class="quote-card">
+                    <strong>🔒 Restricted access</strong>
+                    <p class="mb-0 mt-2">This portal is only for authorized platform administrators.</p>
+                </div>
+            }
+            else if (isTutor)
+            {
+                <h1 class="auth-side-title">One more step<br /><span>to confirm</span><br />it's really you.</h1>
+                <p class="auth-side-copy">Two-factor authentication keeps your tutor account secure, even if your password is ever compromised.</p>
+                <div class="quote-card">
+                    <strong>🔒 Extra security, enabled by you</strong>
+                    <p class="mb-0 mt-2">You turned on two-factor authentication for this account in your settings.</p>
+                </div>
+            }
+            else
+            {
+                <h1 class="auth-side-title serif">One more step<br /><span>to confirm</span><br />it's really you.</h1>
+                <p class="auth-side-copy">Two-factor authentication keeps your student account secure, even if your password is ever compromised.</p>
+                <div class="quote-card">
+                    <strong>🔒 Extra security, enabled by you</strong>
+                    <p class="mb-0 mt-2">You turned on two-factor authentication for this account in your settings.</p>
+                </div>
+            }
         </div>
         <div class="auth-sdg">SDG 4: Quality Education</div>
     </aside>
 
     <section class="auth-main">
         <div class="auth-top">
-            <a class="back-link" asp-controller="Account" asp-action="AdminLogin">← Back to admin login</a>
+            <a class="back-link" asp-controller="Account" asp-action="@(isTutor ? "TutorLogin" : isStudent ? "StudentLogin" : "AdminLogin")">
+                ← Back to @(isTutor ? "tutor" : isStudent ? "student" : "admin") login
+            </a>
         </div>
 
-        <div class="auth-panel admin-panel">
+        <div class="auth-panel @(isAdmin ? "admin-panel" : "")">
             <div class="auth-heading">
-                <div class="admin-chip">🛠 Admin access</div>
+                @if (isAdmin)
+                {
+                    <div class="admin-chip">🛠 Admin access</div>
+                }
                 <h1 class="mt-2">Enter authenticator code</h1>
                 <p>Open your authenticator app and enter the 6-digit code for TutorBridge Nepal.</p>
             </div>
@@ -35,6 +65,7 @@
             <form asp-action="VerifyAuthenticatorCode" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" asp-for="RememberMe" />
+                <input type="hidden" asp-for="Role" />
                 <div asp-validation-summary="ModelOnly"></div>
 
                 <div class="field mb-3">
@@ -43,8 +74,12 @@
                     <span asp-validation-for="Code" class="text-danger small"></span>
                 </div>
 
-                <button class="tb-btn brown w-100" type="submit">Verify &amp; Sign In</button>
-                <div class="admin-warning">⚠ Unauthorized access is logged and reported<br />All admin actions are recorded for security audits.</div>
+                <button class="tb-btn @(isAdmin ? "brown" : "") w-100" type="submit">Verify &amp; Sign In</button>
+
+                @if (isAdmin)
+                {
+                    <div class="admin-warning">⚠ Unauthorized access is logged and reported<br />All admin actions are recorded for security audits.</div>
+                }
             </form>
         </div>
     </section>

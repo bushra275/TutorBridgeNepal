@@ -4,6 +4,7 @@ public class TwoFactorViewModel
 {
     public string Code { get; set; } = string.Empty;
     public bool RememberMe { get; set; }
+    public string Role { get; set; } = string.Empty;
 }
 
 public class AuthenticatorSetupViewModel

@@ -197,8 +197,7 @@
                                         <input type="time" name="endTime" value="@(d.EndTime.HasValue ? d.EndTime.Value.ToString(@"hh\:mm") : "17:00")" class="tb-input time-input" />
                                     </div>
                                     <label class="dayoff-toggle">
-                                        <input type="checkbox" name="__dayoff_@d.DayOfWeek" onchange="document.getElementById('isDayOff_@d.DayOfWeek').value = this.checked ? 'true' : 'false'; document.getElementById('availRow_@d.DayOfWeek').classList.toggle('is-dayoff', this.checked);" checked="@d.IsDayOff" />
-                                        <span>Day off</span>
+                                        <input type="checkbox" name="__dayoff_@d.DayOfWeek" onchange="document.getElementById('isDayOff_@d.DayOfWeek').value = this.checked ? 'true' : 'false'; document.getElementById('availRow_@d.DayOfWeek').classList.toggle('is-dayoff', this.checked);" @(d.IsDayOff ? "checked" : "") />                                        <span>Day off</span>
                                     </label>
                                     <input type="hidden" name="isDayOff" id="isDayOff_@d.DayOfWeek" value="@(d.IsDayOff ? "true" : "false")" />
                                 </div>

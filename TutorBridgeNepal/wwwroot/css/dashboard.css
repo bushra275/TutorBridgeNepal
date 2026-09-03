@@ -379,6 +379,11 @@
     color: #a96808;
 }
 
+.pill-proposed {
+    background: #e3ecfd;
+    color: #1d4fa3;
+}
+
 .session-btn-row {
     display: flex;
     gap: .4rem;
@@ -1281,11 +1286,34 @@ span.mini-btn {
         padding: .9rem 1rem;
     }
 
-    .calendar-title {
-        font-weight: 800;
-        font-size: .9rem;
-        margin-bottom: .6rem;
-        text-align: center;
+.calendar-title {
+    font-weight: 800;
+    font-size: .9rem;
+    margin-bottom: .6rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cal-nav-arrow {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 700;
+}
+
+    .cal-nav-arrow:hover {
+        background: var(--soft);
+    }
+
+    .cal-nav-arrow.disabled {
+        color: var(--line);
+        pointer-events: none;
     }
 
     .calendar-grid {
@@ -2850,6 +2878,11 @@ span.mini-btn {
             color: var(--danger, #bf3030);
         }
 
+        .sr-status-pill.proposed {
+            background: #e3ecfd;
+            color: #1d4fa3;
+        }
+
     .sort-select {
         border: 1px solid var(--line, #deded7);
         border-radius: 8px;
@@ -3831,3 +3864,160 @@ span.mini-btn {
         .availability-pill.avail-off .avail-dot {
             background: var(--muted);
         }
+
+
+/* ============================================================
+   RESPONSIVE PASS
+   ============================================================ */
+
+/* Hamburger button - hidden on desktop, shown once the sidebar collapses */
+.hamburger-btn {
+    display: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--soft);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 64px 0 0 0;
+    background: rgba(20, 25, 22, .4);
+    z-index: 140;
+}
+
+    .sidebar-backdrop.open {
+        display: block;
+    }
+
+@media (max-width: 900px) {
+    /* Topbar: let the search box shrink instead of squeezing everything */
+    .dash-topbar {
+        gap: .75rem;
+        padding: 0 1rem;
+    }
+
+    .dash-search {
+        max-width: none;
+    }
+
+    .tb-brand span {
+        display: none;
+    }
+}
+
+@media (max-width: 720px) {
+    .hamburger-btn {
+        display: grid;
+        place-items: center;
+    }
+
+    .dash-body {
+        grid-template-columns: 1fr;
+    }
+
+    .dash-sidebar {
+        display: block;
+        position: fixed;
+        top: 64px;
+        left: -260px;
+        width: 240px;
+        height: calc(100vh - 64px);
+        z-index: 150;
+        overflow-y: auto;
+        transition: left .2s ease;
+        box-shadow: 4px 0 16px rgba(20, 25, 22, .15);
+    }
+
+        .dash-sidebar.mobile-open {
+            left: 0;
+        }
+
+    .dash-main {
+        padding: 1.25rem 1rem 2rem;
+    }
+
+    .dash-search {
+        display: none;
+    }
+}
+
+@media (max-width: 560px) {
+    /* Any panel containing a wide table gets horizontal scroll instead of
+       squeezing/overflowing the page. */
+    .panel:has(table),
+    .info-panel:has(table) {
+        overflow-x: auto;
+    }
+
+    .dash-table {
+        min-width: 480px;
+    }
+
+    /* Weekly availability rows: stack instead of a cramped 3-column grid */
+    .weekly-avail-row {
+        grid-template-columns: 1fr;
+        justify-items: start;
+        gap: .5rem;
+    }
+
+    .dayoff-toggle {
+        justify-self: start;
+    }
+
+    /* Header action buttons (Book a session / Message / Save tutor, etc.) */
+    .action-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+        .action-row > a,
+        .action-row > form {
+            width: 100%;
+        }
+
+            .action-row > form button {
+                width: 100%;
+            }
+
+    /* Booking panel shouldn't stay pinned on a short mobile viewport */
+    .booking-panel {
+        position: static;
+    }
+
+    /* Grids that were already responsive down to 2 columns go to 1 */
+    .stat-cards,
+    .stat-cards-6,
+    .achievements-grid,
+    .rv-overview-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .settings-form-grid,
+    .settings-form-grid.cols-3 {
+        grid-template-columns: 1fr;
+    }
+
+    /* Messages: side-by-side panes don't fit, stack them */
+    .messages-shell {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .conv-list {
+        width: 100%;
+        max-height: 260px;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .chat-panel {
+        min-height: 420px;
+    }
+}

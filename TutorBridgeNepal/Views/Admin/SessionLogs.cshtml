@@ -284,13 +284,14 @@
                                         <td>@s.Mode</td>
                                         <td>
                                             <div class="um-actions-cell">
+                                                <button type="button" class="mini-btn sl-view-btn" data-booking-id="@s.BookingId">View</button>
                                                 @if (s.IsDisputed)
                                                 {
                                                     <form asp-controller="Admin" asp-action="ResolveDispute" method="post" style="margin:0;">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="bookingId" value="@s.BookingId" />
                                                         <input type="hidden" name="returnUrl" value="@returnUrl" />
-                                                        <button type="submit" class="mini-btn sl-review-btn">Review</button>
+                                                        <button type="submit" class="mini-btn sl-review-btn">Resolve</button>
                                                     </form>
                                                 }
                                                 else
@@ -299,10 +300,9 @@
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="bookingId" value="@s.BookingId" />
                                                         <input type="hidden" name="returnUrl" value="@returnUrl" />
-                                                        <button type="submit" class="mini-btn">View</button>
+                                                        <button type="submit" class="mini-btn">Flag</button>
                                                     </form>
                                                 }
-                                                <button type="button" class="um-kebab" title="More">⋮</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -394,6 +394,16 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="sessionDetailsOverlay">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 id="sdTitle">Session details</h3>
+                <button type="button" class="modal-close" id="sdCloseBtn">&times;</button>
+            </div>
+            <div id="sdBody" style="font-size:.9rem; line-height:1.6;">Loading...</div>
+        </div>
+    </div>
+
     <script>
             function slChangePageSize(value) {
                 var url = new URL(window.location.href);
@@ -401,6 +411,49 @@
                 url.searchParams.set('page', '1');
                 window.location.href = url.toString();
             }
+
+            var sdOverlay = document.getElementById('sessionDetailsOverlay');
+            var sdBody = document.getElementById('sdBody');
+            var sdTitle = document.getElementById('sdTitle');
+            var sdCloseBtn = document.getElementById('sdCloseBtn');
+
+            document.querySelectorAll('.sl-view-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var id = btn.getAttribute('data-booking-id');
+                    sdTitle.textContent = 'Session details';
+                    sdBody.innerHTML = 'Loading...';
+                    sdOverlay.classList.add('open');
+
+                    fetch('/Admin/SessionDetailsJson?id=' + id)
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            sdTitle.textContent = 'Session #' + d.sessionId;
+                            var html = ''
+                                + '<p><strong>Status:</strong> ' + d.status + (d.isDisputed ? ' ⚠' : '') + '</p>'
+                                + '<p><strong>Student:</strong> ' + d.studentName + ' (' + d.studentEmail + ')' + (d.studentDistrict ? ', ' + d.studentDistrict : '') + '</p>'
+                                + '<p><strong>Tutor:</strong> ' + d.tutorName + ' (' + d.tutorEmail + ')' + (d.tutorDistrict ? ', ' + d.tutorDistrict : '') + '</p>'
+                                + '<p><strong>Subject:</strong> ' + d.subject + '</p>'
+                                + '<p><strong>Date & time:</strong> ' + d.date + ', ' + d.time + '</p>'
+                                + '<p><strong>Mode:</strong> ' + (d.mode || '-') + '</p>'
+                                + '<p><strong>Requested:</strong> ' + d.createdAt + '</p>'
+                                + (d.decidedAt ? '<p><strong>Decided:</strong> ' + d.decidedAt + (d.declinedByTutor ? ' (declined by tutor)' : '') + '</p>' : '')
+                                + (d.note ? '<p><strong>Student note:</strong> ' + d.note + '</p>' : '')
+                                + '<p><strong>Calendar synced:</strong> ' + (d.calendarSynced ? 'Yes' : 'No') + '</p>';
+
+                            if (d.isDisputed && d.ticketSubject) {
+                                html += '<hr/><p><strong>⚠ Linked complaint</strong> (' + d.ticketStatus + ', filed ' + d.ticketFiledAt + ')</p>'
+                                    + '<p><strong>' + d.ticketSubject + '</strong></p>'
+                                    + '<p>' + d.ticketMessage + '</p>';
+                            }
+
+                            sdBody.innerHTML = html;
+                        })
+                        .catch(function () { sdBody.innerHTML = 'Could not load session details.'; });
+                });
+            });
+
+            if (sdCloseBtn) sdCloseBtn.addEventListener('click', function () { sdOverlay.classList.remove('open'); });
+            sdOverlay.addEventListener('click', function (e) { if (e.target === sdOverlay) sdOverlay.classList.remove('open'); });
     </script>
 </body>
 </html>

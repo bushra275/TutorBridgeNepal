@@ -62,6 +62,11 @@ public class AdminTutorVerificationRowViewModel
     // card so the admin can see what they last asked for, and cleared
     // automatically once the tutor re-uploads a document.
     public string? VerificationNote { get; set; }
+
+    public bool AllDocumentsUploaded { get; set; }
+    public DateTime? InterviewScheduledAt { get; set; }
+    public string? InterviewMeetingLink { get; set; }
+    public bool InterviewHasHappened => InterviewScheduledAt.HasValue && InterviewScheduledAt.Value <= DateTime.Now;
 }
 
 public class AdminTutorVerificationDocumentViewModel

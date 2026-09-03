@@ -79,4 +79,9 @@ public class TutorProfile
     // TutorController.UploadVerificationDocument), since a fresh upload is
     // the tutor's way of responding to the request.
     public string? VerificationNote { get; set; }
+
+    // Set by ScheduleTutorInterview - the interview must have taken place
+    // (InterviewScheduledAt in the past) before an admin can Approve/Reject.
+    public DateTime? InterviewScheduledAt { get; set; }
+    public string? InterviewMeetingLink { get; set; }
 }

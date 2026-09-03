@@ -10,6 +10,7 @@
     var notificationCount = ViewData["NotificationCount"] as int? ?? 0;
 }
 <header class="dash-topbar">
+    <button type="button" class="hamburger-btn" id="sidebarToggleBtn" aria-label="Toggle menu">☰</button>
     <a class="tb-brand" asp-controller="Home" asp-action="Index">TutorBridge <span>Nepal</span></a>
 
     <div class="dash-search">
@@ -80,9 +81,31 @@
         </div>
     </div>
 </header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
 <script>
     (function() {
+        var sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+        var sidebarBackdrop = document.getElementById('sidebarBackdrop');
+        var sidebarEl = document.querySelector('.dash-sidebar');
+
+        function closeSidebar() {
+            if (sidebarEl) sidebarEl.classList.remove('mobile-open');
+            if (sidebarBackdrop) sidebarBackdrop.classList.remove('open');
+        }
+
+        if (sidebarToggleBtn && sidebarEl) {
+            sidebarToggleBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                sidebarEl.classList.toggle('mobile-open');
+                if (sidebarBackdrop) sidebarBackdrop.classList.toggle('open');
+            });
+        }
+
+        if (sidebarBackdrop) {
+            sidebarBackdrop.addEventListener('click', closeSidebar);
+        }
+
         function wireDropdown(btnId, dropdownId) {
             var btn = document.getElementById(btnId);
             var dropdown = document.getElementById(dropdownId);

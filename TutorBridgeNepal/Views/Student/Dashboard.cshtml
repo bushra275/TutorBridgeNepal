@@ -99,7 +99,7 @@
                                             <div class="session-btn-row">
                                                 @if (session.Status == "Confirmed")
                                                 {
-                                                    <span class="mini-btn" title="Your tutor will share the meeting link closer to the session time">Join session</span>
+                                                    <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@session.TutorProfileId" class="mini-btn">Message</a>
                                                 }
                                                 else
                                                 {

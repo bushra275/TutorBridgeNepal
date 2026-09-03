@@ -4,9 +4,10 @@
     Layout = null;
 
     var dateGroups = Model.SlotsByDate;
-    var displayMonth = dateGroups.Any()
-        ? new DateTime(dateGroups.First().Date.Year, dateGroups.First().Date.Month, 1)
-        : new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    var displayMonth = Model.DisplayMonth;
+    var isCurrentOrPastMonth = displayMonth.Year == DateTime.Today.Year && displayMonth.Month == DateTime.Today.Month;
+    var prevMonthDate = displayMonth.AddMonths(-1);
+    var nextMonthDate = displayMonth.AddMonths(1);
     var daysInMonth = DateTime.DaysInMonth(displayMonth.Year, displayMonth.Month);
     var leadingBlanks = (int)displayMonth.DayOfWeek;
     var availableDateSet = dateGroups.Select(g => g.Date).ToHashSet();
@@ -22,7 +23,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@Model.FullName - TutorBridge Nepal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -215,8 +216,18 @@
 
                                 <div class="step-label">Step 2 — Select date</div>
                                 <div class="calendar-box">
-                                    <div class="calendar-title">@displayMonth.ToString("MMMM yyyy")</div>
-                                    <div class="calendar-grid">
+                                    <div class="calendar-title">
+                                        @if (isCurrentOrPastMonth)
+                                        {
+                                            <span class="cal-nav-arrow disabled" aria-hidden="true">‹</span>
+                                        }
+                                        else
+                                        {
+                                            <a class="cal-nav-arrow" asp-action="TutorProfile" asp-route-id="@Model.TutorProfileId" asp-route-month="@prevMonthDate.Month" asp-route-year="@prevMonthDate.Year">‹</a>
+                                        }
+                                        <span>@displayMonth.ToString("MMMM yyyy")</span>
+                                        <a class="cal-nav-arrow" asp-action="TutorProfile" asp-route-id="@Model.TutorProfileId" asp-route-month="@nextMonthDate.Month" asp-route-year="@nextMonthDate.Year">›</a>
+                                    </div>                                    <div class="calendar-grid">
                                         <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
 
                                         @for (int i = 0; i < leadingBlanks; i++)

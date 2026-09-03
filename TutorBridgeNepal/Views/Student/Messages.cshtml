@@ -142,19 +142,78 @@
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
     <script>
-        document.getElementById('convSearch')?.addEventListener('input', function () {
-        var term = this.value.toLowerCase();
-        document.querySelectorAll('#convItems .conv-item').forEach(function (item) {
-        var name = item.getAttribute('data-name') || '';
-        item.style.display = name.indexOf(term) !== -1 ? 'flex' : 'none';
-        });
+            document.getElementById('convSearch')?.addEventListener('input', function() {
+                var term = this.value.toLowerCase();
+                document.querySelectorAll('#convItems .conv-item').forEach(function(item) {
+                    var name = item.getAttribute('data-name') || '';
+                    item.style.display = name.indexOf(term) !== -1 ? 'flex' : 'none';
+                });
+            });
+
+            var chatMessages = document.querySelector('.chat-messages');
+            if (chatMessages) {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+    var activeTutorId = @(Model.ActiveTutorProfileId ?? 0);
+    var connection;
+    if (activeTutorId > 0) {
+        connection = new signalR.HubConnectionBuilder().withUrl('/hubs/chat').withAutomaticReconnect().build();
+
+        connection.on('ReceiveMessage', function (msg) {
+            if (msg.tutorProfileId !== activeTutorId) return;
+            var chatMessages = document.querySelector('.chat-messages');
+            if (!chatMessages) return;
+            var row = document.createElement('div');
+            row.className = 'chat-msg-row other';
+            row.innerHTML = '<div class="chat-msg-avatar">' + '@Model.ActiveTutorInitials' + '</div>'
+                + '<div class="chat-msg-group"><div class="chat-msg-bubble"></div><div class="chat-msg-meta"></div></div>';
+            row.querySelector('.chat-msg-bubble').textContent = msg.content;
+            row.querySelector('.chat-msg-meta').textContent = msg.sentAt + ' · ' + '@Model.ActiveTutorName'.split(' ')[0];
+            chatMessages.appendChild(row);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         });
 
-        var chatMessages = document.querySelector('.chat-messages');
-        if (chatMessages) {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+        connection.start().then(function () {
+            connection.invoke('JoinThread', @ViewBag.StudentProfileId, activeTutorId);
+        }).catch(function () { /* live updates unavailable - normal page reloads still work */ });
+    }
+
+            var chatForm = document.querySelector('.chat-input-bar');
+            if (chatForm) {
+                chatForm.addEventListener('submit', function(e) {
+                    var input = chatForm.querySelector('.chat-input');
+                    var content = input.value.trim();
+                    if (!content) return;
+                    e.preventDefault();
+
+                    var formData = new URLSearchParams();
+                    formData.set('tutorProfileId', activeTutorId);
+                    formData.set('content', content);
+                    var token = chatForm.querySelector('input[name="__RequestVerificationToken"]');
+                    if (token) formData.set('__RequestVerificationToken', token.value);
+                    if (typeof connection !== 'undefined' && connection.state === 'Connected') {
+                        formData.set('connectionId', connection.connectionId);
+                    }
+
+                    fetch('/Student/SendMessageLive', { method: 'POST', body: formData })
+                        .then(function(r) { if (!r.ok) throw new Error('send failed'); return r.json(); })
+                        .then(function(data) {
+                            var chatMessages = document.querySelector('.chat-messages');
+                            var row = document.createElement('div');
+                            row.className = 'chat-msg-row self';
+                            row.innerHTML = '<div class="chat-msg-group"><div class="chat-msg-bubble"></div><div class="chat-msg-meta"></div></div>';
+                            row.querySelector('.chat-msg-bubble').textContent = content;
+                            row.querySelector('.chat-msg-meta').textContent = data.sentAt + ' · You ✓';
+                            chatMessages.appendChild(row);
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                            input.value = '';
+                        })
+                        .catch(function() { chatForm.submit(); }); // JS/live path failed - fall back to the normal full-page post
+                });
+            }
     </script>
 </body>
 </html>

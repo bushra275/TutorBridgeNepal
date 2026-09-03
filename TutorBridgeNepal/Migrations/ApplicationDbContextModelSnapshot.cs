@@ -184,6 +184,12 @@ namespace TutorBridgeNepal.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("EmailOtpCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("EmailOtpExpiresAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -786,6 +792,12 @@ namespace TutorBridgeNepal.Migrations
                     b.Property<string>("ExperienceSummary")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("InterviewMeetingLink")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("InterviewScheduledAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<bool>("IsAvailableNow")
                         .HasColumnType("bit");
 
@@ -811,9 +823,6 @@ namespace TutorBridgeNepal.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("NotifyNewSessionRequests")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("NotifyWeeklyEarningsSummary")
                         .HasColumnType("bit");
 
                     b.Property<int>("ReviewCount")

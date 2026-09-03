@@ -2,7 +2,10 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
+using System.Data;
 using TutorBridgeNepal.Data;
 using TutorBridgeNepal.Helpers;
 using TutorBridgeNepal.Models;
@@ -25,6 +28,7 @@ public class TutorController : Controller
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly GoogleOAuthOptions _googleOptions;
     private readonly GoogleCalendarService _googleCalendarService;
+    private readonly IHubContext<TutorBridgeNepal.Hubs.ChatHub> _chatHub;
 
     public TutorController(
         ApplicationDbContext context,
@@ -33,7 +37,8 @@ public class TutorController : Controller
         IWebHostEnvironment webHostEnvironment,
         IHttpClientFactory httpClientFactory,
         IOptions<GoogleOAuthOptions> googleOptions,
-        GoogleCalendarService googleCalendarService)
+        GoogleCalendarService googleCalendarService,
+        IHubContext<TutorBridgeNepal.Hubs.ChatHub> chatHub)
     {
         _context = context;
         _userManager = userManager;
@@ -42,6 +47,7 @@ public class TutorController : Controller
         _httpClientFactory = httpClientFactory;
         _googleOptions = googleOptions.Value;
         _googleCalendarService = googleCalendarService;
+        _chatHub = chatHub;
     }
 
     private static readonly string[] AllowedWhileUnverified =
@@ -134,6 +140,23 @@ public class TutorController : Controller
         ViewData["UnreadMessageCount"] = unreadMessageCount;
         ViewData["ShowAvailabilityBadge"] = tutor.ShowAvailabilityBadge;
         ViewData["IsAvailableNow"] = tutor.IsAvailableNow;
+
+        var tutorNotifications = new List<NotificationItemViewModel>();
+        if (tutor.InterviewScheduledAt.HasValue)
+        {
+            tutorNotifications.Add(new NotificationItemViewModel
+            {
+                Type = "Verification",
+                Icon = "📅",
+                Title = "Interview scheduled",
+                Subtitle = $"Your interview is on {tutor.InterviewScheduledAt.Value:ddd, d MMM 'at' h:mm tt}",
+                Timestamp = tutor.InterviewScheduledAt.Value,
+                LinkController = "Tutor",
+                LinkAction = "VerificationPending"
+            });
+        }
+        ViewData["Notifications"] = tutorNotifications;
+        ViewData["NotificationCount"] = tutorNotifications.Count;
     }
 
     // ── VerificationPending ───────────────────────────────────────────────
@@ -157,6 +180,8 @@ public class TutorController : Controller
             IsRejected = tutor.VerificationRejected,
             SubmittedAt = tutor.User.CreatedAt,
             AdminNote = tutor.VerificationNote,
+            InterviewScheduledAt = tutor.InterviewScheduledAt,
+            InterviewMeetingLink = tutor.InterviewMeetingLink,
             RequiredDocuments = RequiredVerificationDocuments.Select(rd =>
             {
                 var match = credentials.FirstOrDefault(c => c.DocumentType == rd.Type);
@@ -417,6 +442,143 @@ public class TutorController : Controller
         await _context.SaveChangesAsync();
 
         return RedirectToAction("Dashboard");
+    }
+
+    public async Task<IActionResult> ProposeNewTime(int bookingId, int? month, int? year)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var booking = await _context.Bookings
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .Include(b => b.TutorAvailabilitySlot)
+            .FirstOrDefaultAsync(b => b.Id == bookingId && b.TutorProfileId == tutor.Id && b.Status == "Pending");
+
+        if (booking == null)
+        {
+            TempData["BookingError"] = "This request can no longer be proposed a new time.";
+            return RedirectToAction("SessionRequests");
+        }
+
+        await SetTutorSidebarContextAsync("sessionrequests", tutor);
+
+        var now = DateTime.Now;
+        var earliestMonth = new DateTime(now.Year, now.Month, 1);
+        var displayMonth = earliestMonth;
+        if (month.HasValue && year.HasValue && month.Value >= 1 && month.Value <= 12 && year.Value >= 1)
+        {
+            try
+            {
+                var requested = new DateTime(year.Value, month.Value, 1);
+                if (requested > earliestMonth) displayMonth = requested;
+            }
+            catch (ArgumentOutOfRangeException) { /* keep the default */ }
+        }
+
+        var slots = await _context.TutorAvailabilitySlots
+            .Where(s => s.TutorProfileId == tutor.Id
+                && !s.IsBooked
+                && s.StartTime >= now
+                && s.Id != booking.TutorAvailabilitySlotId)
+            .OrderBy(s => s.StartTime)
+            .Take(60)
+            .ToListAsync();
+
+        var vm = new TutorBridgeNepal.ViewModels.TutorProfileDetailViewModel
+        {
+            TutorProfileId = tutor.Id,
+            FullName = booking.StudentProfile.User.FullName,
+            Initials = GetInitials(booking.StudentProfile.User.FullName),
+            RescheduleBookingId = booking.Id,
+            RescheduleSubject = booking.Subject,
+            CurrentSlotStartTime = booking.TutorAvailabilitySlot.StartTime,
+            CurrentSlotEndTime = booking.TutorAvailabilitySlot.EndTime,
+            DisplayMonth = displayMonth,
+            AvailableSlots = slots.Select(s => new TutorBridgeNepal.ViewModels.AvailableSlotViewModel
+            {
+                SlotId = s.Id,
+                StartTime = s.StartTime,
+                EndTime = s.EndTime
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ConfirmProposeTime(int bookingId, int newSlotId)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var booking = await _context.Bookings
+            .Include(b => b.TutorAvailabilitySlot)
+            .FirstOrDefaultAsync(b => b.Id == bookingId && b.TutorProfileId == tutor.Id && b.Status == "Pending");
+
+        if (booking == null)
+        {
+            TempData["BookingError"] = "This request can no longer be proposed a new time.";
+            return RedirectToAction("SessionRequests");
+        }
+
+        var oldSlotId = booking.TutorAvailabilitySlotId;
+
+        // Serializable-transaction pattern used for student bookings and
+        // reschedules - re-checks the target slot's capacity atomically right
+        // before moving the booking onto it.
+        using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
+        {
+            var newSlot = await _context.TutorAvailabilitySlots
+                .FirstOrDefaultAsync(s => s.Id == newSlotId && s.TutorProfileId == tutor.Id);
+
+            if (newSlot == null)
+            {
+                await transaction.RollbackAsync();
+                TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
+                return RedirectToAction("ProposeNewTime", new { bookingId });
+            }
+
+            var activeCount = await _context.Bookings
+                .CountAsync(b => b.TutorAvailabilitySlotId == newSlotId && b.Status != "Cancelled");
+
+            if (activeCount >= newSlot.Capacity)
+            {
+                await transaction.RollbackAsync();
+                TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
+                return RedirectToAction("ProposeNewTime", new { bookingId });
+            }
+
+            booking.TutorAvailabilitySlotId = newSlot.Id;
+            // Neither side has fully signed off on this new time yet - the
+            // tutor is countering the student's original request, so it
+            // needs the student's explicit accept before it becomes a real
+            // Confirmed session.
+            booking.Status = "AwaitingStudentConfirmation";
+
+            newSlot.IsBooked = (activeCount + 1) >= newSlot.Capacity;
+
+            var oldSlot = await _context.TutorAvailabilitySlots.FirstOrDefaultAsync(s => s.Id == oldSlotId);
+            if (oldSlot != null)
+            {
+                var remainingOnOldSlot = await _context.Bookings
+                    .CountAsync(b => b.TutorAvailabilitySlotId == oldSlotId && b.Status != "Cancelled" && b.Id != booking.Id);
+                oldSlot.IsBooked = remainingOnOldSlot >= oldSlot.Capacity;
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch (SqlException ex) when (ex.Number == 1205) // SQL Server deadlock victim
+        {
+            await transaction.RollbackAsync();
+            TempData["BookingError"] = "That slot is no longer available. Please choose another time.";
+            return RedirectToAction("ProposeNewTime", new { bookingId });
+        }
+
+        TempData["BookingSuccess"] = "New time proposed! The student will be asked to confirm it.";
+        return RedirectToAction("SessionRequests");
     }
 
     public async Task<IActionResult> SessionRequests(string tab = "pending", string sort = "newest")
@@ -1157,6 +1319,7 @@ public class TutorController : Controller
         .ToList();
 
         var vm = new TutorMessagesPageViewModel { Tab = tab, Search = search };
+        ViewBag.TutorProfileId = tutor.Id;
 
         var activeStudentId = studentProfileId ?? conversations.FirstOrDefault()?.StudentProfileId;
 
@@ -1265,6 +1428,49 @@ public class TutorController : Controller
         await _context.SaveChangesAsync();
 
         return RedirectToAction("Messages", new { studentProfileId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendMessageLive(int studentProfileId, string content, string? connectionId)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(content)) return BadRequest();
+
+        var hasRelationship = await _context.Bookings
+            .AnyAsync(b => b.TutorProfileId == tutor.Id && b.StudentProfileId == studentProfileId);
+        if (!hasRelationship) return Forbid();
+
+        var message = new Message
+        {
+            StudentProfileId = studentProfileId,
+            TutorProfileId = tutor.Id,
+            SenderRole = "Tutor",
+            Content = content.Trim(),
+            SentAt = DateTime.Now,
+            IsRead = false
+        };
+        _context.Messages.Add(message);
+        await _context.SaveChangesAsync();
+
+        var groupName = TutorBridgeNepal.Hubs.ChatHub.GroupName(studentProfileId, tutor.Id);
+        var payload = new
+        {
+            senderRole = "Tutor",
+            content = message.Content,
+            sentAt = message.SentAt.ToString("h:mm tt"),
+            studentProfileId,
+            tutorProfileId = tutor.Id
+        };
+
+        if (!string.IsNullOrEmpty(connectionId))
+            await _chatHub.Clients.GroupExcept(groupName, connectionId).SendAsync("ReceiveMessage", payload);
+        else
+            await _chatHub.Clients.Group(groupName).SendAsync("ReceiveMessage", payload);
+
+        return Ok(new { sentAt = message.SentAt.ToString("h:mm tt") });
     }
 
     [HttpPost]
@@ -1597,12 +1803,19 @@ public class TutorController : Controller
                 Subject = s.Subject,
                 Description = s.Description
             }).ToList(),
-            Credentials = credentials.Select(c => new TutorCredentialRowViewModel
+            RequiredDocuments = RequiredVerificationDocuments.Select(rd =>
             {
-                Id = c.Id,
-                Title = c.Title,
-                FileName = c.FileName,
-                Icon = c.Icon
+                var match = credentials.FirstOrDefault(c => c.DocumentType == rd.Type);
+                return new TutorDocumentSlotViewModel
+                {
+                    DocumentType = rd.Type,
+                    Label = rd.Label,
+                    Icon = rd.Icon,
+                    IsUploaded = match != null,
+                    CredentialId = match?.Id,
+                    OriginalFileName = match?.FileName,
+                    UploadedAt = match?.UploadedAt
+                };
             }).ToList(),
             ProfileCompletionPercent = completionPercent,
             ProfileCompletionHint = completionHint
@@ -1817,6 +2030,12 @@ public class TutorController : Controller
         // becomes complete (not on every individual upload) - checks the
         // in-memory state we've been building this request, since the new
         // TutorCredential row may not be saved yet.
+        //
+        // Every application now goes through a mandatory admin-scheduled
+        // interview before approval - there's no auto-approve path anymore,
+        // regardless of PlatformSettings.AutoApproveVerifiedTutors (that
+        // setting is intentionally no longer consulted here).
+        var justCompletedDocuments = false;
         if (!tutor.IsVerified && !tutor.VerificationRejected)
         {
             var currentDocTypes = (await _context.TutorCredentials
@@ -1830,38 +2049,23 @@ public class TutorController : Controller
             var allComplete = RequiredVerificationDocuments.All(rd => currentDocTypes.Contains(rd.Type));
             if (allComplete)
             {
-                var platformSettings = await GetOrCreatePlatformSettingsAsync();
+                justCompletedDocuments = true;
 
-                if (platformSettings.AutoApproveVerifiedTutors)
-                {
-                    // RequiredVerificationDocuments already includes PoliceReport, so
-                    // "allComplete" naturally satisfies RequirePoliceReportForTutors too -
-                    // no separate check needed here.
-                    tutor.IsVerified = true;
-                    tutor.VerificationDecidedAt = DateTime.Now;
-
-                    NotificationHelper.Create(_context,
-                        type: "Verification",
-                        title: "Tutor auto-approved",
-                        message: $"{tutor.User.FullName}'s application for {tutor.Subjects} was auto-approved (all required documents submitted)",
-                        icon: "✔️");
-                }
-                else
-                {
-                    NotificationHelper.Create(_context,
-                        type: "Verification",
-                        title: "New tutor verification submitted",
-                        message: $"{tutor.User.FullName} submitted documents for {tutor.Subjects}",
-                        icon: "🎓",
-                        actionLabel: "Review now",
-                        actionUrl: Url.Action("TutorVerification", "Admin"));
-                }
+                NotificationHelper.Create(_context,
+                    type: "Verification",
+                    title: "New tutor verification submitted",
+                    message: $"{tutor.User.FullName} submitted documents for {tutor.Subjects}",
+                    icon: "🎓",
+                    actionLabel: "Schedule interview",
+                    actionUrl: Url.Action("TutorVerification", "Admin"));
             }
         }
 
         await _context.SaveChangesAsync();
 
-        TempData["ProfileSuccess"] = "Document uploaded.";
+        TempData["ProfileSuccess"] = justCompletedDocuments
+            ? "Your documents have been uploaded and a meeting/interview will be scheduled for evaluation."
+            : "Document uploaded.";
         return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
     }
 
@@ -2340,7 +2544,8 @@ public class TutorController : Controller
         switch (key)
         {
             case "NewSessionRequests": tutor.NotifyNewSessionRequests = value; break;
-            case "NewMessages": tutor.NotifyNewMessages = value; break;        }
+            case "NewMessages": tutor.NotifyNewMessages = value; break;
+        }
 
         await _context.SaveChangesAsync();
         return RedirectToAction("SettingsNotifications");

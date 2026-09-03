@@ -10,10 +10,13 @@ public class RegisterViewModel
     [Required]
     public string FullName { get; set; } = string.Empty;
 
-    [Required, EmailAddress]
+    [Required(ErrorMessage = "Email is required.")]
+    [EmailAddress(ErrorMessage = "Please enter a valid email address.")]
     public string Email { get; set; } = string.Empty;
 
-    public string? PhoneNumber { get; set; }
+    [Required(ErrorMessage = "Phone number is required.")]
+    [RegularExpression(@"^9[678]\d{8}$", ErrorMessage = "Enter a valid 10-digit Nepali mobile number (e.g. 98XXXXXXXX).")]
+    public string PhoneNumber { get; set; } = string.Empty;
     public string? District { get; set; }
     public string? GradeLevel { get; set; }
     public string? Subjects { get; set; }

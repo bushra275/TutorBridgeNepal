@@ -1,13 +1,16 @@
-﻿using System.Text;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using DnsClient;
+using DnsClient.Protocol;
+using System.Net;
+using System.Security.Claims;
+using System.Text;
 using TutorBridgeNepal.Data;
 using TutorBridgeNepal.Helpers;
 using TutorBridgeNepal.Models;
 using TutorBridgeNepal.ViewModels;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 
 namespace TutorBridgeNepal.Controllers;
 
@@ -16,15 +19,18 @@ public class AccountController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly ApplicationDbContext _context;
+    private readonly TutorBridgeNepal.Services.IEmailSender _emailSender;
 
     public AccountController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        TutorBridgeNepal.Services.IEmailSender emailSender)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _context = context;
+        _emailSender = emailSender;
     }
 
     private async Task StartDeviceSessionAsync(ApplicationUser user, bool isPersistent)
@@ -102,6 +108,45 @@ public class AccountController : Controller
             return ViewForRole();
         }
 
+        // Admin accounts get a fresh emailed code on every single login, on
+        // top of the password - this runs before the EmailConfirmed check
+        // below because the seeded admin has EmailConfirmed = true and would
+        // otherwise skip straight through to a normal sign-in.
+        if (model.Role == "Admin")
+        {
+            var adminPasswordCheck = await _signInManager.CheckPasswordSignInAsync(
+                user, model.Password, lockoutOnFailure: true);
+
+            if (!adminPasswordCheck.Succeeded)
+            {
+                ModelState.AddModelError("", adminPasswordCheck.IsLockedOut
+                    ? "This account is locked out. Try again later."
+                    : "Invalid email or password.");
+                return ViewForRole();
+            }
+
+            await SendEmailOtpAsync(user);
+            return RedirectToAction("VerifyAdminCode", new { email = user.Email, rememberMe = model.RememberMe });
+        }
+
+        if (!user.EmailConfirmed)
+        {
+            // Verify password first so this doesn't become a way to check
+            // whether an email is registered without knowing the password.
+            var passwordCheck = await _userManager.CheckPasswordAsync(user, model.Password);
+            if (!passwordCheck)
+            {
+                ModelState.AddModelError("", "Invalid email or password.");
+                return ViewForRole();
+            }
+
+            if (!await SendEmailOtpAsync(user))
+            {
+                TempData["SettingsError"] = "We couldn't send a code to that email address. Double-check it's correct, then tap Resend code below.";
+            }
+            return RedirectToAction("VerifyEmail", new { email = user.Email });
+        }
+
         if (model.Role == "Tutor")
         {
             var tutorProfile = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.UserId == user.Id);
@@ -117,7 +162,7 @@ public class AccountController : Controller
 
         if (result.RequiresTwoFactor)
         {
-            return RedirectToAction("VerifyAuthenticatorCode", new { rememberMe = model.RememberMe });
+            return RedirectToAction("VerifyAuthenticatorCode", new { rememberMe = model.RememberMe, role = model.Role });
         }
 
         if (!result.Succeeded)
@@ -138,9 +183,9 @@ public class AccountController : Controller
     }
 
     [HttpGet]
-    public IActionResult VerifyAuthenticatorCode(bool rememberMe = false)
+    public IActionResult VerifyAuthenticatorCode(bool rememberMe = false, string role = "")
     {
-        return View(new TwoFactorViewModel { RememberMe = rememberMe });
+        return View(new TwoFactorViewModel { RememberMe = rememberMe, Role = role });
     }
 
     [HttpPost]
@@ -150,7 +195,12 @@ public class AccountController : Controller
         var user = await _signInManager.GetTwoFactorAuthenticationUserAsync();
         if (user == null)
         {
-            return RedirectToAction("AdminLogin");
+            return model.Role switch
+            {
+                "Tutor" => RedirectToAction("TutorLogin"),
+                "Student" => RedirectToAction("StudentLogin"),
+                _ => RedirectToAction("AdminLogin")
+            };
         }
 
         if (!ModelState.IsValid) return View(model);
@@ -162,7 +212,13 @@ public class AccountController : Controller
         if (result.Succeeded)
         {
             await StartDeviceSessionAsync(user, model.RememberMe);
-            return RedirectToAction("Dashboard", "Admin");
+            return model.Role switch
+            {
+                "Tutor" => RedirectToAction("VerificationPending", "Tutor"),
+                "Student" => RedirectToAction("Dashboard", "Student"),
+                "Admin" => RedirectToAction("Dashboard", "Admin"),
+                _ => RedirectToAction("Index", "Home")
+            };
         }
 
         if (result.IsLockedOut)
@@ -349,9 +405,28 @@ public class AccountController : Controller
         var resetLink = Url.Action("ResetPassword", "Account",
             new { email = model.Email, token, role = model.Role }, Request.Scheme);
 
-        // No email provider is configured yet, so the reset link is shown directly
-        // on the confirmation page instead of being emailed.
-        ViewData["ResetLink"] = resetLink;
+        var sender = _emailSender as TutorBridgeNepal.Services.SmtpEmailSender;
+        if (sender != null && sender.IsConfigured)
+        {
+            var subject = "Reset your TutorBridge Nepal password";
+            var body = $@"
+                <p>Hi {WebUtility.HtmlEncode(user.FullName)},</p>
+                <p>We received a request to reset your TutorBridge Nepal password. Click the link below to choose a new one:</p>
+                <p><a href=""{resetLink}"">Reset my password</a></p>
+                <p>If you didn't request this, you can safely ignore this email - your password won't be changed.</p>
+                <p>This link will expire shortly for your security.</p>";
+
+            await _emailSender.SendEmailAsync(model.Email, subject, body);
+        }
+        else
+        {
+            // SMTP isn't configured (EmailSettings is empty), so fall back to
+            // showing the reset link directly on the confirmation page. Fill
+            // in appsettings.Development.json's EmailSettings to send a real
+            // email instead.
+            ViewData["ResetLink"] = resetLink;
+        }
+
         return View("ForgotPasswordConfirmation", model);
     }
 
@@ -398,6 +473,78 @@ public class AccountController : Controller
         return View();
     }
 
+    // Returns false if the email genuinely couldn't be sent (bad address,
+    // SMTP rejected it, connection failure, etc.) so callers can show a
+    // clear message instead of letting the exception crash the request.
+    private async Task<bool> SendEmailOtpAsync(ApplicationUser user)
+    {
+        var code = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        user.EmailOtpCode = code;
+        user.EmailOtpExpiresAt = DateTime.UtcNow.AddMinutes(10);
+        await _userManager.UpdateAsync(user);
+
+        var subject = "Your TutorBridge Nepal verification code";
+        var body = $@"
+            <p>Hi {System.Net.WebUtility.HtmlEncode(user.FullName)},</p>
+            <p>Your verification code is:</p>
+            <p style=""font-size:28px; font-weight:700; letter-spacing:4px;"">{code}</p>
+            <p>This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>";
+
+        var sender = _emailSender as TutorBridgeNepal.Services.SmtpEmailSender;
+        if (sender != null && sender.IsConfigured)
+        {
+            try
+            {
+                await _emailSender.SendEmailAsync(user.Email!, subject, body);
+            }
+            catch
+            {
+                // Already logged inside SmtpEmailSender - just report the
+                // failure up so the caller can show a friendly message
+                // instead of a crashed request.
+                return false;
+            }
+        }
+        else
+        {
+            // SMTP isn't configured yet - surface the code directly so
+            // registration/login still works end-to-end during development.
+            TempData["DevOtpCode"] = code;
+        }
+
+        return true;
+    }
+
+    // Called from the registration wizard's step-1 "Next" click. Checks
+    // whether the email's domain actually has mail servers configured
+    // (MX records) - catches obviously fake domains like "zyz.com"
+    // immediately, instead of only failing much later at the OTP step.
+    // Deliberately fails OPEN (returns valid) if the DNS lookup itself
+    // errors out or times out, rather than blocking registration entirely
+    // over a network hiccup - the OTP step is still the real backstop.
+    [HttpGet]
+    public async Task<IActionResult> CheckEmailDomain(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+        {
+            return Json(new { valid = false });
+        }
+
+        var domain = email.Split('@').Last().Trim();
+
+        try
+        {
+            var lookup = new LookupClient(new LookupClientOptions { Timeout = TimeSpan.FromSeconds(4) });
+            var result = await lookup.QueryAsync(domain, QueryType.MX);
+            var hasMx = result.Answers.OfType<MxRecord>().Any();
+            return Json(new { valid = hasMx });
+        }
+        catch
+        {
+            return Json(new { valid = true });
+        }
+    }
+
     [HttpGet]
     public IActionResult Register(string role = "Student")
     {
@@ -420,7 +567,26 @@ public class AccountController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Register(RegisterViewModel model)
     {
-        if (!ModelState.IsValid) return View(model);
+        // Same reasoning as Login's ViewForRole(): StudentRegister/
+        // TutorRegister don't share a view with the generic "Register" page,
+        // so a bare View(model) here would silently swap the person onto the
+        // wrong page (the generic role-toggle one) instead of showing the
+        // error back on the wizard they were actually using.
+        IActionResult ViewForRole() => model.Role switch
+        {
+            "Student" => View("StudentRegister", model),
+            "Tutor" => View("TutorRegister", model),
+            _ => View(model)
+        };
+
+        if (!ModelState.IsValid) return ViewForRole();
+
+        var existingUser = await _userManager.FindByEmailAsync(model.Email);
+        if (existingUser != null)
+        {
+            ModelState.AddModelError(nameof(model.Email), "An account with this email already exists.");
+            return ViewForRole();
+        }
 
         var user = new ApplicationUser
         {
@@ -438,7 +604,7 @@ public class AccountController : Controller
             {
                 ModelState.AddModelError("", error.Description);
             }
-            return View(model);
+            return ViewForRole();
         }
 
         await _userManager.AddToRoleAsync(user, model.Role);
@@ -479,15 +645,137 @@ public class AccountController : Controller
         }
 
         await _context.SaveChangesAsync();
+        if (!await SendEmailOtpAsync(user))
+        {
+            TempData["SettingsError"] = "We couldn't send a code to that email address. Double-check it's correct, then tap Resend code below.";
+        }
+
+        return RedirectToAction("VerifyEmail", new { email = user.Email });
+    }
+
+    [HttpGet]
+    public IActionResult VerifyEmail(string email)
+    {
+        return View(new VerifyEmailViewModel { Email = email });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> VerifyEmail(VerifyEmailViewModel model)
+    {
+        if (!ModelState.IsValid) return View(model);
+
+        var user = await _userManager.FindByEmailAsync(model.Email);
+        if (user == null)
+        {
+            ModelState.AddModelError("", "We couldn't find that account.");
+            return View(model);
+        }
+
+        if (user.EmailConfirmed)
+        {
+            // Already verified (e.g. they hit back after succeeding once) -
+            // just let them through instead of erroring.
+        }
+        else if (string.IsNullOrEmpty(user.EmailOtpCode)
+            || user.EmailOtpExpiresAt == null
+            || user.EmailOtpExpiresAt < DateTime.UtcNow
+            || user.EmailOtpCode != model.Code)
+        {
+            ModelState.AddModelError(nameof(model.Code), "That code is incorrect or has expired. Request a new one below.");
+            return View(model);
+        }
+        else
+        {
+            user.EmailConfirmed = true;
+            user.EmailOtpCode = null;
+            user.EmailOtpExpiresAt = null;
+            await _userManager.UpdateAsync(user);
+        }
+
         await _signInManager.SignInAsync(user, isPersistent: false);
         await StartDeviceSessionAsync(user, false);
 
-        return model.Role switch
+        var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
+        return role switch
         {
             "Tutor" => RedirectToAction("VerificationPending", "Tutor"),
             "Student" => RedirectToAction("Dashboard", "Student"),
+            "Admin" => RedirectToAction("Dashboard", "Admin"),
             _ => RedirectToAction("Index", "Home")
         };
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResendEmailOtp(string email)
+    {
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user != null && !user.EmailConfirmed)
+        {
+            if (await SendEmailOtpAsync(user))
+            {
+                TempData["SettingsSuccessGlobal"] = "A new code has been sent to your email.";
+            }
+            else
+            {
+                TempData["SettingsError"] = "We couldn't send a code to that email address. Double-check it's correct, then try again.";
+            }
+        }
+
+        return RedirectToAction("VerifyEmail", new { email });
+    }
+
+    [HttpGet]
+    public IActionResult VerifyAdminCode(string email, bool rememberMe = false)
+    {
+        return View(new AdminOtpViewModel { Email = email, RememberMe = rememberMe });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> VerifyAdminCode(AdminOtpViewModel model)
+    {
+        if (!ModelState.IsValid) return View(model);
+
+        var user = await _userManager.FindByEmailAsync(model.Email);
+        if (user == null || !await _userManager.IsInRoleAsync(user, "Admin"))
+        {
+            ModelState.AddModelError("", "We couldn't find that admin account.");
+            return View(model);
+        }
+
+        if (string.IsNullOrEmpty(user.EmailOtpCode)
+            || user.EmailOtpExpiresAt == null
+            || user.EmailOtpExpiresAt < DateTime.UtcNow
+            || user.EmailOtpCode != model.Code)
+        {
+            ModelState.AddModelError(nameof(model.Code), "That code is incorrect or has expired. Request a new one below.");
+            return View(model);
+        }
+
+        user.EmailOtpCode = null;
+        user.EmailOtpExpiresAt = null;
+        await _userManager.UpdateAsync(user);
+
+        await _signInManager.SignInAsync(user, isPersistent: model.RememberMe);
+        await StartDeviceSessionAsync(user, model.RememberMe);
+
+        return RedirectToAction("Dashboard", "Admin");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResendAdminCode(string email, bool rememberMe)
+    {
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user != null && await _userManager.IsInRoleAsync(user, "Admin"))
+        {
+            await SendEmailOtpAsync(user);
+            TempData["SettingsSuccessGlobal"] = "A new code has been sent to your email.";
+        }
+
+        return RedirectToAction("VerifyAdminCode", new { email, rememberMe });
     }
 
     [HttpPost]

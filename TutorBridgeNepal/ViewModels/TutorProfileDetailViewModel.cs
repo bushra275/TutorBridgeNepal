@@ -16,6 +16,23 @@ public class TutorProfileDetailViewModel
     public int ReviewCount { get; set; }
     public List<ReviewRowViewModel> Reviews { get; set; } = new();
 
+    // The calendar month currently being displayed on the booking panel.
+    // Defaults to the current month; navigated via ?month=&year= on the
+    // TutorProfile action so students can actually reach slots that fall
+    // in a later month instead of being stuck looking at only whichever
+    // month the very first available slot happens to fall in.
+    public DateTime DisplayMonth { get; set; }
+
+    // Set only when this ViewModel is reused for the RescheduleBooking page
+    // instead of the normal TutorProfile page - identifies which existing
+    // booking is being moved, and what its current time slot is, so the
+    // view can show "currently booked for..." and the subject stays fixed
+    // instead of offering a subject picker.
+    public int? RescheduleBookingId { get; set; }
+    public string? RescheduleSubject { get; set; }
+    public DateTime? CurrentSlotStartTime { get; set; }
+    public DateTime? CurrentSlotEndTime { get; set; }
+
     public List<string> SubjectTags =>
         Subjects.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 

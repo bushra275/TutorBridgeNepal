@@ -210,10 +210,28 @@
                     <strong>Admin note:</strong> @Model.AdminNote
                 </div>
             }
+            else if (Model.InterviewScheduledAt.HasValue)
+            {
+                <div class="status-banner @(Model.InterviewIsUpcoming ? "info" : "warn") mb-3">
+                    <strong>Your interview is scheduled for @Model.InterviewScheduledAt.Value.ToString("dddd, d MMMM yyyy 'at' h:mm tt").</strong>
+                    @if (!string.IsNullOrWhiteSpace(Model.InterviewMeetingLink))
+                    {
+                        <text> Join here: <a href="@Model.InterviewMeetingLink" target="_blank">@Model.InterviewMeetingLink</a></text>
+                    }
+                    @if (Model.InterviewIsUpcoming)
+                    {
+                        <text> Please join a few minutes early.</text>
+                    }
+                    else
+                    {
+                        <text> An admin will confirm your application status shortly.</text>
+                    }
+                </div>
+            }
             else if (Model.AllDocumentsUploaded)
             {
                 <div class="status-banner warn mb-3">
-                    Your documents are submitted and waiting for an admin to review them. You'll be able to access your dashboard as soon as your application is approved - check back here anytime to see the current status.
+                    Your documents have been uploaded and a meeting/interview will be scheduled for evaluation. Check back here for the interview details once it's arranged.
                 </div>
             }
             else
@@ -267,11 +285,10 @@
                                 <form asp-action="UploadVerificationDocument" method="post" enctype="multipart/form-data" class="mp-upload-form" data-doc-form>
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="documentType" value="@doc.DocumentType" />
-                                    <label class="mp-file-picker">
-                                        <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required class="mp-file-input-native" data-file-input />
-                                        <span data-file-label>Choose file</span>
+                                    <label class="mp-doc-btn mp-doc-btn-primary" data-upload-btn>
+                                        <span data-upload-label>Upload</span>
+                                        <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required class="mp-file-input-native" data-file-input style="position:absolute; width:1px; height:1px; opacity:0; overflow:hidden;" />
                                     </label>
-                                    <button type="submit" class="mp-doc-btn mp-doc-btn-primary" data-upload-btn disabled>Upload</button>
                                 </form>
                             }
                         </div>
@@ -285,24 +302,13 @@
     <script>
             document.querySelectorAll('[data-doc-form]').forEach(function(form) {
                 var input = form.querySelector('[data-file-input]');
-                var label = form.querySelector('[data-file-label]');
-                var button = form.querySelector('[data-upload-btn]');
+                var labelText = form.querySelector('[data-upload-label]');
 
                 input.addEventListener('change', function() {
                     if (input.files && input.files.length > 0) {
-                        label.textContent = input.files[0].name;
-                        form.classList.add('has-file');
-                        button.disabled = false;
-                    } else {
-                        label.textContent = 'Choose file';
-                        form.classList.remove('has-file');
-                        button.disabled = true;
+                        labelText.textContent = 'Uploading…';
+                        form.submit();
                     }
-                });
-
-                form.addEventListener('submit', function() {
-                    button.disabled = true;
-                    button.textContent = 'Uploading…';
                 });
             });
     </script>
