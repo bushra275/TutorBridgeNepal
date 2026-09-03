@@ -236,8 +236,8 @@
                                     }
                                     <a asp-action="UserDetail" asp-route-userId="@a.UserId" asp-route-returnUrl="@Context.Request.Path@Context.Request.QueryString" class="tv-view-link">View full profile</a>
                                 </div>
-                                <div class="tv-docs" style="@(a.Status == "Pending" && a.AllDocumentsUploaded && !a.InterviewScheduledAt.HasValue ? "flex:0 0 640px;" : "")">
-                                    <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:flex-start; margin-bottom: @(a.Status == "Pending" && a.AllDocumentsUploaded && !a.InterviewScheduledAt.HasValue ? "0" : "1rem");">
+                                <div class="tv-docs" style="@(a.Status == "Pending" && a.AllDocumentsUploaded ? "flex:0 0 640px;" : "")">
+                                    <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:flex-start; margin-bottom: @(a.Status == "Pending" && a.AllDocumentsUploaded ? "0" : "1rem");">
                                         <div style="min-width:220px;">
                                             <div class="tv-docs-label">SUBMITTED DOCUMENTS</div>
                                             <div class="tv-docs-grid" style="margin-bottom:0;">
@@ -275,6 +275,35 @@
                                                 </form>
                                             </div>
                                         }
+                                        @if (a.Status == "Pending" && a.InterviewScheduledAt.HasValue && !a.InterviewHasHappened)
+                                        {
+                                            <div style="flex:1; min-width:280px;">
+                                                <div class="tv-note-sent" style="margin-bottom:.6rem;">
+                                                    📅 Interview scheduled for @a.InterviewScheduledAt.Value.ToString("d MMM yyyy, h:mm tt")
+                                                    @if (!string.IsNullOrWhiteSpace(a.InterviewMeetingLink))
+                                                    {
+                                                        <text> — <a href="@a.InterviewMeetingLink" target="_blank">meeting link</a></text>
+                                                    }
+                                                    . Approve/Reject unlock once this time has passed.
+                                                </div>
+
+                                                <button type="button" class="mini-btn" data-note-toggle="tv-reschedule-@a.TutorProfileId">Reschedule</button>
+                                                <form asp-controller="Admin" asp-action="ScheduleTutorInterview" method="post" class="tv-note-form" id="tv-reschedule-@a.TutorProfileId" style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:flex-end;">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
+                                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                                    <div>
+                                                        <label style="font-size:.75rem; font-weight:700; display:block;">New date &amp; time</label>
+                                                        <input type="datetime-local" name="interviewAt" required class="tb-input" />
+                                                    </div>
+                                                    <div style="flex:1; min-width:200px;">
+                                                        <label style="font-size:.75rem; font-weight:700; display:block;">Meeting link</label>
+                                                        <input type="url" name="meetingLink" required value="@a.InterviewMeetingLink" class="tb-input" />
+                                                    </div>
+                                                    <button type="submit" class="mini-btn green">Update</button>
+                                                </form>
+                                            </div>
+                                        }
                                     </div>
 
                                     @if (a.Status == "Pending" && !a.AllDocumentsUploaded)
@@ -303,30 +332,8 @@
                                     }
                                     else if (a.Status == "Pending" && a.InterviewScheduledAt.HasValue && !a.InterviewHasHappened)
                                     {
-                                        <div class="tv-note-sent">
-                                            📅 Interview scheduled for @a.InterviewScheduledAt.Value.ToString("d MMM yyyy, h:mm tt")
-                                            @if (!string.IsNullOrWhiteSpace(a.InterviewMeetingLink))
-                                            {
-                                                <text> — <a href="@a.InterviewMeetingLink" target="_blank">meeting link</a></text>
-                                            }
-                                            . Approve/Reject unlock once this time has passed.
-                                        </div>
-
-                                        <button type="button" class="mini-btn" data-note-toggle="tv-reschedule-@a.TutorProfileId">Reschedule</button>
-                                        <form asp-controller="Admin" asp-action="ScheduleTutorInterview" method="post" class="tv-note-form" id="tv-reschedule-@a.TutorProfileId" style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:flex-end;">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
-                                            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                                            <div>
-                                                <label style="font-size:.75rem; font-weight:700; display:block;">New date &amp; time</label>
-                                                <input type="datetime-local" name="interviewAt" required class="tb-input" />
-                                            </div>
-                                            <div style="flex:1; min-width:200px;">
-                                                <label style="font-size:.75rem; font-weight:700; display:block;">Meeting link</label>
-                                                <input type="url" name="meetingLink" required value="@a.InterviewMeetingLink" class="tb-input" />
-                                            </div>
-                                            <button type="submit" class="mini-btn green">Update</button>
-                                        </form>
+                                        <!-- Nothing to show here - the scheduled-interview info and
+                                             reschedule form already rendered above, next to the document chips. -->
                                     }
                                     else if (a.Status == "Pending")
                                     {
