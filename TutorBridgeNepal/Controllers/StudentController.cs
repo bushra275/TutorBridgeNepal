@@ -23,8 +23,9 @@ public class StudentController : Controller
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly GoogleCalendarService _googleCalendarService;
     private readonly IHubContext<TutorBridgeNepal.Hubs.ChatHub> _chatHub;
+    private readonly IEmailSender _emailSender;
 
-    public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment, GoogleCalendarService googleCalendarService, IHubContext<TutorBridgeNepal.Hubs.ChatHub> chatHub)
+    public StudentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IWebHostEnvironment webHostEnvironment, GoogleCalendarService googleCalendarService, IHubContext<TutorBridgeNepal.Hubs.ChatHub> chatHub, IEmailSender emailSender)
     {
         _context = context;
         _userManager = userManager;
@@ -32,6 +33,26 @@ public class StudentController : Controller
         _webHostEnvironment = webHostEnvironment;
         _googleCalendarService = googleCalendarService;
         _chatHub = chatHub;
+        _emailSender = emailSender;
+    }
+
+    // Best-effort - a failed email never blocks a booking/session action that
+    // has already been saved to the database by the time this runs.
+    private async Task SendSessionEmailAsync(ApplicationUser? user, string subject, string bodyHtml)
+    {
+        if (user == null || string.IsNullOrWhiteSpace(user.Email)) return;
+
+        var sender = _emailSender as SmtpEmailSender;
+        if (sender == null || !sender.IsConfigured) return;
+
+        try
+        {
+            await _emailSender.SendEmailAsync(user.Email, subject, bodyHtml);
+        }
+        catch
+        {
+            // Logged inside SmtpEmailSender already.
+        }
     }
 
     private static string GetInitials(string fullName)
@@ -206,13 +227,16 @@ public class StudentController : Controller
             .Where(b => b.StudentProfileId == studentProfile.Id)
             .ToListAsync();
 
+        // "Upcoming" means not yet finished (covers sessions currently in
+        // progress too), not merely "hasn't started" - otherwise an ongoing
+        // session briefly looks like history the instant it begins.
         var upcoming = bookings
-            .Where(b => b.TutorAvailabilitySlot.StartTime >= now && b.Status != "Cancelled")
+            .Where(b => b.TutorAvailabilitySlot.EndTime >= now && b.Status != "Cancelled")
             .OrderBy(b => b.TutorAvailabilitySlot.StartTime)
             .ToList();
 
         var recent = bookings
-            .Where(b => b.TutorAvailabilitySlot.StartTime < now || b.Status == "Cancelled")
+            .Where(b => b.TutorAvailabilitySlot.EndTime < now || b.Status == "Cancelled")
             .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
             .ToList();
 
@@ -741,7 +765,7 @@ public class StudentController : Controller
         if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
 
         var slot = await _context.TutorAvailabilitySlots
-                   .Include(s => s.TutorProfile)
+                   .Include(s => s.TutorProfile).ThenInclude(t => t.User)
                    .FirstOrDefaultAsync(s => s.Id == slotId);
 
         if (slot == null || slot.TutorProfile.IsDeactivated)
@@ -842,6 +866,40 @@ public class StudentController : Controller
             return RedirectToAction("TutorProfile", new { id = tutorProfileId });
         }
 
+        var studentUser = await _userManager.GetUserAsync(User);
+        var tutorUser = slot.TutorProfile.User;
+        var subjectLabel = string.IsNullOrWhiteSpace(subject) ? "General" : subject;
+        var whenLabel = slot.StartTime.ToString("dddd, d MMM yyyy, h:mm tt");
+
+        if (isReturningStudent)
+        {
+            var booking = await _context.Bookings
+                .Where(b => b.StudentProfileId == studentProfile.Id && b.TutorAvailabilitySlotId == slot.Id)
+                .OrderByDescending(b => b.Id)
+                .FirstAsync();
+            booking.MeetingLink = MeetingLinkHelper.GenerateForBooking(booking.Id);
+            await _context.SaveChangesAsync();
+
+            await SendSessionEmailAsync(tutorUser, "New session auto-confirmed", $@"
+                <p>Hi {System.Net.WebUtility.HtmlEncode(tutorUser.FullName)},</p>
+                <p>{System.Net.WebUtility.HtmlEncode(studentUser?.FullName ?? "A returning student")} booked a {System.Net.WebUtility.HtmlEncode(subjectLabel)} session with you for {whenLabel}. It's been auto-confirmed.</p>
+                <p>— TutorBridge Nepal</p>");
+
+            await SendSessionEmailAsync(studentUser, "Your session is confirmed", $@"
+                <p>Hi {System.Net.WebUtility.HtmlEncode(studentUser?.FullName ?? "there")},</p>
+                <p>Your {System.Net.WebUtility.HtmlEncode(subjectLabel)} session with {System.Net.WebUtility.HtmlEncode(tutorUser.FullName)} on {whenLabel} is confirmed.</p>
+                <p>Join it here when it's time: <a href=""{booking.MeetingLink}"">{booking.MeetingLink}</a></p>
+                <p>— TutorBridge Nepal</p>");
+        }
+        else
+        {
+            await SendSessionEmailAsync(tutorUser, "New session request", $@"
+                <p>Hi {System.Net.WebUtility.HtmlEncode(tutorUser.FullName)},</p>
+                <p>{System.Net.WebUtility.HtmlEncode(studentUser?.FullName ?? "A student")} requested a {System.Net.WebUtility.HtmlEncode(subjectLabel)} session with you for {whenLabel}.</p>
+                <p>Log in to accept or decline it.</p>
+                <p>— TutorBridge Nepal</p>");
+        }
+
         TempData["BookingSuccess"] = isReturningStudent
             ? "Session booked and automatically confirmed!"
             : "Session requested! Your tutor will confirm it shortly.";
@@ -863,7 +921,11 @@ public class StudentController : Controller
             .Where(b => b.StudentProfileId == studentProfile.Id)
             .ToListAsync();
 
-        bool IsUpcoming(Booking b) => b.TutorAvailabilitySlot.StartTime >= now && b.Status != "Cancelled";
+        // "Upcoming" means not yet finished (covers sessions currently in
+        // progress too), not merely "hasn't started" - otherwise an ongoing
+        // session falls out of every tab except "All sessions" the instant
+        // it begins.
+        bool IsUpcoming(Booking b) => b.TutorAvailabilitySlot.EndTime >= now && b.Status != "Cancelled";
         bool IsCompleted(Booking b) => b.Status == "Completed";
         bool IsCancelled(Booking b) => b.Status == "Cancelled";
 
@@ -922,7 +984,8 @@ public class StudentController : Controller
                 StartTime = b.TutorAvailabilitySlot.StartTime,
                 EndTime = b.TutorAvailabilitySlot.EndTime,
                 Status = b.Status,
-                MyReviewRating = myReviewRatings.TryGetValue(b.Id, out var myRating) ? myRating : (int?)null
+                MyReviewRating = myReviewRatings.TryGetValue(b.Id, out var myRating) ? myRating : (int?)null,
+                MeetingLink = b.MeetingLink
             }).ToList(),
             SubjectOptions = allBookings.Select(b => b.Subject).Distinct().OrderBy(s => s).ToList(),
             TutorOptions = allBookings
@@ -976,6 +1039,36 @@ public class StudentController : Controller
         }
 
         return returnTo == "Sessions" ? RedirectToAction("Sessions") : RedirectToAction("Dashboard");
+    }
+
+    public async Task<IActionResult> JoinSession(int id)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return RedirectToAction("StudentLogin", "Account");
+
+        var booking = await _context.Bookings
+            .Include(b => b.TutorAvailabilitySlot)
+            .Include(b => b.TutorProfile).ThenInclude(t => t.User)
+            .FirstOrDefaultAsync(b => b.Id == id && b.StudentProfileId == studentProfile.Id);
+
+        if (booking == null || booking.Status != "Confirmed" || string.IsNullOrWhiteSpace(booking.MeetingLink))
+        {
+            TempData["SettingsError"] = "This session isn't ready to join yet.";
+            return RedirectToAction("Sessions");
+        }
+
+        var start = booking.TutorAvailabilitySlot.StartTime;
+        var end = booking.TutorAvailabilitySlot.EndTime;
+        if (DateTime.Now < start.AddMinutes(-10) || DateTime.Now > end)
+        {
+            TempData["SettingsError"] = $"You can join this session between {start.AddMinutes(-10):h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
+            return RedirectToAction("Sessions");
+        }
+
+        ViewData["MeetingLink"] = booking.MeetingLink;
+        ViewData["OtherPartyName"] = booking.TutorProfile.User.FullName;
+        ViewData["Subject"] = booking.Subject;
+        return View();
     }
 
     [HttpPost]

@@ -14,7 +14,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tutor Dashboard - TutorBridge Nepal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -93,7 +93,15 @@
                                         <div class="session-actions">
                                             <span class="pill pill-confirmed">Confirmed</span>
                                             <div class="session-btn-row">
-                                                @if (started)
+                                                @{
+                                                    var canJoin = !string.IsNullOrWhiteSpace(s.MeetingLink) && now >= s.StartTime.AddMinutes(-10) && now <= s.EndTime;
+                                                    var finished = s.EndTime <= now;
+                                                }
+                                                @if (canJoin)
+                                                {
+                                                    <a asp-controller="Tutor" asp-action="JoinSession" asp-route-id="@s.BookingId" class="mini-btn green" target="_blank">Join session</a>
+                                                }
+                                                @if (finished)
                                                 {
                                                     <form asp-controller="Tutor" asp-action="MarkSessionCompleted" method="post" style="margin:0;">
                                                         @Html.AntiForgeryToken()
@@ -101,7 +109,7 @@
                                                         <button type="submit" class="mini-btn green">Mark completed</button>
                                                     </form>
                                                 }
-                                                else
+                                                else if (!canJoin)
                                                 {
                                                     <span class="disabled-btn" title="Session hasn't started yet">Not started</span>
                                                 }

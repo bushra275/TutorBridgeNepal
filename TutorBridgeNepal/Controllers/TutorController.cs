@@ -29,6 +29,7 @@ public class TutorController : Controller
     private readonly GoogleOAuthOptions _googleOptions;
     private readonly GoogleCalendarService _googleCalendarService;
     private readonly IHubContext<TutorBridgeNepal.Hubs.ChatHub> _chatHub;
+    private readonly IEmailSender _emailSender;
 
     public TutorController(
         ApplicationDbContext context,
@@ -38,7 +39,8 @@ public class TutorController : Controller
         IHttpClientFactory httpClientFactory,
         IOptions<GoogleOAuthOptions> googleOptions,
         GoogleCalendarService googleCalendarService,
-        IHubContext<TutorBridgeNepal.Hubs.ChatHub> chatHub)
+        IHubContext<TutorBridgeNepal.Hubs.ChatHub> chatHub,
+        IEmailSender emailSender)
     {
         _context = context;
         _userManager = userManager;
@@ -48,6 +50,26 @@ public class TutorController : Controller
         _googleOptions = googleOptions.Value;
         _googleCalendarService = googleCalendarService;
         _chatHub = chatHub;
+        _emailSender = emailSender;
+    }
+
+    // Best-effort - a failed email never blocks a booking/session action that
+    // has already been saved to the database by the time this runs.
+    private async Task SendSessionEmailAsync(ApplicationUser? user, string subject, string bodyHtml)
+    {
+        if (user == null || string.IsNullOrWhiteSpace(user.Email)) return;
+
+        var sender = _emailSender as SmtpEmailSender;
+        if (sender == null || !sender.IsConfigured) return;
+
+        try
+        {
+            await _emailSender.SendEmailAsync(user.Email, subject, bodyHtml);
+        }
+        catch
+        {
+            // Logged inside SmtpEmailSender already.
+        }
     }
 
     private static readonly string[] AllowedWhileUnverified =
@@ -249,7 +271,8 @@ public class TutorController : Controller
             StartTime = b.TutorAvailabilitySlot.StartTime,
             EndTime = b.TutorAvailabilitySlot.EndTime,
             Status = b.Status,
-            RequestedAt = b.CreatedAt
+            RequestedAt = b.CreatedAt,
+            MeetingLink = b.MeetingLink
         };
 
         var myStudents = studentGroups.Select(g =>
@@ -340,6 +363,7 @@ public class TutorController : Controller
         {
             booking.Status = "Confirmed";
             booking.DecidedAt = DateTime.Now;
+            booking.MeetingLink = MeetingLinkHelper.GenerateForBooking(booking.Id);
             await _context.SaveChangesAsync();
 
             var connection = await _context.TutorCalendarConnections.FirstOrDefaultAsync(c => c.TutorProfileId == tutor.Id);
@@ -352,6 +376,13 @@ public class TutorController : Controller
                     await _context.SaveChangesAsync();
                 }
             }
+
+            var whenLabel = booking.TutorAvailabilitySlot.StartTime.ToString("dddd, d MMM yyyy, h:mm tt");
+            await SendSessionEmailAsync(booking.StudentProfile.User, "Your session is confirmed", $@"
+                <p>Hi {System.Net.WebUtility.HtmlEncode(booking.StudentProfile.User.FullName)},</p>
+                <p>{System.Net.WebUtility.HtmlEncode(tutor.User.FullName)} confirmed your {System.Net.WebUtility.HtmlEncode(booking.Subject)} session for {whenLabel}.</p>
+                <p>Join it here when it's time: <a href=""{booking.MeetingLink}"">{booking.MeetingLink}</a></p>
+                <p>— TutorBridge Nepal</p>");
         }
 
         return returnTo switch
@@ -411,9 +442,10 @@ public class TutorController : Controller
             .Include(b => b.StudentProfile).ThenInclude(s => s.User)
             .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id && b.Status == "Confirmed");
 
-        // Can only mark a session complete once it has actually started - stops
-        // a tutor from marking a future session done before it happens.
-        if (booking != null && booking.TutorAvailabilitySlot.StartTime <= DateTime.Now)
+        // Can only mark a session complete once it has actually finished -
+        // stops a tutor from marking an in-progress or future session done
+        // before it's over.
+        if (booking != null && booking.TutorAvailabilitySlot.EndTime <= DateTime.Now)
         {
             booking.Status = "Completed";
 
@@ -426,9 +458,45 @@ public class TutorController : Controller
                 actionUrl: Url.Action("SessionLogs", "Admin", new { search = $"SES-{booking.Id:D4}" }));
 
             await _context.SaveChangesAsync();
+
+            await SendSessionEmailAsync(booking.StudentProfile.User, "How was your session?", $@"
+                <p>Hi {System.Net.WebUtility.HtmlEncode(booking.StudentProfile.User.FullName)},</p>
+                <p>Your {System.Net.WebUtility.HtmlEncode(booking.Subject)} session with {System.Net.WebUtility.HtmlEncode(tutor.User.FullName)} has been marked complete.</p>
+                <p>Log in and leave a review to help other students.</p>
+                <p>— TutorBridge Nepal</p>");
         }
 
         return RedirectToAction("Dashboard");
+    }
+
+    public async Task<IActionResult> JoinSession(int id)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return RedirectToAction("Index", "Home");
+
+        var booking = await _context.Bookings
+            .Include(b => b.TutorAvailabilitySlot)
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
+            .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id);
+
+        if (booking == null || booking.Status != "Confirmed" || string.IsNullOrWhiteSpace(booking.MeetingLink))
+        {
+            TempData["SettingsError"] = "This session isn't ready to join yet.";
+            return RedirectToAction("Dashboard");
+        }
+
+        var start = booking.TutorAvailabilitySlot.StartTime;
+        var end = booking.TutorAvailabilitySlot.EndTime;
+        if (DateTime.Now < start.AddMinutes(-10) || DateTime.Now > end)
+        {
+            TempData["SettingsError"] = $"You can join this session between {start.AddMinutes(-10):h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
+            return RedirectToAction("Dashboard");
+        }
+
+        ViewData["MeetingLink"] = booking.MeetingLink;
+        ViewData["OtherPartyName"] = booking.StudentProfile.User.FullName;
+        ViewData["Subject"] = booking.Subject;
+        return View();
     }
 
     [HttpPost]
@@ -635,7 +703,8 @@ public class TutorController : Controller
                 Note = b.Note,
                 CreatedAt = b.CreatedAt,
                 Status = b.Status,
-                DeclinedByTutor = b.DeclinedByTutor
+                RequestedAt = b.CreatedAt,
+                MeetingLink = b.MeetingLink
             };
         }
 
@@ -2024,6 +2093,10 @@ public class TutorController : Controller
             tutor.VerificationDecidedAt = null;
         }
 
+        // Captured before clearing, so the completion notification below can
+        // tell an admin's "request more info" being resolved apart from a
+        // tutor's very first document submission.
+        var wasRespondingToRequest = !string.IsNullOrWhiteSpace(tutor.VerificationNote);
         tutor.VerificationNote = null;
 
         // Fire "verification submitted" the moment the tutor's document set
@@ -2035,7 +2108,6 @@ public class TutorController : Controller
         // interview before approval - there's no auto-approve path anymore,
         // regardless of PlatformSettings.AutoApproveVerifiedTutors (that
         // setting is intentionally no longer consulted here).
-        var justCompletedDocuments = false;
         if (!tutor.IsVerified && !tutor.VerificationRejected)
         {
             var currentDocTypes = (await _context.TutorCredentials
@@ -2049,13 +2121,13 @@ public class TutorController : Controller
             var allComplete = RequiredVerificationDocuments.All(rd => currentDocTypes.Contains(rd.Type));
             if (allComplete)
             {
-                justCompletedDocuments = true;
-
                 NotificationHelper.Create(_context,
                     type: "Verification",
-                    title: "New tutor verification submitted",
-                    message: $"{tutor.User.FullName} submitted documents for {tutor.Subjects}",
-                    icon: "🎓",
+                    title: wasRespondingToRequest ? "Tutor responded to your request" : "New tutor verification submitted",
+                    message: wasRespondingToRequest
+                        ? $"{tutor.User.FullName} updated their documents after your request for more info"
+                        : $"{tutor.User.FullName} submitted documents for {tutor.Subjects}",
+                    icon: wasRespondingToRequest ? "📬" : "🎓",
                     actionLabel: "Schedule interview",
                     actionUrl: Url.Action("TutorVerification", "Admin"));
             }
@@ -2063,9 +2135,10 @@ public class TutorController : Controller
 
         await _context.SaveChangesAsync();
 
-        TempData["ProfileSuccess"] = justCompletedDocuments
-            ? "Your documents have been uploaded and a meeting/interview will be scheduled for evaluation."
-            : "Document uploaded.";
+        // The persistent status banner on VerificationPending already explains
+        // what happens next once all documents are in, so this flash just
+        // confirms the immediate action - no need to repeat it.
+        TempData["ProfileSuccess"] = "Document uploaded.";
         return RedirectToAction(tutor.IsVerified ? "Profile" : "VerificationPending");
     }
 

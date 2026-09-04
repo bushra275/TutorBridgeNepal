@@ -37,8 +37,9 @@ public class TutorBookingRowViewModel
 	public string Subject { get; set; } = string.Empty;
 	public DateTime StartTime { get; set; }
 	public DateTime EndTime { get; set; }
-	public string Status { get; set; } = string.Empty;
-	public DateTime RequestedAt { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public DateTime RequestedAt { get; set; }
+    public string? MeetingLink { get; set; }
 }
 
 public class TutorStudentRowViewModel

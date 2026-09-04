@@ -66,7 +66,15 @@ public class AdminTutorVerificationRowViewModel
     public bool AllDocumentsUploaded { get; set; }
     public DateTime? InterviewScheduledAt { get; set; }
     public string? InterviewMeetingLink { get; set; }
-    public bool InterviewHasHappened => InterviewScheduledAt.HasValue && InterviewScheduledAt.Value <= DateTime.Now;
+    public DateTime? InterviewCompletedAt { get; set; }
+
+    // The scheduled time has arrived, but the admin hasn't confirmed the
+    // interview actually took place yet.
+    public bool InterviewTimeHasArrived => InterviewScheduledAt.HasValue && InterviewScheduledAt.Value <= DateTime.Now;
+
+    // Approve/Reject gate on this, not just the clock - an admin must
+    // explicitly confirm the interview happened.
+    public bool InterviewHasHappened => InterviewCompletedAt.HasValue;
 }
 
 public class AdminTutorVerificationDocumentViewModel

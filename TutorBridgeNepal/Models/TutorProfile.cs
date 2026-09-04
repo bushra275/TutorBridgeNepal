@@ -84,4 +84,9 @@ public class TutorProfile
     // (InterviewScheduledAt in the past) before an admin can Approve/Reject.
     public DateTime? InterviewScheduledAt { get; set; }
     public string? InterviewMeetingLink { get; set; }
+
+    // Set by ConfirmTutorInterview - the admin's explicit confirmation that
+    // the interview actually took place, separate from the scheduled time
+    // simply having passed (which doesn't guarantee it happened).
+    public DateTime? InterviewCompletedAt { get; set; }
 }

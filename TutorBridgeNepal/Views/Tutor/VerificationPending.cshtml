@@ -208,7 +208,7 @@
             {
                 <div class="status-banner warn mb-3">
                     <strong>Admin note:</strong> @Model.AdminNote
-                </div>
+                </div>  
             }
             else if (Model.InterviewScheduledAt.HasValue)
             {
@@ -228,7 +228,7 @@
                     }
                 </div>
             }
-            else if (Model.AllDocumentsUploaded)
+            else if (Model.AllDocumentsUploaded && !Model.InterviewScheduledAt.HasValue)
             {
                 <div class="status-banner warn mb-3">
                     Your documents have been uploaded and a meeting/interview will be scheduled for evaluation. Check back here for the interview details once it's arranged.
@@ -251,6 +251,7 @@
             }
 
             <div class="panel-head"><h2>Required documents</h2></div>
+            <p class="mp-doc-hint" style="margin-top:-.4rem; margin-bottom:1rem;">Please note: uploading every document below is mandatory before your application can proceed to the next step.</p>
 
             <div class="mp-doc-checklist">
                 @foreach (var doc in Model.RequiredDocuments)

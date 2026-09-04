@@ -37,6 +37,63 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin-dashboard.css" asp-append-version="true" />
+    <style>
+            .tv-modal {
+                border: none;
+                border-radius: 12px;
+                padding: 1.4rem;
+                width: 360px;
+                max-width: 90vw;
+                box-shadow: 0 12px 40px rgba(0,0,0,.18);
+            }
+
+                .tv-modal::backdrop {
+                    background: rgba(20,20,20,.45);
+                }
+
+            .tv-modal-title {
+                margin: 0 0 1rem;
+                font-size: 1rem;
+                font-weight: 800;
+                color: var(--ink);
+            }
+
+            .tv-modal-form {
+                display: flex;
+                flex-direction: column;
+                gap: .9rem;
+            }
+
+            .tv-modal-field label {
+                font-size: .75rem;
+                font-weight: 700;
+                display: block;
+                margin-bottom: .3rem;
+                color: var(--ink);
+            }
+
+            .tv-modal-field .tb-input {
+                width: 100%;
+            }
+
+            .tv-modal-textarea {
+                width: 100%;
+                min-height: 90px;
+                resize: vertical;
+                border: 1px solid var(--line);
+                border-radius: 8px;
+                padding: .6rem .7rem;
+                font-size: .82rem;
+                font-family: inherit;
+            }
+
+            .tv-modal-actions {
+                display: flex;
+                justify-content: flex-end;
+                gap: .6rem;
+                margin-top: .3rem;
+            }
+    </style>
 </head>
 <body>
     <div class="dash-shell">
@@ -259,20 +316,49 @@
                                         {
                                             <div style="flex:1; min-width:280px;">
                                                 <div class="tv-note-sent" style="margin-bottom:.6rem;">📄 All documents received - schedule an interview to proceed.</div>
-                                                <form asp-controller="Admin" asp-action="ScheduleTutorInterview" method="post" style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:flex-end; margin:0;">
-                                                    @Html.AntiForgeryToken()
-                                                    <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
-                                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                                                    <div>
-                                                        <label style="font-size:.75rem; font-weight:700; display:block;">Interview date &amp; time</label>
-                                                        <input type="datetime-local" name="interviewAt" required class="tb-input" />
-                                                    </div>
-                                                    <div style="flex:1; min-width:200px;">
-                                                        <label style="font-size:.75rem; font-weight:700; display:block;">Meeting link</label>
-                                                        <input type="url" name="meetingLink" required placeholder="https://meet.google.com/..." class="tb-input" />
-                                                    </div>
-                                                    <button type="submit" class="mini-btn green">📅 Schedule interview</button>
-                                                </form>
+
+                                                <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                                                    <button type="button" class="mini-btn green" onclick="document.getElementById('tv-schedule-modal-@a.TutorProfileId').showModal()">📅 Schedule interview</button>
+                                                    <button type="button" class="mini-btn" onclick="document.getElementById('tv-moreinfo-modal-@a.TutorProfileId').showModal()">Request more info</button>
+                                                </div>
+
+                                                <dialog id="tv-schedule-modal-@a.TutorProfileId" class="tv-modal">
+                                                    <form asp-controller="Admin" asp-action="ScheduleTutorInterview" method="post" class="tv-modal-form">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
+                                                        <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                                        <h3 class="tv-modal-title">Schedule interview</h3>
+                                                        <div class="tv-modal-field">
+                                                            <label>Interview date &amp; time</label>
+                                                            <input type="datetime-local" name="interviewAt" required class="tb-input" />
+                                                        </div>
+                                                        <div class="tv-modal-field">
+                                                            <label>Meeting link</label>
+                                                            <input type="url" name="meetingLink" required placeholder="https://meet.google.com/..." class="tb-input" />
+                                                        </div>
+                                                        <div class="tv-modal-actions">
+                                                            <button type="button" class="mini-btn" onclick="this.closest('dialog').close()">Cancel</button>
+                                                            <button type="submit" class="mini-btn green">📅 Schedule interview</button>
+                                                        </div>
+                                                    </form>
+                                                </dialog>
+
+                                                <dialog id="tv-moreinfo-modal-@a.TutorProfileId" class="tv-modal">
+                                                    <form asp-controller="Admin" asp-action="RequestMoreInfoTutor" method="post" class="tv-modal-form">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
+                                                        <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                                        <h3 class="tv-modal-title">Request more info</h3>
+                                                        <div class="tv-modal-field">
+                                                            <label>What's missing or needs fixing?</label>
+                                                            <textarea name="note" maxlength="500" required placeholder="e.g. Police report is blurry, please re-upload." class="tv-modal-textarea"></textarea>
+                                                        </div>
+                                                        <div class="tv-modal-actions">
+                                                            <button type="button" class="mini-btn" onclick="this.closest('dialog').close()">Cancel</button>
+                                                            <button type="submit" class="mini-btn green">Send to tutor</button>
+                                                        </div>
+                                                    </form>
+                                                </dialog>
                                             </div>
                                         }
                                         @if (a.Status == "Pending" && a.InterviewScheduledAt.HasValue && !a.InterviewHasHappened)
@@ -284,24 +370,48 @@
                                                     {
                                                         <text> — <a href="@a.InterviewMeetingLink" target="_blank">meeting link</a></text>
                                                     }
-                                                    . Approve/Reject unlock once this time has passed.
+                                                    @if (a.InterviewTimeHasArrived)
+                                                    {
+                                                        <text> Please confirm below once it has taken place.</text>
+                                                    }
+                                                    else
+                                                    {
+                                                        <text> Approve/Reject unlock once the interview is confirmed complete.</text>
+                                                    }
                                                 </div>
 
-                                                <button type="button" class="mini-btn" data-note-toggle="tv-reschedule-@a.TutorProfileId">Reschedule</button>
-                                                <form asp-controller="Admin" asp-action="ScheduleTutorInterview" method="post" class="tv-note-form" id="tv-reschedule-@a.TutorProfileId" style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:flex-end;">
-                                                    @Html.AntiForgeryToken()
-                                                    <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
-                                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                                                    <div>
-                                                        <label style="font-size:.75rem; font-weight:700; display:block;">New date &amp; time</label>
-                                                        <input type="datetime-local" name="interviewAt" required class="tb-input" />
-                                                    </div>
-                                                    <div style="flex:1; min-width:200px;">
-                                                        <label style="font-size:.75rem; font-weight:700; display:block;">Meeting link</label>
-                                                        <input type="url" name="meetingLink" required value="@a.InterviewMeetingLink" class="tb-input" />
-                                                    </div>
-                                                    <button type="submit" class="mini-btn green">Update</button>
-                                                </form>
+                                                @if (a.InterviewTimeHasArrived)
+                                                {
+                                                    <form asp-controller="Admin" asp-action="ConfirmTutorInterview" method="post" style="margin:0 0 .5rem;">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
+                                                        <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                                        <button type="submit" class="mini-btn green">✓ Confirm interview completed</button>
+                                                    </form>
+                                                }
+
+                                                <button type="button" class="mini-btn" onclick="document.getElementById('tv-reschedule-modal-@a.TutorProfileId').showModal()">Reschedule</button>
+
+                                                <dialog id="tv-reschedule-modal-@a.TutorProfileId" class="tv-modal">
+                                                    <form asp-controller="Admin" asp-action="ScheduleTutorInterview" method="post" class="tv-modal-form">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
+                                                        <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                                        <h3 class="tv-modal-title">Reschedule interview</h3>
+                                                        <div class="tv-modal-field">
+                                                            <label>New date &amp; time</label>
+                                                            <input type="datetime-local" name="interviewAt" required class="tb-input" />
+                                                        </div>
+                                                        <div class="tv-modal-field">
+                                                            <label>Meeting link</label>
+                                                            <input type="url" name="meetingLink" required value="@a.InterviewMeetingLink" class="tb-input" />
+                                                        </div>
+                                                        <div class="tv-modal-actions">
+                                                            <button type="button" class="mini-btn" onclick="this.closest('dialog').close()">Cancel</button>
+                                                            <button type="submit" class="mini-btn green">✓ Confirm reschedule</button>
+                                                        </div>
+                                                    </form>
+                                                </dialog>
                                             </div>
                                         }
                                     </div>
@@ -345,7 +455,6 @@
                                                 <button type="submit" class="mini-btn green">✓ Approve</button>
                                             </form>
                                             <button type="button" class="mini-btn danger" data-note-toggle="tv-reject-@a.TutorProfileId">✕ Reject</button>
-                                            <button type="button" class="mini-btn" data-note-toggle="tv-note-@a.TutorProfileId">Request more info</button>
                                         </div>
 
                                         <form asp-controller="Admin" asp-action="RejectTutor" method="post" class="tv-note-form" id="tv-reject-@a.TutorProfileId">
@@ -354,19 +463,6 @@
                                             <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
                                             <textarea name="reason" maxlength="500" required placeholder="Why is this application being rejected? e.g. Citizenship document is unreadable, please re-upload a clearer scan."></textarea>
                                             <button type="submit" class="mini-btn danger">Confirm reject</button>
-                                        </form>
-
-                                        @if (!string.IsNullOrWhiteSpace(a.VerificationNote))
-                                        {
-                                            <div class="tv-note-sent">📝 Sent: "@a.VerificationNote"</div>
-                                        }
-
-                                        <form asp-controller="Admin" asp-action="RequestMoreInfoTutor" method="post" class="tv-note-form" id="tv-note-@a.TutorProfileId">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="tutorProfileId" value="@a.TutorProfileId" />
-                                            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                                            <textarea name="note" maxlength="500" required placeholder="What's missing or needs fixing? e.g. Police report is blurry, please re-upload.">@a.VerificationNote</textarea>
-                                            <button type="submit" class="mini-btn green">Send to tutor</button>
                                         </form>
                                     }
                                     else

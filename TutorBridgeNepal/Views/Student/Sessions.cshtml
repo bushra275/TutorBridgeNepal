@@ -134,7 +134,15 @@
                                         {
                                             @if (s.Status == "Confirmed")
                                             {
-                                                <span class="mini-btn" title="Your tutor will share the meeting link closer to the session time">Join session</span>
+                                                var canJoin = !string.IsNullOrWhiteSpace(s.MeetingLink) && DateTime.Now >= s.StartTime.AddMinutes(-10) && DateTime.Now <= s.EndTime;
+                                                if (canJoin)
+                                                {
+                                                    <a asp-controller="Student" asp-action="JoinSession" asp-route-id="@s.BookingId" class="mini-btn green" target="_blank">Join session</a>
+                                                }
+                                                else
+                                                {
+                                                    <span class="mini-btn" title="You can join 10 minutes before the session starts">Join session</span>
+                                                }
                                             }
                                             <a asp-controller="Student" asp-action="RescheduleBooking" asp-route-id="@s.BookingId" class="mini-btn">Reschedule</a>
                                             <a asp-controller="Student" asp-action="Messages" asp-route-tutorProfileId="@s.TutorProfileId" class="mini-btn">Message tutor</a>

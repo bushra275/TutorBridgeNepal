@@ -33,4 +33,5 @@ public class SessionRowViewModel
     public DateTime EndTime { get; set; }
     public string Status { get; set; } = string.Empty;
     public int? MyReviewRating { get; set; }
+    public string? MeetingLink { get; set; }
 }

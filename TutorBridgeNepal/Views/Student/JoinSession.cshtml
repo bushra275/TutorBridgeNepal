@@ -1,0 +1,27 @@
+﻿@{
+    ViewData["Title"] = "Join Session";
+    Layout = null;
+    var meetingLink = ViewData["MeetingLink"] as string;
+    var otherParty = ViewData["OtherPartyName"] as string;
+    var subject = ViewData["Subject"] as string;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Session with @otherParty - TutorBridge Nepal</title>
+    <style>
+            body { margin: 0; background: #111; font-family: Inter, sans-serif; }
+            .call-header { display:flex; justify-content:space-between; align-items:center; padding:.8rem 1.2rem; background:#1a1a1a; color:#fff; }
+            .call-header a { color:#9fd8b3; text-decoration:none; font-weight:600; }
+            iframe { width:100%; height:calc(100vh - 56px); border:0; }
+    </style>
+</head>
+<body>
+    <div class="call-header">
+        <div><strong>@subject</strong> with @otherParty</div>
+        <a asp-controller="Student" asp-action="Sessions">← Back to sessions</a>
+    </div>
+    <iframe src="@meetingLink#config.prejoinPageEnabled=false" allow="camera; microphone; fullscreen; display-capture; autoplay"></iframe>
+</body>
+</html>

@@ -938,7 +938,8 @@ public class AdminController : Controller
                 VerificationNote = t.VerificationNote,
                 AllDocumentsUploaded = documents.All(d => !d.IsMissing),
                 InterviewScheduledAt = t.InterviewScheduledAt,
-                InterviewMeetingLink = t.InterviewMeetingLink
+                InterviewMeetingLink = t.InterviewMeetingLink,
+                InterviewCompletedAt = t.InterviewCompletedAt
             };
         }).ToList();
 
@@ -1314,9 +1315,9 @@ public class AdminController : Controller
     {
         var tutor = await _context.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorProfileId);
 
-        if (tutor != null && (!tutor.InterviewScheduledAt.HasValue || tutor.InterviewScheduledAt.Value > DateTime.Now))
+        if (tutor != null && !tutor.InterviewCompletedAt.HasValue)
         {
-            TempData["SettingsError"] = "Schedule and complete the interview before approving this application.";
+            TempData["SettingsError"] = "Confirm the interview is complete before approving this application.";
             return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Dashboard") : LocalRedirect(returnUrl);
         }
 
@@ -1345,6 +1346,14 @@ public class AdminController : Controller
                 icon: "✔️");
 
             await _context.SaveChangesAsync();
+
+            await SendTutorVerificationEmailAsync(tutor.User, "Welcome to TutorBridge Nepal!", $@"
+                <p>Hi {System.Net.WebUtility.HtmlEncode(tutor.User.FullName)},</p>
+                <p>🎉 Congratulations — you've been approved as a tutor on TutorBridge Nepal. Welcome to the board!</p>
+                <p>Your profile is now live and students can start booking sessions with you.</p>
+                <p>— TutorBridge Nepal</p>");
+
+            TempData["SettingsSuccess"] = "Application approved and the tutor has been notified by email.";
         }
 
         return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Dashboard") : LocalRedirect(returnUrl);
@@ -1356,26 +1365,37 @@ public class AdminController : Controller
     {
         var tutor = await _context.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorProfileId);
 
-        if (tutor != null && (!tutor.InterviewScheduledAt.HasValue || tutor.InterviewScheduledAt.Value > DateTime.Now))
+        if (tutor != null && !tutor.InterviewCompletedAt.HasValue)
         {
-            TempData["SettingsError"] = "Schedule and complete the interview before rejecting this application.";
+            TempData["SettingsError"] = "Confirm the interview is complete before rejecting this application.";
             return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Dashboard") : LocalRedirect(returnUrl);
         }
 
         if (tutor != null)
         {
-            tutor.IsVerified = false;
-            tutor.VerificationRejected = true;
-            tutor.VerificationDecidedAt = DateTime.Now;
-            tutor.VerificationNote = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+            var tutorUser = tutor.User;
+            var tutorName = tutorUser.FullName;
+            var trimmedReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
 
             NotificationHelper.Create(_context,
                 type: "Verification",
                 title: "Tutor application rejected",
-                message: $"{tutor.User.FullName}'s application was rejected" + (string.IsNullOrWhiteSpace(reason) ? "" : $": {reason.Trim()}"),
+                message: $"{tutorName}'s application was rejected" + (trimmedReason == null ? "" : $": {trimmedReason}") + " - the account has been removed.",
                 icon: "✖️");
 
-            await _context.SaveChangesAsync();
+            await SendTutorVerificationEmailAsync(tutorUser, "Your TutorBridge Nepal application", $@"
+                <p>Hi {System.Net.WebUtility.HtmlEncode(tutorName)},</p>
+                <p>Thank you for applying and interviewing with TutorBridge Nepal. After careful review, we're not able to move forward with your application at this time.</p>
+                {(trimmedReason != null ? $"<p><strong>Reason:</strong> {System.Net.WebUtility.HtmlEncode(trimmedReason)}</p>" : "")}
+                <p>You're welcome to register again in the future with updated information.</p>
+                <p>— TutorBridge Nepal</p>");
+
+            // Hard-deletes the tutor profile, credentials, uploaded documents
+            // and the account itself (this also saves the notification queued
+            // above), so the same email address is free to register again.
+            await DeleteUserAccountAsync(tutorUser, "Tutor");
+
+            TempData["SettingsSuccess"] = "Application rejected. The tutor has been notified by email and the account removed.";
         }
 
         return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("Dashboard") : LocalRedirect(returnUrl);
@@ -1391,11 +1411,21 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RequestMoreInfoTutor(int tutorProfileId, string note, string? returnUrl)
     {
-        var tutor = await _context.TutorProfiles.FirstOrDefaultAsync(t => t.Id == tutorProfileId);
+        var tutor = await _context.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorProfileId);
         if (tutor != null && !string.IsNullOrWhiteSpace(note))
         {
-            tutor.VerificationNote = note.Trim();
+            var trimmedNote = note.Trim();
+            tutor.VerificationNote = trimmedNote;
             await _context.SaveChangesAsync();
+
+            await SendTutorVerificationEmailAsync(tutor.User, "TutorBridge Nepal needs more information", $@"
+                <p>Hi {System.Net.WebUtility.HtmlEncode(tutor.User.FullName)},</p>
+                <p>We're reviewing your tutor application and need a bit more information before we can continue:</p>
+                <p><strong>{System.Net.WebUtility.HtmlEncode(trimmedNote)}</strong></p>
+                <p>Please log in and update your application with the requested information.</p>
+                <p>— TutorBridge Nepal</p>");
+
+            TempData["SettingsSuccess"] = $"Request sent to {tutor.User.FullName} - they've been notified by email.";
         }
 
         return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("TutorVerification") : LocalRedirect(returnUrl);
@@ -1755,6 +1785,28 @@ public class AdminController : Controller
             <p>— TutorBridge Nepal</p>");
 
         TempData["SettingsSuccess"] = "Interview scheduled and the tutor has been notified.";
+        return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("TutorVerification") : LocalRedirect(returnUrl);
+    }
+
+    // Confirms the scheduled interview actually took place - required before
+    // ApproveTutor/RejectTutor will allow a decision, so an application can
+    // never be decided purely off documents without a human interview step.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ConfirmTutorInterview(int tutorProfileId, string? returnUrl)
+    {
+        var tutor = await _context.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorProfileId);
+
+        if (tutor == null || !tutor.InterviewScheduledAt.HasValue || tutor.InterviewScheduledAt.Value > DateTime.Now)
+        {
+            TempData["SettingsError"] = "The scheduled interview time hasn't arrived yet.";
+            return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("TutorVerification") : LocalRedirect(returnUrl);
+        }
+
+        tutor.InterviewCompletedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        TempData["SettingsSuccess"] = "Interview marked as completed. You can now approve or reject this application.";
         return string.IsNullOrWhiteSpace(returnUrl) ? RedirectToAction("TutorVerification") : LocalRedirect(returnUrl);
     }
 

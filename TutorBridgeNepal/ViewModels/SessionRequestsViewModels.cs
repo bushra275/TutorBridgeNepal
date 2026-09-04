@@ -33,6 +33,8 @@ public class SessionRequestRowViewModel
     public DateTime CreatedAt { get; set; }
     public string Status { get; set; } = string.Empty;
     public bool DeclinedByTutor { get; set; }
+    public DateTime RequestedAt { get; set; }
+    public string? MeetingLink { get; set; }
 }
 
 public class RecentlyAcceptedRowViewModel

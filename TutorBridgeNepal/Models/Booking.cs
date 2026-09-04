@@ -34,4 +34,9 @@ public class Booking
     // the request and it gets pushed to their connected calendar. Null if
     // they've never connected Google Calendar, or the push failed.
     public string? GoogleCalendarEventId { get; set; }
+
+    // In-app video call room, generated once the booking becomes Confirmed
+    // (either by the tutor accepting it, or immediately for auto-accepted
+    // returning students). Null until then.
+    public string? MeetingLink { get; set; }
 }
