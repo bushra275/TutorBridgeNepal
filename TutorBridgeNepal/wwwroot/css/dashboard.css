@@ -384,6 +384,22 @@
     color: #1d4fa3;
 }
 
+.pill-ongoing {
+    background: #fde3e3;
+    color: #b3261e;
+    animation: pill-ongoing-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pill-ongoing-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: .6;
+    }
+}
+
 .session-btn-row {
     display: flex;
     gap: .4rem;

@@ -91,7 +91,14 @@
                                             <div class="time">Today, @s.StartTime.ToString("h:mm tt") – @s.EndTime.ToString("h:mm tt")</div>
                                         </div>
                                         <div class="session-actions">
-                                            <span class="pill pill-confirmed">Confirmed</span>
+                                            @if (s.Status == "Ongoing")
+                                            {
+                                                <span class="pill pill-ongoing">Ongoing</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="pill pill-confirmed">Confirmed</span>
+                                            }
                                             <div class="session-btn-row">
                                                 @{
                                                     var canJoin = !string.IsNullOrWhiteSpace(s.MeetingLink) && now >= s.StartTime.AddMinutes(-10) && now <= s.EndTime;

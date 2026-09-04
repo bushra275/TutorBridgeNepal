@@ -28,6 +28,7 @@
         var status = ev.Bookings.FirstOrDefault()?.Status ?? "";
         if (status == "Pending") return "ev-pending";
         if (status == "Missed") return "ev-missed";
+        if (status == "Ongoing") return "ev-ongoing";
         if (dayDate.Date == now.Date) return "ev-today";
         return "ev-confirmed";
     }
@@ -145,10 +146,10 @@
                                             else
                                             {
                                                 <span class="we-name">@primary?.StudentName</span>
-                                                <span class="we-meta">@primary?.Subject · @ev.StartTime.ToString("h:mm tt")-@ev.EndTime.ToString("h:mm tt")@(primary?.Status == "Pending" ? " · Pending" : "")</span>
+                                                <span class="we-meta">@primary?.Subject · @ev.StartTime.ToString("h:mm tt")-@ev.EndTime.ToString("h:mm tt")@(primary?.Status == "Pending" ? " · Pending" : "")@(primary?.Status == "Ongoing" ? " · Ongoing" : "")</span>
                                             }
 
-                                            @if (primary != null && primary.Status == "Confirmed" && ev.StartTime <= now)
+                                            @if (primary != null && (primary.Status == "Confirmed" || primary.Status == "Ongoing") && ev.StartTime <= now)
                                             {
                                                 <div style="margin-top:.3rem; display:flex; gap:.3rem;">
                                                     <form asp-controller="Tutor" asp-action="MarkSessionCompleted" method="post" style="margin:0;">
@@ -329,7 +330,7 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-            document.getElementById('blockTimeOffBackdrop').addEventListener('click', function (e) {
+            document.getElementById('blockTimeOffBackdrop').addEventListener('click', function(e) {
                 if (e.target === this) this.classList.remove('open');
             });
     </script>

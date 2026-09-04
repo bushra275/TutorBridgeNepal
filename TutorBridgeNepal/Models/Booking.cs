@@ -39,4 +39,7 @@ public class Booking
     // (either by the tutor accepting it, or immediately for auto-accepted
     // returning students). Null until then.
     public string? MeetingLink { get; set; }
+
+    public DateTime? StudentJoinedAt { get; set; }
+    public DateTime? TutorJoinedAt { get; set; }
 }

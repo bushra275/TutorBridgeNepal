@@ -1550,6 +1550,7 @@ public class AdminController : Controller
         if (b.Status == "Cancelled") return "Cancelled";
         if (b.Status == "Completed") return "Completed";
         if (b.Status == "Missed") return "Missed";
+        if (b.Status == "Ongoing") return "Live";
 
         if (b.Status == "Confirmed")
         {

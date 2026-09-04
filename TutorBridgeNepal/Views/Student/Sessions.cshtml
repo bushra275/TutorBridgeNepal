@@ -83,7 +83,8 @@
                 @if (Model.ActiveTab == "upcoming")
                 {
                     <div class="section-subhead">
-                        <h2>Upcoming sessions @if (todayCount > 0) {
+                        <h2>
+                            Upcoming sessions @if (todayCount > 0) {
                             <span class="section-count-chip">@todayCount today</span>
                         }
                     </h2>
@@ -101,6 +102,7 @@
                             var statusClass = s.Status switch
                             {
                                 "Confirmed" => "pill-confirmed",
+                                "Ongoing" => "pill-ongoing",
                                 "AwaitingStudentConfirmation" => "pill-proposed",
                                 _ => "pill-pending"
                             };
@@ -132,7 +134,7 @@
                                         }
                                         else
                                         {
-                                            @if (s.Status == "Confirmed")
+                                            @if (s.Status == "Confirmed" || s.Status == "Ongoing")
                                             {
                                                 var canJoin = !string.IsNullOrWhiteSpace(s.MeetingLink) && DateTime.Now >= s.StartTime.AddMinutes(-10) && DateTime.Now <= s.EndTime;
                                                 if (canJoin)

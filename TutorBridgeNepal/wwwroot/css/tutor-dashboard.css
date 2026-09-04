@@ -346,6 +346,11 @@
         border-color: #f0c0c0;
     }
 
+    .week-event.ev-ongoing {
+        background: #fde9e9;
+        border-color: #f2b8b8;
+    }
+
     .week-event.ev-blocked {
         background: #f1f0eb;
         border-color: #ded9cb;
@@ -444,6 +449,11 @@
     .month-chip.ev-missed {
         background: #fff0f0;
         border-color: #f0c0c0;
+    }
+
+    .month-chip.ev-ongoing {
+        background: #fde9e9;
+        border-color: #f2b8b8;
     }
 
     .month-chip.ev-blocked {

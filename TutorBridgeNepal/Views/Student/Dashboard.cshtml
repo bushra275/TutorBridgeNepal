@@ -86,7 +86,12 @@
                             {
                                 foreach (var session in Model.UpcomingSessions)
                                 {
-                                    var statusClass = session.Status == "Confirmed" ? "pill-confirmed" : "pill-pending";
+                                    var statusClass = session.Status switch
+                                    {
+                                        "Confirmed" => "pill-confirmed",
+                                        "Ongoing" => "pill-ongoing",
+                                        _ => "pill-pending"
+                                    };
                                     <div class="session-card @(session.Status == "Pending" ? "pending" : "")">
                                         <div class="avatar">@session.TutorInitials</div>
                                         <div class="session-info">

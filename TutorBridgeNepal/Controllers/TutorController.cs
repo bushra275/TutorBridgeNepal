@@ -241,12 +241,16 @@ public class TutorController : Controller
             .Where(b => b.TutorProfileId == tutor.Id)
             .ToListAsync();
 
+        if (SessionStatusHelper.AutoMarkMissed(bookings))
+        {
+            await _context.SaveChangesAsync();
+        }
         var nonCancelled = bookings.Where(b => b.Status != "Cancelled").ToList();
         var completed = bookings.Where(b => b.Status == "Completed").ToList();
         var pending = bookings.Where(b => b.Status == "Pending").OrderBy(b => b.CreatedAt).ToList();
 
         var todaySchedule = bookings
-            .Where(b => b.Status == "Confirmed" && b.TutorAvailabilitySlot.StartTime.Date == today)
+            .Where(b => (b.Status == "Confirmed" || b.Status == "Ongoing") && b.TutorAvailabilitySlot.StartTime.Date == today)
             .OrderBy(b => b.TutorAvailabilitySlot.StartTime)
             .ToList();
 
@@ -440,7 +444,7 @@ public class TutorController : Controller
         var booking = await _context.Bookings
             .Include(b => b.TutorAvailabilitySlot)
             .Include(b => b.StudentProfile).ThenInclude(s => s.User)
-            .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id && b.Status == "Confirmed");
+            .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id && (b.Status == "Confirmed" || b.Status == "Ongoing"));
 
         // Can only mark a session complete once it has actually finished -
         // stops a tutor from marking an in-progress or future session done
@@ -479,7 +483,7 @@ public class TutorController : Controller
             .Include(b => b.StudentProfile).ThenInclude(s => s.User)
             .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id);
 
-        if (booking == null || booking.Status != "Confirmed" || string.IsNullOrWhiteSpace(booking.MeetingLink))
+        if (booking == null || (booking.Status != "Confirmed" && booking.Status != "Ongoing") || string.IsNullOrWhiteSpace(booking.MeetingLink))
         {
             TempData["SettingsError"] = "This session isn't ready to join yet.";
             return RedirectToAction("Dashboard");
@@ -491,6 +495,13 @@ public class TutorController : Controller
         {
             TempData["SettingsError"] = $"You can join this session between {start.AddMinutes(-10):h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
             return RedirectToAction("Dashboard");
+        }
+
+        // Record that the tutor actually opened the room. Once both sides
+        // have, the booking flips from "Confirmed" to "Ongoing".
+        if (SessionStatusHelper.RecordJoin(booking, isStudent: false))
+        {
+            await _context.SaveChangesAsync();
         }
 
         ViewData["MeetingLink"] = booking.MeetingLink;
@@ -666,6 +677,11 @@ public class TutorController : Controller
             .Where(b => b.TutorProfileId == tutor.Id)
             .OrderBy(b => b.CreatedAt)
             .ToListAsync();
+
+        if (SessionStatusHelper.AutoMarkMissed(allBookings))
+        {
+            await _context.SaveChangesAsync();
+        }
 
         var reviewsGivenToThisTutor = await _context.Reviews
             .Where(r => r.TutorProfileId == tutor.Id)
@@ -883,6 +899,11 @@ public class TutorController : Controller
                 && b.TutorAvailabilitySlot.StartTime >= rangeStart
                 && b.TutorAvailabilitySlot.StartTime < rangeEndExclusive)
             .ToListAsync();
+
+        if (SessionStatusHelper.AutoMarkMissed(bookings))
+        {
+            await _context.SaveChangesAsync();
+        }
 
         var timeOffsInRange = await _context.TutorTimeOffs
             .Where(t => t.TutorProfileId == tutor.Id && t.StartAt < rangeEndExclusive && t.EndAt > rangeStart)

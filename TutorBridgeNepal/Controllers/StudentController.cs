@@ -227,6 +227,11 @@ public class StudentController : Controller
             .Where(b => b.StudentProfileId == studentProfile.Id)
             .ToListAsync();
 
+        if (SessionStatusHelper.AutoMarkMissed(bookings))
+        {
+            await _context.SaveChangesAsync();
+        }
+
         // "Upcoming" means not yet finished (covers sessions currently in
         // progress too), not merely "hasn't started" - otherwise an ongoing
         // session briefly looks like history the instant it begins.
@@ -921,6 +926,11 @@ public class StudentController : Controller
             .Where(b => b.StudentProfileId == studentProfile.Id)
             .ToListAsync();
 
+        if (SessionStatusHelper.AutoMarkMissed(allBookings))
+        {
+            await _context.SaveChangesAsync();
+        }
+
         // "Upcoming" means not yet finished (covers sessions currently in
         // progress too), not merely "hasn't started" - otherwise an ongoing
         // session falls out of every tab except "All sessions" the instant
@@ -1051,7 +1061,7 @@ public class StudentController : Controller
             .Include(b => b.TutorProfile).ThenInclude(t => t.User)
             .FirstOrDefaultAsync(b => b.Id == id && b.StudentProfileId == studentProfile.Id);
 
-        if (booking == null || booking.Status != "Confirmed" || string.IsNullOrWhiteSpace(booking.MeetingLink))
+        if (booking == null || (booking.Status != "Confirmed" && booking.Status != "Ongoing") || string.IsNullOrWhiteSpace(booking.MeetingLink))
         {
             TempData["SettingsError"] = "This session isn't ready to join yet.";
             return RedirectToAction("Sessions");
@@ -1063,6 +1073,15 @@ public class StudentController : Controller
         {
             TempData["SettingsError"] = $"You can join this session between {start.AddMinutes(-10):h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
             return RedirectToAction("Sessions");
+        }
+
+        // Record that the student actually opened the room. Once both sides
+        // have, the booking flips from "Confirmed" to "Ongoing" so the tutor
+        // sees it as a live session rather than one they still have to wait
+        // out to know whether the student showed up.
+        if (SessionStatusHelper.RecordJoin(booking, isStudent: true))
+        {
+            await _context.SaveChangesAsync();
         }
 
         ViewData["MeetingLink"] = booking.MeetingLink;
