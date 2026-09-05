@@ -29,6 +29,7 @@
         if (status == "Pending") return "ev-pending";
         if (status == "Missed") return "ev-missed";
         if (status == "Ongoing") return "ev-ongoing";
+        if (status == "Ended") return "ev-ended";
         if (dayDate.Date == now.Date) return "ev-today";
         return "ev-confirmed";
     }
@@ -146,10 +147,10 @@
                                             else
                                             {
                                                 <span class="we-name">@primary?.StudentName</span>
-                                                <span class="we-meta">@primary?.Subject · @ev.StartTime.ToString("h:mm tt")-@ev.EndTime.ToString("h:mm tt")@(primary?.Status == "Pending" ? " · Pending" : "")@(primary?.Status == "Ongoing" ? " · Ongoing" : "")</span>
+                                                <span class="we-meta">@primary?.Subject · @ev.StartTime.ToString("h:mm tt")-@ev.EndTime.ToString("h:mm tt")@(primary?.Status == "Pending" ? " · Pending" : "")@(primary?.Status == "Ongoing" ? " · Ongoing" : "")@(primary?.Status == "Ended" ? " · Session ended" : "")</span>
                                             }
 
-                                            @if (primary != null && (primary.Status == "Confirmed" || primary.Status == "Ongoing") && ev.StartTime <= now)
+                                            @if (primary != null && ev.StartTime <= now && (primary.Status == "Confirmed" || primary.Status == "Ongoing" || primary.Status == "Ended"))
                                             {
                                                 <div style="margin-top:.3rem; display:flex; gap:.3rem;">
                                                     <form asp-controller="Tutor" asp-action="MarkSessionCompleted" method="post" style="margin:0;">
@@ -157,11 +158,14 @@
                                                         <input type="hidden" name="id" value="@primary.BookingId" />
                                                         <button type="submit" class="mini-btn green" style="font-size:.65rem; padding:.2rem .4rem;">Done</button>
                                                     </form>
-                                                    <form asp-controller="Tutor" asp-action="MarkSessionMissed" method="post" style="margin:0;">
-                                                        @Html.AntiForgeryToken()
-                                                        <input type="hidden" name="id" value="@primary.BookingId" />
-                                                        <button type="submit" class="mini-btn danger" style="font-size:.65rem; padding:.2rem .4rem;">Missed</button>
-                                                    </form>
+                                                    @if (primary.Status != "Ended")
+                                                    {
+                                                        <form asp-controller="Tutor" asp-action="MarkSessionMissed" method="post" style="margin:0;">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="id" value="@primary.BookingId" />
+                                                            <button type="submit" class="mini-btn danger" style="font-size:.65rem; padding:.2rem .4rem;">Missed</button>
+                                                        </form>
+                                                    }
                                                 </div>
                                             }
                                         </div>

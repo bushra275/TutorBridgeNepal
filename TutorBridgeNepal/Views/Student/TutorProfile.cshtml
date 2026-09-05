@@ -13,8 +13,8 @@
     var availableDateSet = dateGroups.Select(g => g.Date).ToHashSet();
 
     var slotDaysOfWeek = Model.AvailableSlots.Select(s => s.StartTime.DayOfWeek).Distinct().OrderBy(d => d).ToList();
-    var hasMorning = Model.AvailableSlots.Any(s => s.StartTime.Hour < 17);
-    var hasEvening = Model.AvailableSlots.Any(s => s.StartTime.Hour >= 17);
+    var hasMorning = Model.AvailableSlots.Any(s => s.StartTime.Hour < 12);
+    var hasEvening = Model.AvailableSlots.Any(s => s.StartTime.Hour >= 12);
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -252,8 +252,8 @@
 
                                 @foreach (var group in dateGroups)
                                 {
-                                    var morning = group.Slots.Where(s => s.StartTime.Hour < 17).ToList();
-                                    var evening = group.Slots.Where(s => s.StartTime.Hour >= 17).ToList();
+                                var morning = group.Slots.Where(s => s.StartTime.Hour < 12).ToList();
+                                var evening = group.Slots.Where(s => s.StartTime.Hour >= 12).ToList();
                                     <div class="slot-date-group" data-date="@group.Date.ToString("yyyy-MM-dd")" style="display:none;">
                                         @if (morning.Any())
                                         {

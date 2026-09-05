@@ -192,7 +192,14 @@
                                     <td><span class="status-text completed">Completed</span></td>
                                     <td>
                                         <a asp-controller="Student" asp-action="TutorProfile" asp-route-id="@row.TutorProfileId" class="mini-btn">Rebook</a>
-                                        <span class="disabled-btn" title="Reviews aren't available yet">Leave review</span>
+                                        @if (row.MyReviewRating.HasValue)
+                                        {
+                                            <span class="review-stars-inline">@(new string('★', row.MyReviewRating.Value))@(new string('☆', 5 - row.MyReviewRating.Value))</span>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="mini-btn leave-review-btn" data-booking-id="@row.BookingId" data-tutor-name="@row.TutorName">Leave review</button>
+                                        }
                                     </td>
                                 </tr>
                             }
@@ -203,8 +210,64 @@
         </div>
     </div>
 
+    <!-- Shared "Leave a review" modal -->
+    <div class="review-modal-backdrop" id="reviewModalBackdrop">
+        <div class="review-modal">
+            <h3>Review <span id="reviewModalTutorName"></span></h3>
+            <form asp-controller="Student" asp-action="SubmitReview" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="bookingId" id="reviewModalBookingId" />
+                <input type="hidden" name="rating" id="reviewModalRatingInput" value="0" />
+
+                <div class="star-picker" id="starPicker">
+                    <button type="button" class="star-btn" data-value="1">★</button>
+                    <button type="button" class="star-btn" data-value="2">★</button>
+                    <button type="button" class="star-btn" data-value="3">★</button>
+                    <button type="button" class="star-btn" data-value="4">★</button>
+                    <button type="button" class="star-btn" data-value="5">★</button>
+                </div>
+
+                <textarea name="comment" class="tb-input" style="min-height:90px; padding:.8rem 1.1rem; margin-top:.8rem;" maxlength="1000" placeholder="Optional comment..."></textarea>
+
+                <div class="settings-actions" style="margin-top:1rem;">
+                    <button type="submit" class="tb-btn">Submit review</button>
+                    <button type="button" class="tb-btn-outline" onclick="closeReviewModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+            function openReviewModal(bookingId, tutorName) {
+                document.getElementById('reviewModalBookingId').value = bookingId;
+                document.getElementById('reviewModalTutorName').textContent = tutorName;
+                document.getElementById('reviewModalRatingInput').value = 0;
+                document.querySelectorAll('#starPicker .star-btn').forEach(function(b) { b.classList.remove('selected'); });
+                document.getElementById('reviewModalBackdrop').classList.add('open');
+            }
+
+            document.querySelectorAll('.leave-review-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    openReviewModal(btn.dataset.bookingId, btn.dataset.tutorName);
+                });
+            });
+
+            function closeReviewModal() {
+                document.getElementById('reviewModalBackdrop').classList.remove('open');
+            }
+
+            document.querySelectorAll('#starPicker .star-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var value = parseInt(btn.dataset.value, 10);
+                    document.getElementById('reviewModalRatingInput').value = value;
+                    document.querySelectorAll('#starPicker .star-btn').forEach(function(b) {
+                        b.classList.toggle('selected', parseInt(b.dataset.value, 10) <= value);
+                    });
+                });
+            });
+    </script>
     <script>
             document.getElementById('tutorSearchBox')?.addEventListener('input', function () {
                 var term = this.value.toLowerCase();

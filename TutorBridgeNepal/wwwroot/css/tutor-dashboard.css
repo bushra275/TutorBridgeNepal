@@ -351,6 +351,11 @@
         border-color: #f2b8b8;
     }
 
+    .week-event.ev-ended {
+        background: #f3effc;
+        border-color: #d6c6f5;
+    }
+
     .week-event.ev-blocked {
         background: #f1f0eb;
         border-color: #ded9cb;
@@ -454,6 +459,11 @@
     .month-chip.ev-ongoing {
         background: #fde9e9;
         border-color: #f2b8b8;
+    }
+
+    .month-chip.ev-ended {
+        background: #f3effc;
+        border-color: #d6c6f5;
     }
 
     .month-chip.ev-blocked {

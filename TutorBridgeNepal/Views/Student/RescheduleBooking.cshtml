@@ -109,8 +109,8 @@
 
                             @foreach (var group in dateGroups)
                             {
-                                var morning = group.Slots.Where(s => s.StartTime.Hour < 17).ToList();
-                                var evening = group.Slots.Where(s => s.StartTime.Hour >= 17).ToList();
+                                var morning = group.Slots.Where(s => s.StartTime.Hour < 12).ToList();
+                                var evening = group.Slots.Where(s => s.StartTime.Hour >= 12).ToList();
                                 <div class="slot-date-group" data-date="@group.Date.ToString("yyyy-MM-dd")" style="display:none;">
                                     @if (morning.Any())
                                     {

@@ -4,6 +4,7 @@
     var meetingLink = ViewData["MeetingLink"] as string;
     var otherParty = ViewData["OtherPartyName"] as string;
     var subject = ViewData["Subject"] as string;
+    var bookingId = ViewData["BookingId"];
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -11,10 +12,31 @@
     <meta charset="utf-8" />
     <title>Session with @otherParty - TutorBridge Nepal</title>
     <style>
-            body { margin: 0; background: #111; font-family: Inter, sans-serif; }
-            .call-header { display:flex; justify-content:space-between; align-items:center; padding:.8rem 1.2rem; background:#1a1a1a; color:#fff; }
-            .call-header a { color:#9fd8b3; text-decoration:none; font-weight:600; }
-            iframe { width:100%; height:calc(100vh - 56px); border:0; }
+            body {
+                margin: 0;
+                background: #111;
+                font-family: Inter, sans-serif;
+            }
+
+            .call-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: .8rem 1.2rem;
+                background: #1a1a1a;
+                color: #fff;
+            }
+
+                .call-header a {
+                    color: #9fd8b3;
+                    text-decoration: none;
+                    font-weight: 600;
+                }
+
+            #jitsi-container {
+                width: 100%;
+                height: calc(100vh - 56px);
+            }
     </style>
 </head>
 <body>
@@ -22,6 +44,43 @@
         <div><strong>@subject</strong> with @otherParty</div>
         <a asp-controller="Student" asp-action="Sessions">← Back to sessions</a>
     </div>
-    <iframe src="@meetingLink#config.prejoinPageEnabled=false" allow="camera; microphone; fullscreen; display-capture; autoplay"></iframe>
+    <div id="jitsi-container"></div>
+
+    <form id="end-session-form" asp-controller="Student" asp-action="EndSession" method="post" style="display:none;">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" value="@bookingId" />
+    </form>
+
+    <script src="https://meet.jit.si/external_api.js"></script>
+    <script>
+            (function() {
+                var meetingLink = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(meetingLink));
+                var url = new URL(meetingLink);
+
+                var api = new JitsiMeetExternalAPI(url.hostname, {
+                    roomName: url.pathname.substring(1),
+                    parentNode: document.getElementById('jitsi-container'),
+                    configOverwrite: { prejoinPageEnabled: false },
+                    interfaceConfigOverwrite: {}
+                });
+
+                var sent = false;
+                function notifyServerCallEnded() {
+                    if (sent) return;
+                    sent = true;
+                    var form = document.getElementById('end-session-form');
+                    fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        credentials: 'same-origin',
+                        keepalive: true
+                    }).catch(function() { /* best-effort */ });
+                }
+
+                api.addEventListener('readyToClose', notifyServerCallEnded);
+                api.addEventListener('videoConferenceLeft', notifyServerCallEnded);
+                window.addEventListener('beforeunload', notifyServerCallEnded);
+            })();
+    </script>
 </body>
 </html>

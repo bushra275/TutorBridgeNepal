@@ -29,17 +29,22 @@ public class TutorDashboardViewModel
 
 public class TutorBookingRowViewModel
 {
-	public int BookingId { get; set; }
+    public int BookingId { get; set; }
     public int StudentProfileId { get; set; }
     public string StudentName { get; set; } = string.Empty;
-	public string StudentInitials { get; set; } = string.Empty;
-	public string? StudentGradeLevel { get; set; }
-	public string Subject { get; set; } = string.Empty;
-	public DateTime StartTime { get; set; }
-	public DateTime EndTime { get; set; }
+    public string StudentInitials { get; set; } = string.Empty;
+    public string? StudentGradeLevel { get; set; }
+    public string Subject { get; set; } = string.Empty;
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
     public string Status { get; set; } = string.Empty;
     public DateTime RequestedAt { get; set; }
     public string? MeetingLink { get; set; }
+
+    // Actual recorded length of the video call (OngoingAt -> CallEndedAt),
+    // not the scheduled slot length. Null until the call has both started
+    // and ended.
+    public int? CallDurationMinutes { get; set; }
 }
 
 public class TutorStudentRowViewModel

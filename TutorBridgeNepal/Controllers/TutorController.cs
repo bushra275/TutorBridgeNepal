@@ -276,7 +276,8 @@ public class TutorController : Controller
             EndTime = b.TutorAvailabilitySlot.EndTime,
             Status = b.Status,
             RequestedAt = b.CreatedAt,
-            MeetingLink = b.MeetingLink
+            MeetingLink = b.MeetingLink,
+            CallDurationMinutes = SessionStatusHelper.GetCallDuration(b) is TimeSpan d ? (int)d.TotalMinutes : (int?)null
         };
 
         var myStudents = studentGroups.Select(g =>
@@ -455,13 +456,21 @@ public class TutorController : Controller
         var booking = await _context.Bookings
             .Include(b => b.TutorAvailabilitySlot)
             .Include(b => b.StudentProfile).ThenInclude(s => s.User)
-            .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id && (b.Status == "Confirmed" || b.Status == "Ongoing"));
+            .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id && (b.Status == "Confirmed" || b.Status == "Ongoing" || b.Status == "Ended"));
 
-        // Can only mark a session complete once it has actually finished -
-        // stops a tutor from marking an in-progress or future session done
-        // before it's over.
-        if (booking != null && booking.TutorAvailabilitySlot.EndTime <= DateTime.Now)
+        // Normally a session can only be marked complete once its scheduled
+        // slot has actually finished - stops a tutor from marking an
+        // in-progress or future session done before it's over. The one
+        // exception is a session whose call already ended (both sides left
+        // the room, or the demo Jitsi server disconnected them): at that
+        // point there's nothing left to wait for, so the tutor can complete
+        // it immediately even if the scheduled end time hasn't arrived yet.
+        var readyToComplete = booking != null
+            && (booking.Status == "Ended" || booking.TutorAvailabilitySlot.EndTime <= DateTime.Now);
+
+        if (booking != null && readyToComplete)
         {
+            var duration = SessionStatusHelper.GetCallDuration(booking);
             booking.Status = "Completed";
 
             NotificationHelper.Create(_context,
@@ -474,9 +483,14 @@ public class TutorController : Controller
 
             await _context.SaveChangesAsync();
 
+            var durationLine = duration.HasValue
+                ? $"<p>Call duration: {(int)duration.Value.TotalMinutes} minutes.</p>"
+                : "";
+
             await SendSessionEmailAsync(booking.StudentProfile.User, "How was your session?", $@"
                 <p>Hi {System.Net.WebUtility.HtmlEncode(booking.StudentProfile.User.FullName)},</p>
                 <p>Your {System.Net.WebUtility.HtmlEncode(booking.Subject)} session with {System.Net.WebUtility.HtmlEncode(tutor.User.FullName)} has been marked complete.</p>
+                {durationLine}
                 <p>Log in and leave a review to help other students.</p>
                 <p>— TutorBridge Nepal</p>");
         }
@@ -496,7 +510,7 @@ public class TutorController : Controller
 
         if (booking == null || (booking.Status != "Confirmed" && booking.Status != "Ongoing") || string.IsNullOrWhiteSpace(booking.MeetingLink))
         {
-            TempData["SettingsError"] = "This session isn't ready to join yet.";
+            TempData["SettingsError"] = "This session isn't ready to start yet.";
             return RedirectToAction("Dashboard");
         }
 
@@ -505,13 +519,13 @@ public class TutorController : Controller
         if (!SessionStatusHelper.CanJoin(booking))
         {
             var opensAt = start.AddMinutes(-SessionStatusHelper.JoinWindowMinutesBeforeStart);
-            TempData["SettingsError"] = $"You can join this session between {opensAt:h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
+            TempData["SettingsError"] = $"You can start this session between {opensAt:h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
             return RedirectToAction("Dashboard");
         }
 
-        // Record that the tutor actually opened the room. Once both sides
-        // have, the booking flips from "Confirmed" to "Ongoing".
-        if (SessionStatusHelper.RecordJoin(booking, isStudent: false))
+        // The tutor starting the session is what makes it live - the
+        // student can't get into the room until this has happened.
+        if (SessionStatusHelper.StartSession(booking))
         {
             await _context.SaveChangesAsync();
         }
@@ -519,7 +533,31 @@ public class TutorController : Controller
         ViewData["MeetingLink"] = booking.MeetingLink;
         ViewData["OtherPartyName"] = booking.StudentProfile.User.FullName;
         ViewData["Subject"] = booking.Subject;
+        ViewData["BookingId"] = booking.Id;
         return View();
+    }
+
+    // Called from the client-side call page (JoinSession) as soon as the
+    // video call is detected as having ended, so the booking can move to
+    // "Ended" immediately instead of waiting for the scheduled slot time to
+    // pass. Fired via a keepalive fetch, so it must stay a simple, fast,
+    // side-effect-only POST.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EndSession(int id)
+    {
+        var tutor = await GetCurrentTutorProfileAsync();
+        if (tutor == null) return Unauthorized();
+
+        var booking = await _context.Bookings
+            .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id && b.Status == "Ongoing");
+
+        if (booking != null && SessionStatusHelper.EndCall(booking))
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        return Ok();
     }
 
     [HttpPost]

@@ -34,4 +34,9 @@ public class SessionRowViewModel
     public string Status { get; set; } = string.Empty;
     public int? MyReviewRating { get; set; }
     public string? MeetingLink { get; set; }
+
+    // Actual recorded length of the video call (OngoingAt -> CallEndedAt),
+    // not the scheduled slot length. Null until the call has both started
+    // and ended.
+    public int? CallDurationMinutes { get; set; }
 }

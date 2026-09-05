@@ -96,21 +96,29 @@
                                             {
                                                 <span class="pill pill-ongoing">Ongoing</span>
                                             }
+                                            else if (s.Status == "Ended")
+                                            {
+                                                <span class="pill pill-ended">Session ended</span>
+                                                @if (s.CallDurationMinutes.HasValue)
+                                                {
+                                                    <div style="margin-top:.15rem; font-size:.72rem; color:var(--muted, #8c8d87);">Lasted @s.CallDurationMinutes min</div>
+                                                }
+                                            }
                                             else
                                             {
                                                 <span class="pill pill-confirmed">Confirmed</span>
                                             }
                                             <div class="session-btn-row">
                                                 @{
-                                                    var canJoin = !string.IsNullOrWhiteSpace(s.MeetingLink) && now >= s.StartTime.AddMinutes(-SessionStatusHelper.JoinWindowMinutesBeforeStart) && now <= s.EndTime;
-                                                    var finished = s.EndTime <= now;
-                                                    var joinLabel = s.Status == "Ongoing" ? "Go back to meeting" : "Join session";
+                                                    var canJoin = (s.Status == "Confirmed" || s.Status == "Ongoing") && !string.IsNullOrWhiteSpace(s.MeetingLink) && now >= s.StartTime.AddMinutes(-SessionStatusHelper.JoinWindowMinutesBeforeStart) && now <= s.EndTime;
+                                                    var readyToComplete = s.Status == "Ended" || s.EndTime <= now;
+                                                    var joinLabel = s.Status == "Ongoing" ? "Go back to meeting" : "Start session";
                                                 }
                                                 @if (canJoin)
                                                 {
                                                     <a asp-controller="Tutor" asp-action="JoinSession" asp-route-id="@s.BookingId" class="mini-btn green" target="_blank">@joinLabel</a>
                                                 }
-                                                @if (finished)
+                                                @if (readyToComplete)
                                                 {
                                                     <form asp-controller="Tutor" asp-action="MarkSessionCompleted" method="post" style="margin:0;">
                                                         @Html.AntiForgeryToken()
@@ -171,7 +179,7 @@
                                                 <button type="submit" class="mini-btn danger" style="width:100%;">Decline</button>
                                             </form>
                                             <a asp-controller="Tutor" asp-action="ProposeNewTime" asp-route-bookingId="@r.BookingId" class="mini-btn" style="width:100%; text-align:center;">Propose new time</a>
-                                            </div>
+                                        </div>
                                     </div>
                                 }
                             }
@@ -300,4 +308,4 @@
             })();
     </script>
 </body>
-</html>
+</html> 

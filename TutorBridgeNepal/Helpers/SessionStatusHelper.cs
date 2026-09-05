@@ -2,17 +2,9 @@
 
 namespace TutorBridgeNepal.Helpers;
 
-// Centralizes the "Confirmed -> Ongoing -> Completed/Missed" state machine
-// for a booking so both StudentController and TutorController apply the
-// exact same rules.
-//
-// There's no background job runner in this app, so "a session nobody
-// joined has now ended, mark it Missed" can't fire on a timer. Instead
-// AutoMarkMissed is called at the top of every action that loads a list of
-// a user's bookings (dashboards, schedules, session lists) and lazily
-// applies the rule to whatever was just loaded - the same pattern already
-// used by AdminController.ComputeSessionDisplayStatus, just persisted
-// instead of only affecting what's displayed.
+// Centralizes the "Confirmed -> Ongoing -> Ended -> Completed/Missed"
+// state machine for a booking so both StudentController and
+// TutorController apply the exact same rules.
 public static class SessionStatusHelper
 {
     // How long before a session starts the "Join" button lights up (and the
@@ -33,6 +25,85 @@ public static class SessionStatusHelper
         return now >= start.AddMinutes(-JoinWindowMinutesBeforeStart) && now <= end;
     }
 
+    // Called when a party opens the join room. Records that side's join
+    // time, and promotes "Confirmed" -> "Ongoing" (stamping OngoingAt) the
+    // moment both sides have joined. Returns true if the booking changed
+    // (caller should save).
+    public static bool RecordJoin(Booking booking, bool isStudent)
+    {
+        var changed = false;
+
+        if (isStudent && booking.StudentJoinedAt == null)
+        {
+            booking.StudentJoinedAt = DateTime.Now;
+            changed = true;
+        }
+        else if (!isStudent && booking.TutorJoinedAt == null)
+        {
+            booking.TutorJoinedAt = DateTime.Now;
+            changed = true;
+        }
+
+        if (booking.Status == "Confirmed" && booking.StudentJoinedAt.HasValue && booking.TutorJoinedAt.HasValue)
+        {
+            booking.Status = "Ongoing";
+            booking.OngoingAt = DateTime.Now;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    // Called when the tutor clicks "Start session". Unlike RecordJoin, this
+    // alone is enough to make the session live - the tutor is always the
+    // one who starts it, and the student can't get into the room until
+    // this has happened (see CanStudentJoin).
+    public static bool StartSession(Booking booking)
+    {
+        if (booking.Status != "Confirmed") return false;
+
+        booking.TutorJoinedAt ??= DateTime.Now;
+        booking.Status = "Ongoing";
+        booking.OngoingAt = DateTime.Now;
+        return true;
+    }
+
+    // Whether the STUDENT specifically can enter the room right now. Unlike
+    // CanJoin (used for the tutor's own "Start session" button), a student
+    // can never get in before the tutor has actually started the session -
+    // there's no time-window check here because the tutor's own start
+    // action already establishes that it's an appropriate time.
+    public static bool CanStudentJoin(Booking booking)
+    {
+        if (string.IsNullOrWhiteSpace(booking.MeetingLink)) return false;
+        if (booking.Status != "Ongoing") return false;
+        return DateTime.Now <= booking.TutorAvailabilitySlot.EndTime;
+    }
+
+    // Called when the client-side call UI detects the video call has ended
+    // (hangup button, tab closed, Jitsi's demo-server disconnect, etc). Only
+    // meaningful from "Ongoing" - a session that's already Ended/Completed/
+    // Missed shouldn't be reopened by a stray late event. Returns true if
+    // the booking changed (caller should save).
+    public static bool EndCall(Booking booking)
+    {
+        if (booking.Status != "Ongoing") return false;
+
+        booking.Status = "Ended";
+        booking.CallEndedAt = DateTime.Now;
+        return true;
+    }
+
+    // How long the call actually ran, from the moment it went live
+    // (OngoingAt) to the moment it was detected as ended (CallEndedAt).
+    // Null if the session never actually went Ongoing, or hasn't ended yet.
+    public static TimeSpan? GetCallDuration(Booking booking)
+    {
+        if (booking.OngoingAt == null || booking.CallEndedAt == null) return null;
+        var duration = booking.CallEndedAt.Value - booking.OngoingAt.Value;
+        return duration < TimeSpan.Zero ? TimeSpan.Zero : duration;
+    }
+
     // A session that reached "Ongoing" had both parties actually join, so
     // it's a real session - it's left for the tutor to explicitly mark
     // completed (or missed) even if that happens late. Only a "Confirmed"
@@ -43,46 +114,13 @@ public static class SessionStatusHelper
         var now = DateTime.Now;
         var changed = false;
 
-        foreach (var b in bookings)
+        foreach (var booking in bookings)
         {
-            if (b.Status == "Confirmed" && b.TutorAvailabilitySlot != null && b.TutorAvailabilitySlot.EndTime <= now)
+            if (booking.Status == "Confirmed" && booking.TutorAvailabilitySlot.EndTime <= now)
             {
-                b.Status = "Missed";
+                booking.Status = "Missed";
                 changed = true;
             }
-        }
-
-        return changed;
-    }
-
-    // Records that one side just opened the meeting room, and promotes the
-    // booking to "Ongoing" the moment both sides have. Returns true if
-    // anything on the booking changed (caller should save).
-    public static bool RecordJoin(Booking booking, bool isStudent)
-    {
-        var changed = false;
-
-        if (isStudent)
-        {
-            if (booking.StudentJoinedAt == null)
-            {
-                booking.StudentJoinedAt = DateTime.Now;
-                changed = true;
-            }
-        }
-        else
-        {
-            if (booking.TutorJoinedAt == null)
-            {
-                booking.TutorJoinedAt = DateTime.Now;
-                changed = true;
-            }
-        }
-
-        if (booking.Status == "Confirmed" && booking.StudentJoinedAt.HasValue && booking.TutorJoinedAt.HasValue)
-        {
-            booking.Status = "Ongoing";
-            changed = true;
         }
 
         return changed;

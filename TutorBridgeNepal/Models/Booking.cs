@@ -11,7 +11,7 @@ public class Booking
     public TutorAvailabilitySlot TutorAvailabilitySlot { get; set; } = default!;
     public string Subject { get; set; } = string.Empty;
     public string Status { get; set; } = "Pending";
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // When the tutor actually accepted/declined the request (null while still
     // pending). Distinct from CreatedAt so real response-time metrics work.
@@ -47,4 +47,7 @@ public class Booking
     // notification has gone out to both parties, so SessionReminderService
     // never sends it twice for the same booking.
     public DateTime? ReminderSentAt { get; set; }
+
+    public DateTime? OngoingAt { get; set; }
+    public DateTime? CallEndedAt { get; set; }
 }

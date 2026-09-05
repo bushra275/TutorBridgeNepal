@@ -118,6 +118,10 @@
                                 </div>
                                 <div class="session-actions">
                                     <span class="pill @statusClass">@statusLabel</span>
+                                    @if ((s.Status == "Ended" || s.Status == "Completed") && s.CallDurationMinutes.HasValue)
+                                    {
+                                        <div style="margin-top:.15rem; font-size:.72rem; color:var(--muted, #8c8d87);">Lasted @s.CallDurationMinutes min</div>
+                                    }
                                     <div class="session-btn-row">
                                         @if (s.Status == "AwaitingStudentConfirmation")
                                         {
@@ -137,15 +141,14 @@
                                         {
                                             @if (s.Status == "Confirmed" || s.Status == "Ongoing")
                                             {
-                                                var canJoin = !string.IsNullOrWhiteSpace(s.MeetingLink) && DateTime.Now >= s.StartTime.AddMinutes(-SessionStatusHelper.JoinWindowMinutesBeforeStart) && DateTime.Now <= s.EndTime;
-                                                var joinLabel = s.Status == "Ongoing" ? "Go back to meeting" : "Join session";
+                                                var canJoin = s.Status == "Ongoing" && !string.IsNullOrWhiteSpace(s.MeetingLink) && DateTime.Now <= s.EndTime; var joinLabel = s.Status == "Ongoing" ? "Go back to meeting" : "Join session";
                                                 if (canJoin)
                                                 {
                                                     <a asp-controller="Student" asp-action="JoinSession" asp-route-id="@s.BookingId" class="mini-btn green" target="_blank">@joinLabel</a>
                                                 }
                                                 else
                                                 {
-                                                    <span class="mini-btn" title="You can join @SessionStatusHelper.JoinWindowMinutesBeforeStart minutes before the session starts">Join session</span>
+                                                    <span class="mini-btn" title="Waiting for your tutor to start the session">Join session</span>
                                                 }
                                             }
                                             <a asp-controller="Student" asp-action="RescheduleBooking" asp-route-id="@s.BookingId" class="mini-btn">Reschedule</a>

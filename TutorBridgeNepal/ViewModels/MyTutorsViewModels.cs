@@ -40,6 +40,7 @@ public class MyTutorCardViewModel
 
 public class TutorSessionHistoryRow
 {
+    public int BookingId { get; set; }
     public int TutorProfileId { get; set; }
     public string TutorName { get; set; } = string.Empty;
     public string TutorInitials { get; set; } = string.Empty;
@@ -47,4 +48,5 @@ public class TutorSessionHistoryRow
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
     public string Status { get; set; } = string.Empty;
+    public int? MyReviewRating { get; set; }
 }

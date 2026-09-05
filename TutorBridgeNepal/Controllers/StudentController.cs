@@ -995,7 +995,8 @@ public class StudentController : Controller
                 EndTime = b.TutorAvailabilitySlot.EndTime,
                 Status = b.Status,
                 MyReviewRating = myReviewRatings.TryGetValue(b.Id, out var myRating) ? myRating : (int?)null,
-                MeetingLink = b.MeetingLink
+                MeetingLink = b.MeetingLink,
+                CallDurationMinutes = SessionStatusHelper.GetCallDuration(b) is TimeSpan d ? (int)d.TotalMinutes : (int?)null
             }).ToList(),
             SubjectOptions = allBookings.Select(b => b.Subject).Distinct().OrderBy(s => s).ToList(),
             TutorOptions = allBookings
@@ -1061,25 +1062,16 @@ public class StudentController : Controller
             .Include(b => b.TutorProfile).ThenInclude(t => t.User)
             .FirstOrDefaultAsync(b => b.Id == id && b.StudentProfileId == studentProfile.Id);
 
-        if (booking == null || (booking.Status != "Confirmed" && booking.Status != "Ongoing") || string.IsNullOrWhiteSpace(booking.MeetingLink))
+        if (booking == null || !SessionStatusHelper.CanStudentJoin(booking))
         {
-            TempData["SettingsError"] = "This session isn't ready to join yet.";
+            TempData["SettingsError"] = booking != null && booking.Status == "Confirmed"
+                ? "Your tutor hasn't started this session yet. You'll be able to join once they do."
+                : "This session isn't ready to join.";
             return RedirectToAction("Sessions");
         }
 
-        var start = booking.TutorAvailabilitySlot.StartTime;
-        var end = booking.TutorAvailabilitySlot.EndTime;
-        if (!SessionStatusHelper.CanJoin(booking))
-        {
-            var opensAt = start.AddMinutes(-SessionStatusHelper.JoinWindowMinutesBeforeStart);
-            TempData["SettingsError"] = $"You can join this session between {opensAt:h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
-            return RedirectToAction("Sessions");
-        }
-
-        // Record that the student actually opened the room. Once both sides
-        // have, the booking flips from "Confirmed" to "Ongoing" so the tutor
-        // sees it as a live session rather than one they still have to wait
-        // out to know whether the student showed up.
+        // The tutor starting the session already made it "Ongoing" - this
+        // just records when the student joined, for the call-duration log.
         if (SessionStatusHelper.RecordJoin(booking, isStudent: true))
         {
             await _context.SaveChangesAsync();
@@ -1088,7 +1080,30 @@ public class StudentController : Controller
         ViewData["MeetingLink"] = booking.MeetingLink;
         ViewData["OtherPartyName"] = booking.TutorProfile.User.FullName;
         ViewData["Subject"] = booking.Subject;
+        ViewData["BookingId"] = booking.Id;
         return View();
+    }
+
+    // Called from the client-side call page (JoinSession) as soon as the
+    // video call is detected as having ended. Mirrors TutorController's
+    // EndSession - either side leaving is enough to flip the booking to
+    // "Ended", since a two-person call can't meaningfully continue alone.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EndSession(int id)
+    {
+        var studentProfile = await GetCurrentStudentProfileAsync();
+        if (studentProfile == null) return Unauthorized();
+
+        var booking = await _context.Bookings
+            .FirstOrDefaultAsync(b => b.Id == id && b.StudentProfileId == studentProfile.Id && b.Status == "Ongoing");
+
+        if (booking != null && SessionStatusHelper.EndCall(booking))
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        return Ok();
     }
 
     [HttpPost]
@@ -1403,6 +1418,16 @@ public class StudentController : Controller
         var completed = bookings.Where(b => b.Status == "Completed").ToList();
         var hoursLearned = completed.Sum(b => (b.TutorAvailabilitySlot.EndTime - b.TutorAvailabilitySlot.StartTime).TotalHours);
 
+        var recentHistoryBookingIds = completed
+            .OrderByDescending(b => b.TutorAvailabilitySlot.StartTime)
+            .Take(5)
+            .Select(b => b.Id)
+            .ToList();
+
+        var myReviewRatings = await _context.Reviews
+            .Where(r => r.StudentProfileId == studentProfile.Id && recentHistoryBookingIds.Contains(r.BookingId))
+            .ToDictionaryAsync(r => r.BookingId, r => r.Rating);
+
         var vm = new MyTutorsPageViewModel
         {
             ActiveTab = tab,
@@ -1422,13 +1447,15 @@ public class StudentController : Controller
                 .Take(5)
                 .Select(b => new TutorSessionHistoryRow
                 {
+                    BookingId = b.Id,
                     TutorProfileId = b.TutorProfileId,
                     TutorName = b.TutorProfile.User.FullName,
                     TutorInitials = GetInitials(b.TutorProfile.User.FullName),
                     Subject = b.Subject,
                     StartTime = b.TutorAvailabilitySlot.StartTime,
                     EndTime = b.TutorAvailabilitySlot.EndTime,
-                    Status = b.Status
+                    Status = b.Status,
+                    MyReviewRating = myReviewRatings.TryGetValue(b.Id, out var myRating) ? myRating : (int?)null
                 }).ToList()
         };
 
