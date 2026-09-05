@@ -42,6 +42,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
+builder.Services.AddHostedService<TutorBridgeNepal.Services.SessionReminderService>();
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())

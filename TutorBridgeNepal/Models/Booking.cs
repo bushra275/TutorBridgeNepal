@@ -42,4 +42,9 @@ public class Booking
 
     public DateTime? StudentJoinedAt { get; set; }
     public DateTime? TutorJoinedAt { get; set; }
+
+    // Set once the "your session starts in 15 minutes" reminder email/
+    // notification has gone out to both parties, so SessionReminderService
+    // never sends it twice for the same booking.
+    public DateTime? ReminderSentAt { get; set; }
 }

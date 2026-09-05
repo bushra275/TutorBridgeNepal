@@ -1069,9 +1069,10 @@ public class StudentController : Controller
 
         var start = booking.TutorAvailabilitySlot.StartTime;
         var end = booking.TutorAvailabilitySlot.EndTime;
-        if (DateTime.Now < start.AddMinutes(-10) || DateTime.Now > end)
+        if (!SessionStatusHelper.CanJoin(booking))
         {
-            TempData["SettingsError"] = $"You can join this session between {start.AddMinutes(-10):h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
+            var opensAt = start.AddMinutes(-SessionStatusHelper.JoinWindowMinutesBeforeStart);
+            TempData["SettingsError"] = $"You can join this session between {opensAt:h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
             return RedirectToAction("Sessions");
         }
 

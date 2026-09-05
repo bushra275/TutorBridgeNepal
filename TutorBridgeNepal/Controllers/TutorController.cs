@@ -406,6 +406,7 @@ public class TutorController : Controller
 
         var booking = await _context.Bookings
             .Include(b => b.TutorAvailabilitySlot)
+            .Include(b => b.StudentProfile).ThenInclude(s => s.User)
             .FirstOrDefaultAsync(b => b.Id == id && b.TutorProfileId == tutor.Id && b.Status == "Pending");
 
         if (booking != null)
@@ -429,6 +430,16 @@ public class TutorController : Controller
                     await _googleCalendarService.DeleteEventAsync(connection, booking.GoogleCalendarEventId);
                 }
             }
+
+            // Let the student know their request was turned down - without
+            // this they'd only find out by noticing the status change next
+            // time they happen to open the Sessions page.
+            var whenLabel = booking.TutorAvailabilitySlot.StartTime.ToString("dddd, d MMM yyyy, h:mm tt");
+            await SendSessionEmailAsync(booking.StudentProfile.User, "Your session request was declined", $@"
+                <p>Hi {System.Net.WebUtility.HtmlEncode(booking.StudentProfile.User.FullName)},</p>
+                <p>{System.Net.WebUtility.HtmlEncode(tutor.User.FullName)} isn't able to take your {System.Net.WebUtility.HtmlEncode(booking.Subject)} session request for {whenLabel}.</p>
+                <p>Feel free to book another time with them, or find another tutor for this subject.</p>
+                <p>— TutorBridge Nepal</p>");
         }
 
         return returnTo == "SessionRequests" ? RedirectToAction("SessionRequests") : RedirectToAction("Dashboard");
@@ -491,9 +502,10 @@ public class TutorController : Controller
 
         var start = booking.TutorAvailabilitySlot.StartTime;
         var end = booking.TutorAvailabilitySlot.EndTime;
-        if (DateTime.Now < start.AddMinutes(-10) || DateTime.Now > end)
+        if (!SessionStatusHelper.CanJoin(booking))
         {
-            TempData["SettingsError"] = $"You can join this session between {start.AddMinutes(-10):h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
+            var opensAt = start.AddMinutes(-SessionStatusHelper.JoinWindowMinutesBeforeStart);
+            TempData["SettingsError"] = $"You can join this session between {opensAt:h:mm tt} and {end:h:mm tt} on {start:d MMM yyyy}.";
             return RedirectToAction("Dashboard");
         }
 

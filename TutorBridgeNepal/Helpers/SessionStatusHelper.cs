@@ -15,6 +15,24 @@ namespace TutorBridgeNepal.Helpers;
 // instead of only affecting what's displayed.
 public static class SessionStatusHelper
 {
+    // How long before a session starts the "Join" button lights up (and the
+    // reminder notification goes out). Single source of truth so the two
+    // controllers and the two views can't drift out of sync with each other.
+    public const int JoinWindowMinutesBeforeStart = 15;
+
+    // True while the join room is reachable for this booking: from
+    // JoinWindowMinutesBeforeStart before the slot starts, up until it ends.
+    public static bool CanJoin(Booking booking)
+    {
+        if (string.IsNullOrWhiteSpace(booking.MeetingLink)) return false;
+        if (booking.Status != "Confirmed" && booking.Status != "Ongoing") return false;
+
+        var now = DateTime.Now;
+        var start = booking.TutorAvailabilitySlot.StartTime;
+        var end = booking.TutorAvailabilitySlot.EndTime;
+        return now >= start.AddMinutes(-JoinWindowMinutesBeforeStart) && now <= end;
+    }
+
     // A session that reached "Ongoing" had both parties actually join, so
     // it's a real session - it's left for the tutor to explicitly mark
     // completed (or missed) even if that happens late. Only a "Confirmed"

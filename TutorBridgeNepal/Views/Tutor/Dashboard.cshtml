@@ -1,4 +1,5 @@
 ﻿@model TutorBridgeNepal.ViewModels.TutorDashboardViewModel
+@using TutorBridgeNepal.Helpers
 @{
     ViewData["Title"] = "Tutor Dashboard";
     Layout = null;
@@ -101,12 +102,13 @@
                                             }
                                             <div class="session-btn-row">
                                                 @{
-                                                    var canJoin = !string.IsNullOrWhiteSpace(s.MeetingLink) && now >= s.StartTime.AddMinutes(-10) && now <= s.EndTime;
+                                                    var canJoin = !string.IsNullOrWhiteSpace(s.MeetingLink) && now >= s.StartTime.AddMinutes(-SessionStatusHelper.JoinWindowMinutesBeforeStart) && now <= s.EndTime;
                                                     var finished = s.EndTime <= now;
+                                                    var joinLabel = s.Status == "Ongoing" ? "Go back to meeting" : "Join session";
                                                 }
                                                 @if (canJoin)
                                                 {
-                                                    <a asp-controller="Tutor" asp-action="JoinSession" asp-route-id="@s.BookingId" class="mini-btn green" target="_blank">Join session</a>
+                                                    <a asp-controller="Tutor" asp-action="JoinSession" asp-route-id="@s.BookingId" class="mini-btn green" target="_blank">@joinLabel</a>
                                                 }
                                                 @if (finished)
                                                 {
